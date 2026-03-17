@@ -35,7 +35,17 @@ const Settings = () => {
     if (!tenantId) return;
     try {
       const settingsData = await getSettings(tenantId);
-      setFormData(settingsData);
+      setFormData({
+        siteName: 'Mi Tienda',
+        logo: '',
+        logoUrlInput: '',
+        whatsappNumber: '',
+        contactEmail: '',
+        primaryColor: '#E50914',
+        secondaryColor: '#1A1A1A',
+        ...settingsData,
+        logoUrlInput: ''
+      });
     } catch (error) {
       console.error('Error loading settings:', error);
     } finally {
@@ -86,13 +96,13 @@ const Settings = () => {
         ...formData,
         logo: logoUrl
       };
-      delete settingsData.logoUrlInput; // Remove temporary field
+      delete settingsData.logoUrlInput;
 
       await updateSettings(tenantId, settingsData);
       await refreshSettings();
+      await loadSettings(); // Recargar desde Firestore
       setSaved(true);
       setLogoFile(null);
-      setFormData({ ...settingsData, logoUrlInput: '' });
       setTimeout(() => setSaved(false), 3000);
     } catch (error) {
       console.error('Error saving settings:', error);

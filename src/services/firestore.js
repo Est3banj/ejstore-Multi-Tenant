@@ -251,10 +251,16 @@ export const updateSettings = async (tenantId, settings) => {
   if (!tenantId) throw new Error('tenantId required');
   try {
     const docRef = doc(db, 'tenants', tenantId);
-    await setDoc(docRef, {
+    // Mapear siteName a name para Firestore
+    const firestoreData = {
       ...settings,
+      name: settings.siteName || settings.name,
+      logoUrl: settings.logo,
       updatedAt: serverTimestamp()
-    }, { merge: true });
+    };
+    delete firestoreData.siteName;
+    delete firestoreData.logo;
+    await setDoc(docRef, firestoreData, { merge: true });
   } catch (error) {
     console.error('Error updating settings:', error);
     throw error;

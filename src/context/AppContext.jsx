@@ -78,12 +78,17 @@ export const AppProvider = ({ children }) => {
     }
   }, []);
 
+  // Cargar datos cuando cambia userTenantId (para el admin)
+  useEffect(() => {
+    if (userTenantId && !tenant?.id) {
+      loadTenantData(userTenantId);
+    }
+  }, [userTenantId, tenant?.id]);
+
   useEffect(() => {
     if (hasTenant && tenant?.id) {
       loadTenantData(tenant.id);
-    } else if (userTenantId) {
-      loadTenantData(userTenantId);
-    } else if (!tenantLoading) {
+    } else if (!tenantLoading && !userTenantId) {
       setLoading(false);
     }
   }, [tenant, tenantLoading, hasTenant, userTenantId, loadTenantData]);
