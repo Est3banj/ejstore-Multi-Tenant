@@ -1,0 +1,49 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ========== TENANTS ==========
+    // Lectura pública para verificar existencia (solo datos públicos)
+    match /tenants/{tenantId} {
+      allow read: if true;
+      // Solo el owner del tenant puede escribir
+      allow write: if request.auth != null && request.auth.token.tenantId == tenantId;
+    }
+
+    // ========== SERVICES ==========
+    match /services/{serviceId} {
+      // Lectura pública de servicios (el cliente filtra por tenantId y active)
+      allow read: if true;
+      // Solo admins del tenant pueden gestionar
+      allow create: if request.auth != null 
+        && request.auth.token.tenantId == request.resource.data.tenantId
+        && request.resource.data.tenantId != null;
+      allow update, delete: if request.auth != null 
+        && request.auth.token.tenantId == resource.data.tenantId;
+    }
+
+    // ========== BANNERS ==========
+    match /banners/{bannerId} {
+      // Lectura pública de banners (el cliente filtra por tenantId y active)
+      allow read: if true;
+      allow create: if request.auth != null 
+        && request.auth.token.tenantId == request.resource.data.tenantId
+        && request.resource.data.tenantId != null;
+      allow update, delete: if request.auth != null 
+        && request.auth.token.tenantId == resource.data.tenantId;
+    }
+
+    // ========== USERS ==========
+    match /users/{userId} {
+      // Un usuario puede leer su propio documento
+      allow read: if request.auth != null && request.auth.uid == userId;
+      // Solo superadmins pueden crear usuarios
+      allow create: if request.auth != null && request.auth.token.role == 'superadmin';
+      // Solo el propio usuario puede actualizar (para campos propios)
+      allow update: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ========== STORAGE (Firebase Storage Rules) ==========
+    // Se configura por separado en firebase.storage
+  }
+}
