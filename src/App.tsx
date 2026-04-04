@@ -1,7 +1,6 @@
-import { Suspense, lazy, useMemo } from 'react';
+import { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AppProvider, useApp } from './context/AppContext';
-import { TenantProvider, useTenant } from './context/TenantContext';
+import { StoreProvider, useAuthStore, useTenantStore } from './store';
 import MainLayout from './layouts/MainLayout';
 import AdminLayout from './layouts/AdminLayout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -17,15 +16,24 @@ const Banners = lazy(() => import('./pages/admin/Banners'));
 const Terms = lazy(() => import('./pages/admin/Terms'));
 const Settings = lazy(() => import('./pages/admin/Settings'));
 
-const PublicRoutes = () => {
-  const { loading: tenantLoading, hasTenant, error } = useTenant();
-  const { loading: appLoading } = useApp();
+// Hook que combina loading states
+const useAppLoading = () => {
+  const tenantLoading = useTenantStore((state) => state.loading);
+  const authLoading = useAuthStore((state) => state.loading);
+  const initialized = useAuthStore((state) => state.initialized);
   
-  if (tenantLoading || appLoading) {
+  return tenantLoading || authLoading || !initialized;
+};
+
+const PublicRoutes = () => {
+  const { loading, tenant } = useTenantStore();
+  const appLoading = useAppLoading();
+  const hasTenant = !!tenant;
+  
+  if (loading || appLoading) {
     return <Loader />;
   }
 
-  // Si no hay tenant, mostrar página de error (excepto rutas admin)
   if (!hasTenant) {
     return <NoTenantPage />;
   }
@@ -66,8 +74,6 @@ const AdminRoutes = () => {
 
 const AppRoutes = () => {
   const location = useLocation();
-  
-  // Las rutas de admin no requieren tenant
   const isAdminRoute = location.pathname.startsWith('/admin');
   
   if (isAdminRoute) {
@@ -80,13 +86,11 @@ const AppRoutes = () => {
 function App() {
   return (
     <BrowserRouter>
-      <TenantProvider>
-        <AppProvider>
-          <Suspense fallback={<Loader />}>
-            <AppRoutes />
-          </Suspense>
-        </AppProvider>
-      </TenantProvider>
+      <StoreProvider>
+        <Suspense fallback={<Loader />}>
+          <AppRoutes />
+        </Suspense>
+      </StoreProvider>
     </BrowserRouter>
   );
 }

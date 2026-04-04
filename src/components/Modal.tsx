@@ -1,7 +1,16 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
+import type { ReactNode } from 'react';
 
-const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
+interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  children: ReactNode;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+}
+
+const Modal = ({ isOpen, onClose, title, children, size = 'md' }: ModalProps): JSX.Element => {
   const sizeClasses = {
     sm: 'max-w-md',
     md: 'max-w-2xl',
@@ -47,4 +56,3 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
 };
 
 export default Modal;
-

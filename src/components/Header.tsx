@@ -3,15 +3,14 @@ import { useApp } from '../context/AppContext';
 import { Menu, X } from 'lucide-react';
 import { useState } from 'react';
 
-const Header = () => {
+const Header = (): JSX.Element => {
   const { settings } = useApp();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path: string): boolean => location.pathname === path;
 
-  const handleNavigation = (e, targetId) => {
-    // If we are on the home page, prevent default navigation and scroll
+  const handleNavigation = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string | null): void => {
     if (location.pathname === '/') {
       e.preventDefault();
       if (targetId) {
@@ -24,12 +23,6 @@ const Header = () => {
       }
       setMobileMenuOpen(false);
     }
-    // If not on home page, normal navigation happens (to /#id), 
-    // and MainLayout (or a useEffect here) can handle the scroll after load.
-    // However, for better UX, we'll let Link handle the routing, and 
-    // we can rely on a global scroll handler or simple timeout if needed.
-    // But for this implementation, let's keep it simple:
-
     setMobileMenuOpen(false);
   };
 
@@ -56,10 +49,11 @@ const Header = () => {
             <Link
               to="/"
               onClick={(e) => handleNavigation(e, null)}
-              className={`px-4 py-2 rounded-lg transition-all ${isActive('/') && !location.hash
-                ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/30'
-                : 'text-white/80 hover:text-white hover:bg-white/5'
-                }`}
+              className={`px-4 py-2 rounded-lg transition-all ${
+                isActive('/') && !location.hash
+                  ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/30'
+                  : 'text-white/80 hover:text-white hover:bg-white/5'
+              }`}
             >
               Inicio
             </Link>
@@ -94,10 +88,11 @@ const Header = () => {
             <Link
               to="/"
               onClick={(e) => handleNavigation(e, null)}
-              className={`block px-4 py-2 rounded-lg ${isActive('/') && !location.hash
-                ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/30'
-                : 'text-white/80 hover:text-white hover:bg-white/5'
-                }`}
+              className={`block px-4 py-2 rounded-lg ${
+                isActive('/') && !location.hash
+                  ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/30'
+                  : 'text-white/80 hover:text-white hover:bg-white/5'
+              }`}
             >
               Inicio
             </Link>
@@ -123,4 +118,3 @@ const Header = () => {
 };
 
 export default Header;
-

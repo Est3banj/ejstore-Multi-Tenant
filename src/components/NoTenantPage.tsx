@@ -1,6 +1,6 @@
 import { useTenant } from '../context/TenantContext';
 
-const NoTenantPage = () => {
+const NoTenantPage = (): JSX.Element => {
   const { error } = useTenant();
 
   return (

@@ -1,8 +1,14 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ShoppingCart } from 'lucide-react';
+import type { Service } from '../types';
 
-const ServiceCard = ({ service, index }) => {
+interface ServiceCardProps {
+  service: Service;
+  index: number;
+}
+
+const ServiceCard = ({ service, index }: ServiceCardProps): JSX.Element => {
   const hasPromo = service.promotionalPrice && service.promotionalPrice < service.price;
 
   return (
@@ -63,4 +69,3 @@ const ServiceCard = ({ service, index }) => {
 };
 
 export default ServiceCard;
-

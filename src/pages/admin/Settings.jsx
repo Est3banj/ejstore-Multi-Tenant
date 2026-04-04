@@ -35,6 +35,7 @@ const Settings = () => {
     if (!tenantId) return;
     try {
       const settingsData = await getSettings(tenantId);
+      const { logoUrlInput, ...restSettings } = settingsData || {};
       setFormData({
         siteName: 'Mi Tienda',
         logo: '',
@@ -43,7 +44,7 @@ const Settings = () => {
         contactEmail: '',
         primaryColor: '#E50914',
         secondaryColor: '#1A1A1A',
-        ...settingsData,
+        ...restSettings,
         logoUrlInput: ''
       });
     } catch (error) {

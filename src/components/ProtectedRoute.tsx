@@ -1,8 +1,13 @@
 import { Navigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import Loader from './Loader';
+import type { ReactNode } from 'react';
 
-const ProtectedRoute = ({ children }) => {
+interface ProtectedRouteProps {
+  children: ReactNode;
+}
+
+const ProtectedRoute = ({ children }: ProtectedRouteProps): JSX.Element => {
   const { user, loading } = useApp();
 
   if (loading) {
@@ -13,8 +18,7 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/admin/login" replace />;
   }
 
-  return children;
+  return <>{children}</>;
 };
 
 export default ProtectedRoute;
-

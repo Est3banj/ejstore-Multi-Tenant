@@ -1,13 +1,19 @@
 import {
   signInWithEmailAndPassword,
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  User
 } from 'firebase/auth';
-import { auth } from './firebase';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from './firebase';
+import type { User as AppUser } from '../types';
 
-export const login = async (email, password) => {
+export interface AuthUser extends User {
+  tenantId: string | null;
+  role?: string;
+}
+
+export const login = async (email: string, password: string): Promise<AuthUser> => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
@@ -19,17 +25,17 @@ export const login = async (email, password) => {
         ...user,
         tenantId: userData.tenantId,
         role: userData.role
-      };
+      } as AuthUser;
     }
     
-    return user;
+    return user as AuthUser;
   } catch (error) {
     console.error('Error logging in:', error);
     throw error;
   }
 };
 
-export const logout = async () => {
+export const logout = async (): Promise<void> => {
   try {
     await signOut(auth);
   } catch (error) {
@@ -38,15 +44,21 @@ export const logout = async () => {
   }
 };
 
-export const onAuthChange = (callback) => {
+export const onAuthChange = (callback: (user: User | null) => void): (() => void) => {
   return onAuthStateChanged(auth, callback);
 };
 
-export const checkUserRole = async (uid) => {
+export const checkUserRole = async (uid: string): Promise<AppUser | null> => {
   try {
     const userDoc = await getDoc(doc(db, 'users', uid));
     if (userDoc.exists()) {
-      return userDoc.data();
+      const data = userDoc.data();
+      return {
+        uid: uid,
+        email: data.email || '',
+        tenantId: data.tenantId,
+        role: data.role as 'admin' | 'superadmin'
+      } as AppUser;
     }
     return null;
   } catch (error) {
@@ -55,7 +67,12 @@ export const checkUserRole = async (uid) => {
   }
 };
 
-export const createUserRecord = async (uid, email, tenantId, role = 'admin') => {
+export const createUserRecord = async (
+  uid: string, 
+  email: string, 
+  tenantId: string, 
+  role: 'admin' | 'superadmin' = 'admin'
+): Promise<void> => {
   try {
     await setDoc(doc(db, 'users', uid), {
       email,
@@ -68,5 +85,3 @@ export const createUserRecord = async (uid, email, tenantId, role = 'admin') => 
     throw error;
   }
 };
-
-import { setDoc, serverTimestamp } from 'firebase/firestore';

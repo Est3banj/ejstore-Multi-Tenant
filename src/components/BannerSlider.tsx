@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import type { Banner } from '../types';
 
-const BannerSlider = () => {
+const BannerSlider = (): JSX.Element | null => {
   const { banners } = useApp();
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -27,6 +28,8 @@ const BannerSlider = () => {
     setCurrentIndex((prev) => (prev + 1) % banners.length);
   };
 
+  const currentBanner = banners[currentIndex];
+
   return (
     <div className="relative h-64 md:h-96 overflow-hidden rounded-2xl mb-12">
       <AnimatePresence mode="wait">
@@ -39,21 +42,21 @@ const BannerSlider = () => {
           className="absolute inset-0"
         >
           <img
-            src={banners[currentIndex].image}
-            alt={banners[currentIndex].title || 'Banner'}
+            src={currentBanner.image || currentBanner.imageUrl}
+            alt={currentBanner.title || 'Banner'}
             className="w-full h-full object-cover"
           />
-          {(banners[currentIndex].title || banners[currentIndex].description) && (
+          {(currentBanner.title || currentBanner.description) && (
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-end">
               <div className="container mx-auto px-4 pb-8">
-                {banners[currentIndex].title && (
+                {currentBanner.title && (
                   <h2 className="text-3xl md:text-4xl font-bold text-white mb-2">
-                    {banners[currentIndex].title}
+                    {currentBanner.title}
                   </h2>
                 )}
-                {banners[currentIndex].description && (
+                {currentBanner.description && (
                   <p className="text-white/90 text-lg">
-                    {banners[currentIndex].description}
+                    {currentBanner.description}
                   </p>
                 )}
               </div>
@@ -82,10 +85,11 @@ const BannerSlider = () => {
               <button
                 key={index}
                 onClick={() => setCurrentIndex(index)}
-                className={`h-2 rounded-full transition-all ${index === currentIndex
+                className={`h-2 rounded-full transition-all ${
+                  index === currentIndex
                     ? 'w-8 bg-primary-500'
                     : 'w-2 bg-white/50'
-                  }`}
+                }`}
               />
             ))}
           </div>
@@ -96,4 +100,3 @@ const BannerSlider = () => {
 };
 
 export default BannerSlider;
-

@@ -1,6 +1,6 @@
 import { useApp } from '../context/AppContext';
 
-const Footer = () => {
+const Footer = (): JSX.Element => {
   const { settings } = useApp();
 
   return (
@@ -53,4 +53,3 @@ const Footer = () => {
 };
 
 export default Footer;
-

@@ -1,7 +1,7 @@
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { storage } from './firebase';
 
-export const uploadImage = async (file, path) => {
+export const uploadImage = async (file: File, path: string): Promise<string> => {
   try {
     const storageRef = ref(storage, path);
     await uploadBytes(storageRef, file);
@@ -13,7 +13,7 @@ export const uploadImage = async (file, path) => {
   }
 };
 
-export const deleteImage = async (path) => {
+export const deleteImage = async (path: string): Promise<void> => {
   try {
     const storageRef = ref(storage, path);
     await deleteObject(storageRef);
@@ -23,7 +23,7 @@ export const deleteImage = async (path) => {
   }
 };
 
-export const getImageUrl = async (path) => {
+export const getImageUrl = async (path: string): Promise<string> => {
   try {
     const storageRef = ref(storage, path);
     return await getDownloadURL(storageRef);
@@ -32,4 +32,3 @@ export const getImageUrl = async (path) => {
     throw error;
   }
 };
-
