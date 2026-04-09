@@ -1,9 +1,9 @@
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useAuthStore } from '../store/authStore';
 import { useAuth } from '../hooks/useAuth';
-import { Menu, X, User, LogOut, Wallet } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Menu, X, User, LogOut, Wallet, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Header = (): JSX.Element => {
@@ -14,6 +14,7 @@ const Header = (): JSX.Element => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [showRechargeModal, setShowRechargeModal] = useState(false);
 
   const isActive = (path: string): boolean => location.pathname === path;
 
@@ -104,6 +105,13 @@ const Header = (): JSX.Element => {
             <div className="hidden md:flex items-center gap-3">
               {user && customer ? (
                 <>
+                  <button
+                    onClick={() => setShowRechargeModal(true)}
+                    className="flex items-center gap-1 px-3 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 rounded-lg transition-all"
+                  >
+                    <Plus size={16} />
+                    <span className="text-sm font-medium">Cargar</span>
+                  </button>
                   <div className="flex items-center gap-2 px-3 py-2 bg-white/10 rounded-lg">
                     <Wallet size={16} className="text-yellow-400" />
                     <span className="text-white font-medium">${customer.balance.toLocaleString()}</span>
@@ -203,6 +211,13 @@ const Header = (): JSX.Element => {
             onModeChange={setAuthMode} 
             onClose={() => setShowAuthModal(false)} 
           />
+        )}
+      </AnimatePresence>
+
+      {/* Recharge Modal */}
+      <AnimatePresence>
+        {showRechargeModal && (
+          <RechargeModal onClose={() => setShowRechargeModal(false)} />
         )}
       </AnimatePresence>
     </>
@@ -352,6 +367,87 @@ const AuthModal = ({ mode, onModeChange, onClose }: {
               ? '¿No tienes cuenta? Regístrate' 
               : '¿Ya tienes cuenta? Inicia sesión'}
           </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+// Modal para recargar saldo
+const RechargeModal = ({ onClose }: { onClose: () => void }) => {
+  const { customer, refreshCustomer } = useAuthStore();
+  const [amount, setAmount] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleRecharge = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const rechargeAmount = parseInt(amount);
+    if (!rechargeAmount || rechargeAmount < 1000) {
+      alert('El monto mínimo es $1,000');
+      return;
+    }
+    
+    setLoading(true);
+    // Aquí después se integrará con el sistema de pagos real
+    // Por ahora solo muestra la info de pago
+    alert('Gracias por tu interés en recargar. El sistema de pagos estará disponible pronto.');
+    setLoading(false);
+    onClose();
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }} 
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <motion.div 
+        initial={{ scale: 0.9 }} 
+        animate={{ scale: 1 }} 
+        exit={{ scale: 0.9 }}
+        className="glass w-full max-w-md p-6"
+        onClick={e => e.stopPropagation()}
+      >
+        <button 
+          onClick={onClose} 
+          className="absolute top-4 right-4 text-white/50 hover:text-white"
+        >
+          <X size={20} />
+        </button>
+
+        <h2 className="text-2xl font-bold gradient-text mb-2">Cargar Saldo</h2>
+        <p className="text-white/60 text-sm mb-6">Tu saldo actual: <span className="text-yellow-400 font-bold">${customer?.balance?.toLocaleString() || 0}</span></p>
+
+        <form onSubmit={handleRecharge} className="space-y-4">
+          <div>
+            <label className="block text-sm text-white/70 mb-1">Monto a cargar (COP)</label>
+            <input
+              type="number"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              className="input-field"
+              placeholder="Ej: 5000"
+              min={1000}
+              required
+            />
+            <p className="text-white/40 text-xs mt-1">Monto mínimo: $1,000 COP</p>
+          </div>
+
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="btn-primary w-full py-3"
+          >
+            {loading ? 'Procesando...' : 'Continuar con el pago'}
+          </button>
+        </form>
+
+        <div className="mt-4 p-3 bg-white/5 rounded-lg">
+          <p className="text-white/50 text-xs text-center">
+            💳 Puedes pagar con Nequi, Daviplata o transferencia Bancolombia
+          </p>
         </div>
       </motion.div>
     </motion.div>
