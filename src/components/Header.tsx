@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { useAuthStore } from '../store/authStore';
 import { useAuth } from '../hooks/useAuth';
 import { Menu, X, User, LogOut, Wallet } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Header = (): JSX.Element => {
@@ -37,7 +37,7 @@ const Header = (): JSX.Element => {
   };
 
   // Escuchar eventos para abrir modal de auth desde otros componentes
-  useState(() => {
+  useEffect(() => {
     const handleOpenAuth = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (customEvent.detail === 'register') {
@@ -49,7 +49,7 @@ const Header = (): JSX.Element => {
     };
     window.addEventListener('openAuthModal', handleOpenAuth);
     return () => window.removeEventListener('openAuthModal', handleOpenAuth);
-  });
+  }, []);
 
   return (
     <>
