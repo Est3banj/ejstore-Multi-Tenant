@@ -89,6 +89,13 @@ export function spinWheel(prizes: RoulettePrize[] = DEFAULT_PRIZES): RoulettePri
   return activePrizes[activePrizes.length - 1];
 }
 
+// Función para calcular la rotación basada en el premio (para que la flecha apunte al premio correcto)
+// Esta función es útil si quieres mantener el sistema actual de "generar premio primero"
+// Retorna el índice del premio en el array
+export function getPrizeIndex(prize: RoulettePrize, prizes: RoulettePrize[] = DEFAULT_PRIZES): number {
+  return prizes.findIndex(p => p.id === prize.id);
+}
+
 // Función para calcular la ganancia/pérdida esperada
 export function calculateExpectedValue(prizes: RoulettePrize[] = DEFAULT_PRIZES): number {
   const price = DEFAULT_ROULETTE_CONFIG.pricePerSpin;
