@@ -20,14 +20,12 @@ const Home = () => {
 
   return (
     <div className="min-h-screen">
+      {/* Ruleta flotante (botón discreto) */}
+      <Roulette />
+
       {/* Banner Slider */}
       <section className="container mx-auto px-4 py-8">
         <BannerSlider />
-      </section>
-
-      {/* Ruleta de Premios */}
-      <section id="ruleta" className="container mx-auto px-4 py-12">
-        <Roulette />
       </section>
 
       {/* Servicios Populares */}

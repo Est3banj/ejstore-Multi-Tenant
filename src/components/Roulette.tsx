@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { DEFAULT_PRIZES, DEFAULT_PAYMENT_INFO } from '../utils/roulette';
 import { getUserSpinData, useSpin, spinWheel, getSpinPrice, getSpinsForFreeSpin, canSpin } from '../hooks/useRoulette';
 import type { RoulettePrize, UserSpinData } from '../types';
+import { Gift, X, Zap } from 'lucide-react';
 
 interface RouletteProps {
   tenantId?: string;
@@ -14,8 +15,10 @@ const Roulette = ({ tenantId }: RouletteProps) => {
   const [showResult, setShowResult] = useState(false);
   const [result, setResult] = useState<RoulettePrize | null>(null);
   const [showPayment, setShowPayment] = useState(false);
+  const [showRoulette, setShowRoulette] = useState(false);
   const [phone, setPhone] = useState('');
   const [useFreeSpin, setUseFreeSpin] = useState(false);
+  const [currentRotation, setCurrentRotation] = useState(0);
   const wheelRef = useRef<HTMLDivElement>(null);
 
   const price = getSpinPrice();
@@ -32,7 +35,6 @@ const Roulette = ({ tenantId }: RouletteProps) => {
     const usingFree = useFreeSpin || data.spinsFree > 0;
     
     if (!usingFree && data.spinsPaid === 0) {
-      // No tiene giros, mostrar pago
       setShowPayment(true);
       return;
     }
@@ -40,17 +42,19 @@ const Roulette = ({ tenantId }: RouletteProps) => {
     setIsSpinning(true);
     setShowResult(false);
 
-    // Determinar si usar giro gratis o pago
     const useFree = data.spinsFree > 0 && (useFreeSpin || data.spinsPaid === 0);
     
-    // Simular tiempo de giro (2-3 segundos)
+    // Animación de giro - dar varias vueltas
+    const spins = 5 + Math.random() * 3; // 5-8 vueltas
+    const newRotation = currentRotation + (spins * 360);
+    setCurrentRotation(newRotation);
+    
+    // Tiempo basado en vueltas
     await new Promise(resolve => setTimeout(resolve, 2500));
     
-    // Obtener resultado
     const prize = spinWheel();
     setResult(prize);
     
-    // Actualizar datos del usuario
     const newData = useSpin(useFree, data);
     setUserData(newData);
     
@@ -61,12 +65,13 @@ const Roulette = ({ tenantId }: RouletteProps) => {
   const handlePaymentConfirm = () => {
     if (!phone) return;
     
-    // Aquí en el futuro se integraría MercadoPago
-    // Por ahora solo confirma el "pago" y permite girar
     setShowPayment(false);
     setIsSpinning(true);
     
-    // Simular giro después de "pago"
+    const spins = 5 + Math.random() * 3;
+    const newRotation = currentRotation + (spins * 360);
+    setCurrentRotation(newRotation);
+    
     setTimeout(async () => {
       const data = getUserSpinData();
       const prize = spinWheel();
@@ -81,129 +86,184 @@ const Roulette = ({ tenantId }: RouletteProps) => {
   };
 
   const prizes = DEFAULT_PRIZES;
+  
+  // Calcular ángulo para cada segmento
+  const segmentAngle = 360 / prizes.length;
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-8"
+    <>
+      {/* Botón flotante discreto */}
+      <motion.button
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        className="fixed bottom-6 right-6 z-40"
+        onClick={() => setShowRoulette(true)}
       >
-        <h2 className="text-4xl font-bold gradient-text mb-2">
-          🎰 Ruleta de Premios
-        </h2>
-        <p className="text-white/70">
-          Gira y gana premios exclusivos
-        </p>
-      </motion.div>
-
-      {/* Info del usuario */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className="flex justify-center gap-4 mb-6"
-      >
-        <div className="glass px-4 py-2 rounded-lg">
-          <span className="text-white/50 text-sm">Giros Gratis:</span>
-          <span className="text-primary-400 font-bold ml-2">{userData.spinsFree}</span>
-        </div>
-        <div className="glass px-4 py-2 rounded-lg">
-          <span className="text-white/50 text-sm">Giros Pagados:</span>
-          <span className="text-primary-400 font-bold ml-2">{userData.spinsPaid}</span>
-        </div>
-        {userData.spinsPaid > 0 && userData.spinsPaid % spinsForFree === 0 && (
-          <div className="glass px-4 py-2 rounded-lg bg-green-500/20 border-green-500/50">
-            <span className="text-green-400 font-bold">🎁 Giros gratis disponibles!</span>
+        <div className="relative group">
+          {/* Glow effect */}
+          <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 rounded-full blur-lg opacity-75 group-hover:opacity-100 transition-opacity"></div>
+          
+          {/* Botón principal */}
+          <div className="relative bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 p-4 rounded-full shadow-2xl hover:scale-110 transition-transform cursor-pointer">
+            <Gift size={28} className="text-white" />
           </div>
-        )}
-      </motion.div>
-
-      {/* La Ruleta */}
-      <div className="relative flex justify-center items-center my-8">
-        {/* Flecha indicadora */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10">
-          <div className="w-0 h-0 border-l-[20px] border-l-transparent border-r-[20px] border-r-transparent border-t-[30px] border-t-primary-500 drop-shadow-lg"></div>
+          
+          {/* Badge de giros gratis */}
+          {userData.spinsFree > 0 && (
+            <div className="absolute -top-1 -right-1 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse">
+              {userData.spinsFree}
+            </div>
+          )}
         </div>
+        
+        {/* Tooltip */}
+        <div className="absolute right-full top-1/2 -translate-y-1/2 mr-3 px-3 py-2 bg-black/90 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+          🎰 Gira y gana!
+        </div>
+      </motion.button>
 
-        {/* Rueda */}
-        <motion.div
-          ref={wheelRef}
-          className="relative w-80 h-80 md:w-96 md:h-96 rounded-full border-8 border-primary-600 shadow-2xl shadow-primary-500/50 overflow-hidden"
-          animate={{ rotate: isSpinning ? 360 * 5 : 0 }}
-          transition={{ 
-            duration: isSpinning ? 2.5 : 0, 
-            ease: isSpinning ? [0.25, 0.1, 0.25, 1] : 'easeOut' 
-          }}
-        >
-          {/* Segmentos de la ruleta */}
-          <div className="w-full h-full relative">
-            {prizes.map((prize, index) => {
-              const angle = (360 / prizes.length) * index;
-              const isWin = prize.id !== 'nothing';
-              return (
+      {/* Modal de la ruleta */}
+      <AnimatePresence>
+        {showRoulette && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowRoulette(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              className="glass relative max-w-lg w-full p-6 md:p-8"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Botón cerrar */}
+              <button
+                onClick={() => setShowRoulette(false)}
+                className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
+              >
+                <X size={24} />
+              </button>
+
+              {/* Header */}
+              <div className="text-center mb-6">
+                <h2 className="text-3xl font-bold gradient-text mb-1">
+                  🎰 Ruleta de Premios
+                </h2>
+                <p className="text-white/60 text-sm">
+                  Gira y gana premios exclusivos
+                </p>
+              </div>
+
+              {/* Info del usuario */}
+              <div className="flex justify-center gap-3 mb-6">
+                <div className="bg-white/5 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                  <Zap size={14} className="text-yellow-400" />
+                  <span className="text-white/70 text-sm">Gratis:</span>
+                  <span className="text-yellow-400 font-bold">{userData.spinsFree}</span>
+                </div>
+                <div className="bg-white/5 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                  <span className="text-white/70 text-sm">Pagados:</span>
+                  <span className="text-primary-400 font-bold">{userData.spinsPaid}</span>
+                </div>
+              </div>
+
+              {/* La Ruleta estilo Pizza */}
+              <div className="relative flex justify-center items-center my-6">
+                {/* Flecha indicadora */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20">
+                  <div className="w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[25px] border-t-yellow-400 drop-shadow-lg"></div>
+                </div>
+
+                {/* Rueda estilo pizza */}
                 <div
-                  key={prize.id}
-                  className="absolute w-full h-full"
-                  style={{ transform: `rotate(${angle}deg)` }}
+                  ref={wheelRef}
+                  className="relative w-64 h-64 md:w-72 md:h-72 rounded-full shadow-2xl overflow-hidden"
+                  style={{ transform: `rotate(${currentRotation}deg)` }}
                 >
-                  <div
-                    className={`absolute w-1/2 h-1/2 left-1/2 origin-left flex items-center justify-center ${
-                      index % 2 === 0 ? 'bg-primary-600' : 'bg-primary-700'
-                    }`}
-                    style={{ transform: `rotate(${360 / prizes.length / 2}deg)` }}
-                  >
-                    <span 
-                      className={`text-xs md:text-sm font-bold ${isWin ? 'text-white' : 'text-white/30'}`}
-                      style={{ transform: 'rotate(90deg)', whiteSpace: 'nowrap' }}
-                    >
-                      {prize.name}
-                    </span>
+                  {/* Segmentos de la ruleta (estilo pizza) */}
+                  {prizes.map((prize, index) => {
+                    const angle = (360 / prizes.length) * index;
+                    const isWin = prize.id !== 'nothing';
+                    const colors = [
+                      '#DC2626', // Rojo (nada)
+                      '#8B5CF6', // Violeta (crunchyroll)
+                      '#EC4899', // Rosa (hbo)
+                      '#F59E0B', // Amarillo (prime)
+                      '#10B981', // Verde (netflix)
+                    ];
+                    const bgColor = colors[index % colors.length];
+                    
+                    return (
+                      <div
+                        key={prize.id}
+                        className="absolute w-full h-full"
+                        style={{ transform: `rotate(${angle}deg)` }}
+                      >
+                        <div 
+                          className="w-full h-full"
+                          style={{ 
+                            background: `conic-gradient(from ${-segmentAngle/2}deg at 50% 50%, ${bgColor} 0deg ${segmentAngle}deg, transparent ${segmentAngle}deg)`,
+                            clipPath: 'polygon(50% 50%, 100% 0, 100% 100%)'
+                          }}
+                        />
+                        <div 
+                          className="absolute w-full h-full"
+                          style={{ 
+                            transform: `rotate(${segmentAngle}deg)`,
+                            background: `conic-gradient(from ${-segmentAngle/2}deg at 50% 50%, ${colors[(index + 1) % colors.length]} 0deg ${segmentAngle}deg, transparent ${segmentAngle}deg)`,
+                            clipPath: 'polygon(50% 50%, 100% 0, 100% 100%)'
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                  
+                  {/* Centro de la ruleta */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg z-10 border-4 border-white">
+                    <span className="text-2xl">🎰</span>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              </div>
 
-          {/* Centro */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-lg z-10">
-            <span className="text-2xl">🎰</span>
-          </div>
-        </motion.div>
-      </div>
+              {/* Checkbox giro gratis */}
+              {userData.spinsFree > 0 && (
+                <label className="flex items-center justify-center gap-2 mb-4 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useFreeSpin}
+                    onChange={(e) => setUseFreeSpin(e.target.checked)}
+                    className="w-4 h-4 rounded accent-yellow-400"
+                  />
+                  <span className="text-white/70 text-sm">Usar giro gratis</span>
+                </label>
+              )}
 
-      {/* Botón de girar */}
-      <div className="text-center">
-        {userData.spinsFree > 0 && (
-          <label className="flex items-center justify-center gap-2 mb-4 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={useFreeSpin}
-              onChange={(e) => setUseFreeSpin(e.target.checked)}
-              className="w-5 h-5 rounded"
-            />
-            <span className="text-white/70">Usar giro gratis</span>
-          </label>
+              {/* Botón de girar */}
+              <div className="text-center">
+                <button
+                  onClick={handleSpin}
+                  disabled={isSpinning}
+                  className={`btn-primary text-lg px-10 py-3 ${
+                    isSpinning ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {isSpinning ? 'Girando...' : `Girar $${price.toLocaleString()}`}
+                </button>
+
+                <p className="text-white/40 text-xs mt-2">
+                  {userData.spinsFree > 0 
+                    ? `Tienes ${userData.spinsFree} giro${userData.spinsFree > 1 ? 's' : ''} gratis`
+                    : `Gira ${spinsForFree} veces para ganar 1 giro gratis!`
+                  }
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
-
-        <button
-          onClick={handleSpin}
-          disabled={isSpinning}
-          className={`btn-primary text-xl px-12 py-4 ${
-            isSpinning ? 'opacity-50 cursor-not-allowed' : 'animate-pulse'
-          }`}
-        >
-          {isSpinning ? 'Girando...' : `Girar $${price.toLocaleString()}`}
-        </button>
-
-        <p className="text-white/50 text-sm mt-2">
-          {userData.spinsFree > 0 
-            ? `Tienes ${userData.spinsFree} giro${userData.spinsFree > 1 ? 's' : ''} gratis disponible${userData.spinsFree > 1 ? 's' : ''}`
-            : `Gira ${spinsForFree} veces para ganar 1 giro gratis!`
-          }
-        </p>
-      </div>
+      </AnimatePresence>
 
       {/* Modal de resultado */}
       <AnimatePresence>
@@ -219,14 +279,14 @@ const Roulette = ({ tenantId }: RouletteProps) => {
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.5, opacity: 0 }}
-              className="glass p-8 max-w-md text-center"
+              className="glass p-8 max-w-sm text-center"
               onClick={(e) => e.stopPropagation()}
             >
               {result.id === 'nothing' ? (
                 <>
                   <div className="text-6xl mb-4">😢</div>
                   <h3 className="text-2xl font-bold text-white mb-2">¡Casi lo logras!</h3>
-                  <p className="text-white/70 mb-4">No fue esta vez. ¡Intenta de nuevo!</p>
+                  <p className="text-white/70 mb-4">No fue esta vez. ¡Intentá de nuevo!</p>
                 </>
               ) : (
                 <>
@@ -270,36 +330,36 @@ const Roulette = ({ tenantId }: RouletteProps) => {
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.5, opacity: 0 }}
-              className="glass p-8 max-w-md w-full"
+              className="glass p-6 max-w-sm w-full"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-2xl font-bold text-white mb-4 text-center">
+              <h3 className="text-xl font-bold text-white mb-4 text-center">
                 💳 Método de Pago
               </h3>
               
-              <div className="space-y-4 mb-6">
-                <div className="bg-white/5 p-4 rounded-lg border border-white/10">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-2xl">💚</span>
+              <div className="space-y-3 mb-4">
+                <div className="bg-white/5 p-3 rounded-lg border border-white/10">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xl">💚</span>
                     <span className="font-bold text-white">Nequi</span>
                   </div>
-                  <p className="text-white/70 text-sm">Envía ${price.toLocaleString()} a:</p>
-                  <p className="text-2xl font-bold text-primary-400">{DEFAULT_PAYMENT_INFO.nequi}</p>
+                  <p className="text-white/50 text-xs">Envía ${price.toLocaleString()} a:</p>
+                  <p className="text-xl font-bold text-primary-400">{DEFAULT_PAYMENT_INFO.nequi}</p>
                 </div>
 
-                <div className="bg-white/5 p-4 rounded-lg border border-white/10">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-2xl">💙</span>
+                <div className="bg-white/5 p-3 rounded-lg border border-white/10">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xl">💙</span>
                     <span className="font-bold text-white">Daviplata</span>
                   </div>
-                  <p className="text-white/70 text-sm">Envía ${price.toLocaleString()} a:</p>
-                  <p className="text-2xl font-bold text-primary-400">{DEFAULT_PAYMENT_INFO.daviplata}</p>
+                  <p className="text-white/50 text-xs">Envía ${price.toLocaleString()} a:</p>
+                  <p className="text-xl font-bold text-primary-400">{DEFAULT_PAYMENT_INFO.daviplata}</p>
                 </div>
               </div>
 
               <div className="mb-4">
                 <label className="block text-white/70 mb-2 text-sm">
-                  Tu número de teléfono (para el premio)
+                  Tu número (para el premio)
                 </label>
                 <input
                   type="tel"
@@ -329,7 +389,7 @@ const Roulette = ({ tenantId }: RouletteProps) => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 };
 
