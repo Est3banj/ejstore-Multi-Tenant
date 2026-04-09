@@ -2,15 +2,26 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  createUserWithEmailAndPassword,
   User
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import type { User as AppUser } from '../types';
 
 export interface AuthUser extends User {
   tenantId: string | null;
   role?: string;
+}
+
+export interface CustomerUser {
+  uid: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  balance: number;
+  createdAt: Date;
 }
 
 export const login = async (email: string, password: string): Promise<AuthUser> => {
@@ -31,6 +42,34 @@ export const login = async (email: string, password: string): Promise<AuthUser> 
     return user as AuthUser;
   } catch (error) {
     console.error('Error logging in:', error);
+    throw error;
+  }
+};
+
+export const register = async (
+  email: string, 
+  password: string,
+  firstName: string,
+  lastName: string,
+  phone: string
+): Promise<AuthUser> => {
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    
+    // Crear documento de cliente en Firestore
+    await setDoc(doc(db, 'customers', user.uid), {
+      email,
+      firstName,
+      lastName,
+      phone,
+      balance: 0,
+      createdAt: serverTimestamp()
+    });
+    
+    return user as AuthUser;
+  } catch (error) {
+    console.error('Error registering:', error);
     throw error;
   }
 };
@@ -64,6 +103,39 @@ export const checkUserRole = async (uid: string): Promise<AppUser | null> => {
   } catch (error) {
     console.error('Error checking user role:', error);
     return null;
+  }
+};
+
+export const getCustomerData = async (uid: string): Promise<CustomerUser | null> => {
+  try {
+    const customerDoc = await getDoc(doc(db, 'customers', uid));
+    if (customerDoc.exists()) {
+      const data = customerDoc.data();
+      return {
+        uid,
+        email: data.email || '',
+        firstName: data.firstName || '',
+        lastName: data.lastName || '',
+        phone: data.phone || '',
+        balance: data.balance || 0,
+        createdAt: data.createdAt?.toDate() || new Date()
+      } as CustomerUser;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting customer data:', error);
+    return null;
+  }
+};
+
+export const updateBalance = async (uid: string, amount: number): Promise<void> => {
+  try {
+    await updateDoc(doc(db, 'customers', uid), {
+      balance: increment(amount)
+    });
+  } catch (error) {
+    console.error('Error updating balance:', error);
+    throw error;
   }
 };
 

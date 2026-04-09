@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DEFAULT_PRIZES, DEFAULT_PAYMENT_INFO } from '../utils/roulette';
 import { getUserSpinData, useSpin, spinWheel, getSpinPrice, getSpinsForFreeSpin } from '../hooks/useRoulette';
+import { useAuthStore } from '../store/authStore';
+import { updateBalance } from '../services/auth';
 import type { RoulettePrize, UserSpinData } from '../types';
-import { Gift, X, Zap } from 'lucide-react';
+import { Gift, X, Zap, Lock } from 'lucide-react';
 
 interface RouletteProps {}
 
@@ -130,6 +132,7 @@ const RouletteWheel = ({
 };
 
 const Roulette = () => {
+  const { user, customer, refreshCustomer } = useAuthStore();
   const [userData, setUserData] = useState<UserSpinData>({ spinsPaid: 0, spinsFree: 0, todaySpins: 0, lastSpinDate: '' });
   const [isSpinning, setIsSpinning] = useState(false);
   const [showResult, setShowResult] = useState(false);
@@ -140,19 +143,57 @@ const Roulette = () => {
   const [useFreeSpin, setUseFreeSpin] = useState(false);
   const [mustSpin, setMustSpin] = useState(false);
   const [prizeNumber, setPrizeNumber] = useState(0);
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false);
 
   const price = getSpinPrice();
   const spinsForFree = getSpinsForFreeSpin();
   const prizes = DEFAULT_PRIZES;
 
-  useEffect(() => { setUserData(getUserSpinData()); }, []);
+  useEffect(() => { 
+    // Cargar datos del usuario desde Firestore si está logueado
+    if (customer) {
+      // Por ahora usamos localStorage para spins (se migrará después)
+      setUserData(getUserSpinData()); 
+    }
+  }, [customer]);
 
-  const handleSpinStart = () => {
+  // Función para abrir la ruleta (verifica auth)
+  const handleOpenRoulette = () => {
+    if (!user) {
+      setShowAuthPrompt(true);
+      return;
+    }
+    setShowRoulette(true);
+  };
+
+  const handleSpinStart = async () => {
     if (isSpinning || mustSpin) return;
+    
+    // Verificar saldo suficiente
+    if (customer && customer.balance < price) {
+      alert('Saldo insuficiente. Recarga para seguir jugando.');
+      return;
+    }
     
     const data = getUserSpinData();
     const usingFree = useFreeSpin || data.spinsFree > 0;
-    if (!usingFree && data.spinsPaid === 0) { setShowPayment(true); return; }
+    
+    // Si no tiene spins gratuitos ni saldo, mostrar pago
+    if (!usingFree && !customer) { 
+      setShowPayment(true); 
+      return; 
+    }
+
+    // Deducir del saldo si es pago
+    if (customer && !usingFree) {
+      try {
+        await updateBalance(customer.uid, -price);
+        await refreshCustomer();
+      } catch (error) {
+        console.error('Error deduciendo saldo:', error);
+        return;
+      }
+    }
 
     const useFree = data.spinsFree > 0 && (useFreeSpin || data.spinsPaid === 0);
     const prize = spinWheel();
@@ -198,15 +239,77 @@ const Roulette = () => {
 
   return (
     <>
-      <motion.button initial={{ scale: 0 }} animate={{ scale: 1 }} className="fixed bottom-6 right-6 z-40" onClick={() => setShowRoulette(true)}>
+      {/* Botón flotante de la ruleta */}
+      <motion.button 
+        initial={{ scale: 0 }} 
+        animate={{ scale: 1 }} 
+        className="fixed bottom-6 right-6 z-40"
+        onClick={handleOpenRoulette}
+      >
         <div className="relative group">
           <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 rounded-full blur-lg opacity-75 group-hover:opacity-100"></div>
           <div className="relative bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 p-4 rounded-full shadow-2xl hover:scale-110">
             <Gift size={28} className="text-white" />
           </div>
-          {userData.spinsFree > 0 && <div className="absolute -top-1 -right-1 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full">{userData.spinsFree}</div>}
+          {customer && userData.spinsFree > 0 && (
+            <div className="absolute -top-1 -right-1 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+              {userData.spinsFree}
+            </div>
+          )}
         </div>
       </motion.button>
+
+      {/* Modal para pedir registro */}
+      <AnimatePresence>
+        {showAuthPrompt && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowAuthPrompt(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9 }} 
+              animate={{ scale: 1 }} 
+              exit={{ scale: 0.9 }}
+              className="glass w-full max-w-sm p-6 text-center"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="text-5xl mb-4">🎰</div>
+              <h3 className="text-xl font-bold mb-2">¡Regístrate para jugar!</h3>
+              <p className="text-white/70 mb-4">
+                Crea una cuenta y participá en nuestros sorteos de premios exclusivos.
+              </p>
+              <p className="text-white/50 text-sm mb-4">
+                Es gratis y rápido.
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => {
+                    setShowAuthPrompt(false);
+                    // Aquí deberíamos abrir el modal de login
+                    // Por ahora usamos el evento custom
+                    window.dispatchEvent(new CustomEvent('openAuthModal'));
+                  }}
+                  className="btn-primary flex-1"
+                >
+                  Iniciar Sesión
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowAuthPrompt(false);
+                    window.dispatchEvent(new CustomEvent('openAuthModal', { detail: 'register' }));
+                  }}
+                  className="btn-secondary flex-1"
+                >
+                  Registrarse
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showRoulette && (
