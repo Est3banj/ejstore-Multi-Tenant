@@ -7,6 +7,7 @@ interface AuthState {
   user: FirebaseUser | null;
   userTenantId: string | null;
   customer: CustomerUser | null;
+  isAdmin: boolean; // true si el usuario es admin
   loading: boolean;
   initialized: boolean;
   
@@ -22,6 +23,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   userTenantId: null,
   customer: null,
+  isAdmin: false,
   loading: false,
   initialized: false,
 
@@ -31,11 +33,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       console.log('🔐 Auth change:', currentUser?.email);
       
       if (currentUser) {
+        // Verificar si es admin (tiene documento en users collection)
         const userData = await checkUserRole(currentUser.uid);
         if (userData?.tenantId) {
-          set({ userTenantId: userData.tenantId });
+          set({ userTenantId: userData.tenantId, isAdmin: true });
         } else {
-          set({ userTenantId: null });
+          set({ userTenantId: null, isAdmin: false });
         }
         
         // Cargar datos del cliente
@@ -45,7 +48,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ customer: customerData });
       } else {
         console.log('❌ Usuario no autenticado');
-        set({ userTenantId: null, customer: null });
+        set({ userTenantId: null, customer: null, isAdmin: false });
       }
       
       set({ loading: false, initialized: true });
@@ -73,6 +76,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     const { logout: authLogout } = await import('../services/auth');
     await authLogout();
-    set({ user: null, userTenantId: null, customer: null });
+    set({ user: null, userTenantId: null, customer: null, isAdmin: false });
   }
 }));
