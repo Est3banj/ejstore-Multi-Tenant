@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Roulette as RouletteWheel } from 'react-custom-roulette';
 import { DEFAULT_PRIZES, DEFAULT_PAYMENT_INFO } from '../utils/roulette';
 import { getUserSpinData, useSpin, spinWheel, getSpinPrice, getSpinsForFreeSpin } from '../hooks/useRoulette';
 import type { RoulettePrize, UserSpinData } from '../types';
-import { Gift, X, Zap, RotateCcw } from 'lucide-react';
+import { Gift, X, Zap } from 'lucide-react';
 
 interface RouletteProps {
   tenantId?: string;
@@ -28,32 +29,30 @@ const Roulette = ({ tenantId }: RouletteProps) => {
   const [showRoulette, setShowRoulette] = useState(false);
   const [phone, setPhone] = useState('');
   const [useFreeSpin, setUseFreeSpin] = useState(false);
-  const [rotation, setRotation] = useState(0);
+  const [spin, setSpin] = useState(false);
+  const [mustSpin, setMustSpin] = useState(false);
+  const [spinResult, setSpinResult] = useState(0);
+  const wheelRef = useRef<any>(null);
 
   const price = getSpinPrice();
   const spinsForFree = getSpinsForFreeSpin();
   const prizes = DEFAULT_PRIZES;
-  const segmentAngle = 360 / prizes.length;
 
-  // Función helper para calcular puntos del polígono
-  const getPoint = (angleInDegrees: number): string => {
-    const angleInRadians = (angleInDegrees - 90) * (Math.PI / 180);
-    const radius = 50;
-    const x = 50 + radius * Math.cos(angleInRadians);
-    const y = 50 + radius * Math.sin(angleInRadians);
-    return `${x}% ${y}%`;
-  };
+  // Convertir premios al formato de la librería
+  const wheelData = prizes.map((prize, index) => ({
+    option: prize.name,
+    style: {
+      backgroundColor: PRIZE_COLORS[prize.id] || '#6B7280',
+      textColor: '#ffffff',
+    }
+  }));
 
   useEffect(() => {
     setUserData(getUserSpinData());
   }, []);
 
-  const getPrizeColor = (prize: RoulettePrize): string => {
-    return PRIZE_COLORS[prize.id] || '#6B7280';
-  };
-
-  const handleSpin = async () => {
-    if (isSpinning) return;
+  const handleSpinStart = async () => {
+    if (isSpinning || mustSpin) return;
     
     const data = getUserSpinData();
     const usingFree = useFreeSpin || data.spinsFree > 0;
@@ -67,22 +66,33 @@ const Roulette = ({ tenantId }: RouletteProps) => {
     setShowResult(false);
 
     const useFree = data.spinsFree > 0 && (useFreeSpin || data.spinsPaid === 0);
-    
-    // Animación de giro
-    const spins = 5 + Math.random() * 3;
-    const newRotation = rotation + (spins * 360);
-    setRotation(newRotation);
-    
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    
+
+    // Determinar qué premio va a salir (basado en probabilidades)
     const prize = spinWheel();
-    setResult(prize);
+    const prizeIndex = prizes.findIndex(p => p.id === prize.id);
     
-    const newData = useSpin(useFree, data);
-    setUserData(newData);
+    // Calcular el ángulo para parar en ese premio
+    const segments = prizes.length;
+    const segmentAngle = 360 / segments;
+    const targetSegment = prizeIndex;
+    const randomOffset = Math.random() * (segmentAngle * 0.8);
+    const spinAngle = 360 * 5 + (targetSegment * segmentAngle) + randomOffset;
     
-    setIsSpinning(false);
-    setShowResult(true);
+    setSpinResult(spinAngle);
+    setMustSpin(true);
+    
+    // Después de que termine el spin
+    setTimeout(() => {
+      setResult(prize);
+      const newData = useSpin(useFree, data);
+      setUserData(newData);
+      setIsSpinning(false);
+      setShowResult(true);
+    }, 3000);
+  };
+
+  const handleSpinEnd = () => {
+    setMustSpin(false);
   };
 
   const handlePaymentConfirm = () => {
@@ -90,22 +100,27 @@ const Roulette = ({ tenantId }: RouletteProps) => {
     
     setShowPayment(false);
     setIsSpinning(true);
+    setShowResult(false);
+
+    const prize = spinWheel();
+    const prizeIndex = prizes.findIndex(p => p.id === prize.id);
+    const segments = prizes.length;
+    const segmentAngle = 360 / segments;
+    const targetSegment = prizeIndex;
+    const randomOffset = Math.random() * (segmentAngle * 0.8);
+    const spinAngle = 360 * 5 + (targetSegment * segmentAngle) + randomOffset;
     
-    const spins = 5 + Math.random() * 3;
-    const newRotation = rotation + (spins * 360);
-    setRotation(newRotation);
+    setSpinResult(spinAngle);
+    setMustSpin(true);
     
-    setTimeout(async () => {
-      const data = getUserSpinData();
-      const prize = spinWheel();
+    setTimeout(() => {
       setResult(prize);
-      
+      const data = getUserSpinData();
       const newData = useSpin(false, data);
       setUserData(newData);
-      
       setIsSpinning(false);
       setShowResult(true);
-    }, 2500);
+    }, 3000);
   };
 
   return (
@@ -160,13 +175,13 @@ const Roulette = ({ tenantId }: RouletteProps) => {
               {/* Botón cerrar */}
               <button
                 onClick={() => setShowRoulette(false)}
-                className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
+                className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors z-20"
               >
                 <X size={24} />
               </button>
 
               {/* Header */}
-              <div className="text-center mb-6">
+              <div className="text-center mb-4">
                 <h2 className="text-3xl font-bold gradient-text mb-1">
                   🎰 Ruleta de Premios
                 </h2>
@@ -188,54 +203,26 @@ const Roulette = ({ tenantId }: RouletteProps) => {
                 </div>
               </div>
 
-              {/* La Ruleta */}
-              <div className="relative flex justify-center items-center my-6">
-                {/* Flecha indicadora */}
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20">
-                  <div className="w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[25px] border-t-yellow-400 drop-shadow-lg"></div>
-                </div>
-
-                {/* Rueda */}
-                <div
-                  className="relative w-56 h-56 md:w-64 md:h-64 rounded-full shadow-2xl overflow-hidden border-4 border-white"
-                  style={{ 
-                    transform: `rotate(${rotation}deg)`,
-                    transition: isSpinning ? 'transform 2.5s cubic-bezier(0.17, 0.67, 0.12, 0.99)' : 'transform 0.5s ease'
-                  }}
-                >
-                  {prizes.map((prize, index) => {
-                    const color = getPrizeColor(prize);
-                    const startAngle = index * segmentAngle;
-                    
-                    return (
-                      <div
-                        key={prize.id}
-                        className="absolute w-full h-full"
-                        style={{
-                          clipPath: `polygon(50% 50%, ${getPoint(startAngle)} ${getPoint(startAngle + segmentAngle)})`,
-                          background: color,
-                        }}
-                      >
-                        {/* Texto del premio */}
-                        <span 
-                          className="absolute text-white text-xs font-bold drop-shadow-md"
-                          style={{
-                            top: '50%',
-                            left: '50%',
-                            transform: `rotate(${startAngle + segmentAngle / 2 - 90}deg) translate(45px, -50%)`,
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {prize.name}
-                        </span>
-                      </div>
-                    );
-                  })}
-                  
-                  {/* Centro */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg z-10 border-3 border-white">
-                    <span className="text-xl">🎰</span>
-                  </div>
+              {/* La Ruleta (librería) */}
+              <div className="relative flex justify-center items-center my-4">
+                <div className="w-64 h-64 md:w-72 md:h-72">
+                  <RouletteWheel
+                    ref={wheelRef}
+                    mustStartSpinning={mustSpin}
+                    spinDuration={1}
+                    data={wheelData}
+                    onStopTransitionEnd={handleSpinEnd}
+                    pointerProps={{
+                      src: undefined,
+                      style: {
+                        top: '-10px',
+                        width: '30px',
+                        height: '30px',
+                        backgroundColor: '#F59E0B',
+                        clipPath: 'polygon(50% 100%, 0 0, 100% 0)',
+                      }
+                    }}
+                  />
                 </div>
               </div>
 
@@ -255,7 +242,7 @@ const Roulette = ({ tenantId }: RouletteProps) => {
               {/* Botón de girar */}
               <div className="text-center">
                 <button
-                  onClick={handleSpin}
+                  onClick={handleSpinStart}
                   disabled={isSpinning}
                   className={`btn-primary text-lg px-10 py-3 ${
                     isSpinning ? 'opacity-50 cursor-not-allowed' : ''
