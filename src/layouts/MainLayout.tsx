@@ -136,10 +136,10 @@ const MainLayout = (): JSX.Element => {
                 <div className="text-2xl">🎁</div>
                 <div>
                   <p className="text-white font-medium text-sm">
-                    ¡Nueva tienda!
+                    ¿Sabías que podés ganar premios gratis?
                   </p>
                   <p className="text-white/60 text-xs mt-1">
-                    Regístrate y obtené beneficios exclusivos en la ruleta 🎰
+                    Mira la ruleta abajo 👇 sorteamos Netflix, HBO y más
                   </p>
                   <button
                     onClick={() => {
@@ -148,7 +148,7 @@ const MainLayout = (): JSX.Element => {
                     }}
                     className="mt-2 text-xs text-yellow-400 hover:text-yellow-300 font-medium"
                   >
-                    ¡Regístrate gratis! →
+                    ¡Quiero participar! →
                   </button>
                 </div>
               </div>
