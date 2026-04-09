@@ -156,8 +156,62 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        <div className="block md:overflow-x-auto">
+          {/* Mobile Cards View */}
+          <div className="md:hidden space-y-3">
+            {loadingCustomers ? (
+              <div className="text-center text-gray-400 py-8">Cargando clientes...</div>
+            ) : filteredCustomers.length === 0 ? (
+              <div className="text-center text-gray-400 py-8">
+                {searchTerm ? 'No se encontraron clientes' : 'No hay clientes registrados'}
+              </div>
+            ) : (
+              filteredCustomers.map((customer) => (
+                <div key={customer.id} className="bg-gray-900/50 rounded-lg p-4 border border-gray-700">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-full bg-primary-500/20 flex items-center justify-center">
+                      <span className="text-primary-400 font-medium">
+                        {(customer.firstName || customer.email || 'U')[0].toUpperCase()}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-white font-medium">
+                        {customer.firstName} {customer.lastName}
+                      </p>
+                      <p className="text-gray-400 text-sm">{customer.email}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                    <div>
+                      <p className="text-gray-500">Teléfono</p>
+                      <p className="text-gray-300">{customer.phone || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Saldo</p>
+                      <p className={`font-medium ${customer.balance > 0 ? 'text-green-400' : 'text-gray-400'}`}>
+                        ${(customer.balance || 0).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-gray-500">Registrado</p>
+                      <p className="text-gray-400 text-xs">
+                        {customer.createdAt?.toDate?.()?.toLocaleDateString() || '-'}
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedCustomer(customer)}
+                    className="w-full mt-2 bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium py-2 rounded-lg"
+                  >
+                    Cargar Saldo
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <table className="hidden md:table w-full">
             <thead className="bg-gray-900/50">
               <tr>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
@@ -244,27 +298,27 @@ const Dashboard = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-black/80 flex items-end md:items-center justify-center z-50 p-0 md:p-4"
             onClick={() => setSelectedCustomer(null)}
           >
             <motion.div
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              className="bg-gray-800 rounded-xl p-6 w-full max-w-md border border-gray-700"
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              className="bg-gray-800 rounded-t-2xl md:rounded-xl p-4 md:p-6 w-full md:max-w-md border-t md:border border-gray-700"
               onClick={e => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-white">Cargar Saldo</h3>
-                <button onClick={() => setSelectedCustomer(null)} className="text-gray-400 hover:text-white">
+                <button onClick={() => setSelectedCustomer(null)} className="text-gray-400 hover:text-white p-1">
                   <X size={20} />
                 </button>
               </div>
               
               <div className="mb-4 p-3 bg-gray-900 rounded-lg">
-                <p className="text-gray-400 text-sm">Cliente</p>
-                <p className="text-white font-medium">{selectedCustomer.firstName} {selectedCustomer.lastName}</p>
-                <p className="text-gray-400 text-sm">{selectedCustomer.email}</p>
+                <p className="text-gray-400 text-xs md:text-sm">Cliente</p>
+                <p className="text-white font-medium text-sm md:text-base">{selectedCustomer.firstName} {selectedCustomer.lastName}</p>
+                <p className="text-gray-400 text-xs md:text-sm">{selectedCustomer.email}</p>
               </div>
 
               <div className="mb-4">
