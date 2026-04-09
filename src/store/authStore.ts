@@ -43,7 +43,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         
         // Cargar datos del cliente
         console.log('📄 Cargando datos del cliente:', currentUser.uid);
-        const customerData = await getCustomerData(currentUser.uid);
+        const customerData = await getCustomerData(currentUser.uid, currentUser.email || '');
         console.log('📊 Customer data:', customerData);
         set({ customer: customerData });
       } else {

@@ -110,7 +110,7 @@ export const checkUserRole = async (uid: string): Promise<AppUser | null> => {
   }
 };
 
-export const getCustomerData = async (uid: string): Promise<CustomerUser | null> => {
+export const getCustomerData = async (uid: string, userEmail?: string): Promise<CustomerUser | null> => {
   try {
     console.log('🔍 Buscando cliente en:', uid);
     const customerDoc = await getDoc(doc(db, 'customers', uid));
@@ -118,6 +118,22 @@ export const getCustomerData = async (uid: string): Promise<CustomerUser | null>
     if (customerDoc.exists()) {
       const data = customerDoc.data();
       console.log('📊 Datos:', data);
+      
+      // Si no tiene email pero tenemos el email del usuario, actualizarlo
+      if (!data.email && userEmail) {
+        console.log('📝 Actualizando email del cliente...');
+        await updateDoc(doc(db, 'customers', uid), { email: userEmail });
+        return {
+          uid,
+          email: userEmail,
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
+          phone: data.phone || '',
+          balance: data.balance || 0,
+          createdAt: data.createdAt?.toDate() || new Date()
+        } as CustomerUser;
+      }
+      
       return {
         uid,
         email: data.email || '',
@@ -132,7 +148,7 @@ export const getCustomerData = async (uid: string): Promise<CustomerUser | null>
     // Si no existe, crear documento automáticamente
     console.log('➕ Creando cliente automáticamente...');
     await setDoc(doc(db, 'customers', uid), {
-      email: '',
+      email: userEmail || '',
       firstName: 'Usuario',
       lastName: '',
       phone: '',
@@ -143,7 +159,7 @@ export const getCustomerData = async (uid: string): Promise<CustomerUser | null>
     
     return {
       uid,
-      email: '',
+      email: userEmail || '',
       firstName: 'Usuario',
       lastName: '',
       phone: '',
