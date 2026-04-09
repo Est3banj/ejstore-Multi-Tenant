@@ -1,13 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DEFAULT_PRIZES, DEFAULT_PAYMENT_INFO } from '../utils/roulette';
-import { getUserSpinData, useSpin, spinWheel, getSpinPrice, getSpinsForFreeSpin, canSpin } from '../hooks/useRoulette';
+import { getUserSpinData, useSpin, spinWheel, getSpinPrice, getSpinsForFreeSpin } from '../hooks/useRoulette';
 import type { RoulettePrize, UserSpinData } from '../types';
 import { Gift, X, Zap } from 'lucide-react';
 
 interface RouletteProps {
   tenantId?: string;
 }
+
+// Colores por premio (según lo que pidió el usuario)
+const PRIZE_COLORS: Record<string, string> = {
+  nothing: '#374151',      // Gris oscuro (X nada)
+  netflix: '#E50914',      // Rojo Netflix
+  disney: '#1E3A8A',      // Azul oscuro Disney
+  prime: '#3B82F6',        // Azul claro Prime Video
+  crunchyroll: '#F97316', // Naranja Crunchyroll
+  hbo: '#9333EA',          // Púrpura HBO
+};
 
 const Roulette = ({ tenantId }: RouletteProps) => {
   const [userData, setUserData] = useState<UserSpinData>({ spinsPaid: 0, spinsFree: 0, todaySpins: 0, lastSpinDate: '' });
@@ -19,7 +29,6 @@ const Roulette = ({ tenantId }: RouletteProps) => {
   const [phone, setPhone] = useState('');
   const [useFreeSpin, setUseFreeSpin] = useState(false);
   const [currentRotation, setCurrentRotation] = useState(0);
-  const wheelRef = useRef<HTMLDivElement>(null);
 
   const price = getSpinPrice();
   const spinsForFree = getSpinsForFreeSpin();
@@ -44,12 +53,11 @@ const Roulette = ({ tenantId }: RouletteProps) => {
 
     const useFree = data.spinsFree > 0 && (useFreeSpin || data.spinsPaid === 0);
     
-    // Animación de giro - dar varias vueltas
-    const spins = 5 + Math.random() * 3; // 5-8 vueltas
+    // Animación de giro
+    const spins = 5 + Math.random() * 3;
     const newRotation = currentRotation + (spins * 360);
     setCurrentRotation(newRotation);
     
-    // Tiempo basado en vueltas
     await new Promise(resolve => setTimeout(resolve, 2500));
     
     const prize = spinWheel();
@@ -86,9 +94,12 @@ const Roulette = ({ tenantId }: RouletteProps) => {
   };
 
   const prizes = DEFAULT_PRIZES;
-  
-  // Calcular ángulo para cada segmento
   const segmentAngle = 360 / prizes.length;
+
+  // Función para obtener el color de un premio
+  const getPrizeColor = (prize: RoulettePrize): string => {
+    return PRIZE_COLORS[prize.id] || '#6B7280';
+  };
 
   return (
     <>
@@ -170,58 +181,71 @@ const Roulette = ({ tenantId }: RouletteProps) => {
                 </div>
               </div>
 
-              {/* La Ruleta estilo Pizza */}
+              {/* La Ruleta */}
               <div className="relative flex justify-center items-center my-6">
                 {/* Flecha indicadora */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20">
                   <div className="w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[25px] border-t-yellow-400 drop-shadow-lg"></div>
                 </div>
 
-                {/* Rueda estilo pizza */}
+                {/* Rueda */}
                 <div
-                  ref={wheelRef}
                   className="relative w-64 h-64 md:w-72 md:h-72 rounded-full shadow-2xl overflow-hidden"
                   style={{ transform: `rotate(${currentRotation}deg)` }}
                 >
-                  {/* Segmentos de la ruleta (estilo pizza) */}
+                  {/* Sectores de la ruleta usando conic-gradient */}
+                  <div 
+                    className="absolute inset-0"
+                    style={{
+                      background: prizes.map((prize, index) => {
+                        const startAngle = index * segmentAngle;
+                        const color = getPrizeColor(prize);
+                        return `${color} ${startAngle}deg ${startAngle + segmentAngle}deg`;
+                      }).join(', '),
+                    }}
+                  />
+                  
+                  {/* Líneas divisorias */}
+                  {prizes.map((_, index) => (
+                    <div
+                      key={index}
+                      className="absolute top-1/2 left-1/2 w-1/2 h-0.5 bg-black/30"
+                      style={{
+                        transformOrigin: 'left center',
+                        transform: `rotate(${index * segmentAngle - 90}deg)`,
+                      }}
+                    />
+                  ))}
+                  
+                  {/* Nombres en cada sector */}
                   {prizes.map((prize, index) => {
-                    const angle = (360 / prizes.length) * index;
-                    const isWin = prize.id !== 'nothing';
-                    const colors = [
-                      '#DC2626', // Rojo (nada)
-                      '#8B5CF6', // Violeta (crunchyroll)
-                      '#EC4899', // Rosa (hbo)
-                      '#F59E0B', // Amarillo (prime)
-                      '#10B981', // Verde (netflix)
-                    ];
-                    const bgColor = colors[index % colors.length];
-                    
+                    const angle = index * segmentAngle + segmentAngle / 2 - 90;
+                    const radius = '35%';
                     return (
                       <div
-                        key={prize.id}
-                        className="absolute w-full h-full"
-                        style={{ transform: `rotate(${angle}deg)` }}
+                        key={`label-${prize.id}`}
+                        className="absolute text-xs font-bold text-white drop-shadow-lg"
+                        style={{
+                          top: '50%',
+                          left: '50%',
+                          width: '50%',
+                          height: '20px',
+                          transform: `rotate(${angle}deg) translateY(-100px)`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'flex-end',
+                          paddingRight: '10px',
+                          whiteSpace: 'nowrap',
+                        }}
                       >
-                        <div 
-                          className="w-full h-full"
-                          style={{ 
-                            background: `conic-gradient(from ${-segmentAngle/2}deg at 50% 50%, ${bgColor} 0deg ${segmentAngle}deg, transparent ${segmentAngle}deg)`,
-                            clipPath: 'polygon(50% 50%, 100% 0, 100% 100%)'
-                          }}
-                        />
-                        <div 
-                          className="absolute w-full h-full"
-                          style={{ 
-                            transform: `rotate(${segmentAngle}deg)`,
-                            background: `conic-gradient(from ${-segmentAngle/2}deg at 50% 50%, ${colors[(index + 1) % colors.length]} 0deg ${segmentAngle}deg, transparent ${segmentAngle}deg)`,
-                            clipPath: 'polygon(50% 50%, 100% 0, 100% 100%)'
-                          }}
-                        />
+                        <span className="bg-black/50 px-1 rounded text-[10px]">
+                          {prize.name}
+                        </span>
                       </div>
                     );
                   })}
                   
-                  {/* Centro de la ruleta */}
+                  {/* Centro */}
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg z-10 border-4 border-white">
                     <span className="text-2xl">🎰</span>
                   </div>
