@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { CATEGORIES } from '../utils/constants';
 import ServiceCard from '../components/ServiceCard';
 import BannerSlider from '../components/BannerSlider';
+import Roulette from '../components/Roulette';
 import { motion } from 'framer-motion';
 
 const Home = () => {
@@ -22,6 +23,11 @@ const Home = () => {
       {/* Banner Slider */}
       <section className="container mx-auto px-4 py-8">
         <BannerSlider />
+      </section>
+
+      {/* Ruleta de Premios */}
+      <section id="ruleta" className="container mx-auto px-4 py-12">
+        <Roulette />
       </section>
 
       {/* Servicios Populares */}
