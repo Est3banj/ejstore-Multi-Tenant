@@ -1,21 +1,21 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DEFAULT_PRIZES, DEFAULT_PAYMENT_INFO } from '../utils/roulette';
 import { getUserSpinData, useSpin, spinWheel, getSpinPrice, getSpinsForFreeSpin } from '../hooks/useRoulette';
 import type { RoulettePrize, UserSpinData } from '../types';
-import { Gift, X, Zap } from 'lucide-react';
+import { Gift, X, Zap, RotateCcw } from 'lucide-react';
 
 interface RouletteProps {
   tenantId?: string;
 }
 
-// Colores por premio (según lo que pidió el usuario)
+// Colores por premio
 const PRIZE_COLORS: Record<string, string> = {
-  nothing: '#374151',      // Gris oscuro (X nada)
+  nothing: '#1F2937',      // Gris oscuro (X nada)
   netflix: '#E50914',      // Rojo Netflix
   disney: '#1E3A8A',      // Azul oscuro Disney
   prime: '#3B82F6',        // Azul claro Prime Video
-  crunchyroll: '#F97316', // Naranja Crunchyroll
+  crunchyroll: '#F97316',  // Naranja Crunchyroll
   hbo: '#9333EA',          // Púrpura HBO
 };
 
@@ -28,14 +28,29 @@ const Roulette = ({ tenantId }: RouletteProps) => {
   const [showRoulette, setShowRoulette] = useState(false);
   const [phone, setPhone] = useState('');
   const [useFreeSpin, setUseFreeSpin] = useState(false);
-  const [currentRotation, setCurrentRotation] = useState(0);
+  const [rotation, setRotation] = useState(0);
 
   const price = getSpinPrice();
   const spinsForFree = getSpinsForFreeSpin();
+  const prizes = DEFAULT_PRIZES;
+  const segmentAngle = 360 / prizes.length;
+
+  // Función helper para calcular puntos del polígono
+  const getPoint = (angleInDegrees: number): string => {
+    const angleInRadians = (angleInDegrees - 90) * (Math.PI / 180);
+    const radius = 50;
+    const x = 50 + radius * Math.cos(angleInRadians);
+    const y = 50 + radius * Math.sin(angleInRadians);
+    return `${x}% ${y}%`;
+  };
 
   useEffect(() => {
     setUserData(getUserSpinData());
   }, []);
+
+  const getPrizeColor = (prize: RoulettePrize): string => {
+    return PRIZE_COLORS[prize.id] || '#6B7280';
+  };
 
   const handleSpin = async () => {
     if (isSpinning) return;
@@ -55,8 +70,8 @@ const Roulette = ({ tenantId }: RouletteProps) => {
     
     // Animación de giro
     const spins = 5 + Math.random() * 3;
-    const newRotation = currentRotation + (spins * 360);
-    setCurrentRotation(newRotation);
+    const newRotation = rotation + (spins * 360);
+    setRotation(newRotation);
     
     await new Promise(resolve => setTimeout(resolve, 2500));
     
@@ -77,8 +92,8 @@ const Roulette = ({ tenantId }: RouletteProps) => {
     setIsSpinning(true);
     
     const spins = 5 + Math.random() * 3;
-    const newRotation = currentRotation + (spins * 360);
-    setCurrentRotation(newRotation);
+    const newRotation = rotation + (spins * 360);
+    setRotation(newRotation);
     
     setTimeout(async () => {
       const data = getUserSpinData();
@@ -91,14 +106,6 @@ const Roulette = ({ tenantId }: RouletteProps) => {
       setIsSpinning(false);
       setShowResult(true);
     }, 2500);
-  };
-
-  const prizes = DEFAULT_PRIZES;
-  const segmentAngle = 360 / prizes.length;
-
-  // Función para obtener el color de un premio
-  const getPrizeColor = (prize: RoulettePrize): string => {
-    return PRIZE_COLORS[prize.id] || '#6B7280';
   };
 
   return (
@@ -169,7 +176,7 @@ const Roulette = ({ tenantId }: RouletteProps) => {
               </div>
 
               {/* Info del usuario */}
-              <div className="flex justify-center gap-3 mb-6">
+              <div className="flex justify-center gap-3 mb-4">
                 <div className="bg-white/5 px-3 py-1.5 rounded-lg flex items-center gap-2">
                   <Zap size={14} className="text-yellow-400" />
                   <span className="text-white/70 text-sm">Gratis:</span>
@@ -190,55 +197,35 @@ const Roulette = ({ tenantId }: RouletteProps) => {
 
                 {/* Rueda */}
                 <div
-                  className="relative w-64 h-64 md:w-72 md:h-72 rounded-full shadow-2xl overflow-hidden"
-                  style={{ transform: `rotate(${currentRotation}deg)` }}
+                  className="relative w-56 h-56 md:w-64 md:h-64 rounded-full shadow-2xl overflow-hidden border-4 border-white"
+                  style={{ 
+                    transform: `rotate(${rotation}deg)`,
+                    transition: isSpinning ? 'transform 2.5s cubic-bezier(0.17, 0.67, 0.12, 0.99)' : 'transform 0.5s ease'
+                  }}
                 >
-                  {/* Sectores de la ruleta usando conic-gradient */}
-                  <div 
-                    className="absolute inset-0"
-                    style={{
-                      background: prizes.map((prize, index) => {
-                        const startAngle = index * segmentAngle;
-                        const color = getPrizeColor(prize);
-                        return `${color} ${startAngle}deg ${startAngle + segmentAngle}deg`;
-                      }).join(', '),
-                    }}
-                  />
-                  
-                  {/* Líneas divisorias */}
-                  {prizes.map((_, index) => (
-                    <div
-                      key={index}
-                      className="absolute top-1/2 left-1/2 w-1/2 h-0.5 bg-black/30"
-                      style={{
-                        transformOrigin: 'left center',
-                        transform: `rotate(${index * segmentAngle - 90}deg)`,
-                      }}
-                    />
-                  ))}
-                  
-                  {/* Nombres en cada sector */}
                   {prizes.map((prize, index) => {
-                    const angle = index * segmentAngle + segmentAngle / 2 - 90;
-                    const radius = '35%';
+                    const color = getPrizeColor(prize);
+                    const startAngle = index * segmentAngle;
+                    
                     return (
                       <div
-                        key={`label-${prize.id}`}
-                        className="absolute text-xs font-bold text-white drop-shadow-lg"
+                        key={prize.id}
+                        className="absolute w-full h-full"
                         style={{
-                          top: '50%',
-                          left: '50%',
-                          width: '50%',
-                          height: '20px',
-                          transform: `rotate(${angle}deg) translateY(-100px)`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'flex-end',
-                          paddingRight: '10px',
-                          whiteSpace: 'nowrap',
+                          clipPath: `polygon(50% 50%, ${getPoint(startAngle)} ${getPoint(startAngle + segmentAngle)})`,
+                          background: color,
                         }}
                       >
-                        <span className="bg-black/50 px-1 rounded text-[10px]">
+                        {/* Texto del premio */}
+                        <span 
+                          className="absolute text-white text-xs font-bold drop-shadow-md"
+                          style={{
+                            top: '50%',
+                            left: '50%',
+                            transform: `rotate(${startAngle + segmentAngle / 2 - 90}deg) translate(45px, -50%)`,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
                           {prize.name}
                         </span>
                       </div>
@@ -246,8 +233,8 @@ const Roulette = ({ tenantId }: RouletteProps) => {
                   })}
                   
                   {/* Centro */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg z-10 border-4 border-white">
-                    <span className="text-2xl">🎰</span>
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg z-10 border-3 border-white">
+                    <span className="text-xl">🎰</span>
                   </div>
                 </div>
               </div>
