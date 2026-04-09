@@ -57,6 +57,8 @@ export const register = async (
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     
+    console.log('📝 Creando cliente con UID:', user.uid);
+    
     // Crear documento de cliente en Firestore
     await setDoc(doc(db, 'customers', user.uid), {
       email,
@@ -66,6 +68,8 @@ export const register = async (
       balance: 0,
       createdAt: serverTimestamp()
     });
+    
+    console.log('✅ Cliente creado en Firestore');
     
     return user as AuthUser;
   } catch (error) {
@@ -108,9 +112,12 @@ export const checkUserRole = async (uid: string): Promise<AppUser | null> => {
 
 export const getCustomerData = async (uid: string): Promise<CustomerUser | null> => {
   try {
+    console.log('🔍 Buscando cliente en:', uid);
     const customerDoc = await getDoc(doc(db, 'customers', uid));
+    console.log('📄 Doc existe:', customerDoc.exists());
     if (customerDoc.exists()) {
       const data = customerDoc.data();
+      console.log('📊 Datos:', data);
       return {
         uid,
         email: data.email || '',
