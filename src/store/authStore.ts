@@ -28,6 +28,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initialize: () => {
     const unsubscribe = onAuthChange(async (currentUser) => {
       set({ user: currentUser, loading: true });
+      console.log('🔐 Auth change:', currentUser?.email);
       
       if (currentUser) {
         const userData = await checkUserRole(currentUser.uid);
@@ -38,9 +39,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
         
         // Cargar datos del cliente
+        console.log('📄 Cargando datos del cliente:', currentUser.uid);
         const customerData = await getCustomerData(currentUser.uid);
+        console.log('📊 Customer data:', customerData);
         set({ customer: customerData });
       } else {
+        console.log('❌ Usuario no autenticado');
         set({ userTenantId: null, customer: null });
       }
       

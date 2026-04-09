@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const Header = (): JSX.Element => {
   const { settings } = useApp();
   const { user, customer, logout } = useAuthStore();
+  console.log('🎨 Header render:', { user: user?.email, customer: customer?.firstName });
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
