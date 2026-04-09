@@ -128,7 +128,28 @@ export const getCustomerData = async (uid: string): Promise<CustomerUser | null>
         createdAt: data.createdAt?.toDate() || new Date()
       } as CustomerUser;
     }
-    return null;
+    
+    // Si no existe, crear documento automáticamente
+    console.log('➕ Creando cliente automáticamente...');
+    await setDoc(doc(db, 'customers', uid), {
+      email: '',
+      firstName: 'Usuario',
+      lastName: '',
+      phone: '',
+      balance: 0,
+      createdAt: serverTimestamp()
+    });
+    console.log('✅ Cliente creado automáticamente');
+    
+    return {
+      uid,
+      email: '',
+      firstName: 'Usuario',
+      lastName: '',
+      phone: '',
+      balance: 0,
+      createdAt: new Date()
+    } as CustomerUser;
   } catch (error) {
     console.error('Error getting customer data:', error);
     return null;
