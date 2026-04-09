@@ -69,6 +69,7 @@ export const getServices = async (tenantId: string): Promise<Service[]> => {
         images: data.images || [],
         image: data.image || data.images?.[0] || '',
         isActive: data.active !== false,
+        isPopular: data.isPopular || false,
         createdAt: convertTimestamp(data.createdAt),
         plans: data.plans
       } as Service;
@@ -107,6 +108,7 @@ export const getAllServices = async (tenantId: string): Promise<Service[]> => {
         images: data.images || [],
         image: data.image || data.images?.[0] || '',
         isActive: data.active !== false,
+        isPopular: data.isPopular || false,
         createdAt: convertTimestamp(data.createdAt),
         plans: data.plans
       } as Service;
@@ -141,6 +143,7 @@ export const getServiceById = async (id: string, tenantId: string): Promise<Serv
           images: data.images || [],
           image: data.image || data.images?.[0] || '',
           isActive: data.active !== false,
+          isPopular: data.isPopular || false,
           createdAt: convertTimestamp(data.createdAt),
           plans: data.plans
         } as Service;
@@ -160,6 +163,7 @@ interface ServiceInput {
   category: string;
   images: string[];
   isActive: boolean;
+  isPopular?: boolean;
   plans?: Service['plans'];
 }
 

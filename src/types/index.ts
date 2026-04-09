@@ -22,6 +22,7 @@ export interface Service {
   images: string[];
   image?: string; // Legacy single image field
   isActive: boolean;
+  isPopular?: boolean; // Destacados en Home
   createdAt?: Date;
   plans?: ServicePlan[];
 }

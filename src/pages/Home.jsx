@@ -9,6 +9,9 @@ const Home = () => {
   const { services } = useApp();
   const [selectedCategory, setSelectedCategory] = useState('all');
 
+  // Filtrar servicios populares
+  const popularServices = services.filter((service) => service.isPopular === true);
+
   const filteredServices =
     selectedCategory === 'all'
       ? services
@@ -20,6 +23,24 @@ const Home = () => {
       <section className="container mx-auto px-4 py-8">
         <BannerSlider />
       </section>
+
+      {/* Servicios Populares */}
+      {popularServices.length > 0 && (
+        <section id="populares" className="container mx-auto px-4 py-12">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-4xl font-bold text-center mb-8 gradient-text"
+          >
+            Servicios Populares
+          </motion.h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {popularServices.map((service, index) => (
+              <ServiceCard key={service.id} service={service} index={index} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Categorías */}
       <section id="categorias" className="container mx-auto px-4 py-12">

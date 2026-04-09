@@ -31,6 +31,7 @@ const Services = () => {
     imageUrl: '',
     imageUrlInput: '',
     active: true,
+    isPopular: false,
     benefits: [],
     pricing: []
   });
@@ -70,6 +71,7 @@ const Services = () => {
         imageUrl: service.image || '',
         imageUrlInput: '',
         active: service.active !== undefined ? service.active : true,
+        isPopular: service.isPopular || false,
         benefits: service.benefits || [],
         pricing: service.pricing || []
       });
@@ -85,6 +87,7 @@ const Services = () => {
         imageUrl: '',
         imageUrlInput: '',
         active: true,
+        isPopular: false,
         benefits: [],
         pricing: []
       });
@@ -182,6 +185,7 @@ const Services = () => {
         category: formData.category,
         image: imageUrl,
         active: formData.active,
+        isPopular: formData.isPopular,
         benefits: formData.benefits,
         pricing: formData.pricing
       };
@@ -544,6 +548,17 @@ const Services = () => {
               className="w-5 h-5 rounded"
             />
             <label htmlFor="active" className="text-white/70">Servicio activo</label>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="isPopular"
+              checked={formData.isPopular}
+              onChange={(e) => setFormData({ ...formData, isPopular: e.target.checked })}
+              className="w-5 h-5 rounded"
+            />
+            <label htmlFor="isPopular" className="text-white/70">Mostrar en "Servicios Populares"</label>
           </div>
 
           <div className="flex justify-end space-x-4">
