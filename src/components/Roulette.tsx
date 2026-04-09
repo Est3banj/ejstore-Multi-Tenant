@@ -259,51 +259,37 @@ const Roulette = () => {
         </div>
       </motion.button>
 
-      {/* Modal para pedir registro */}
+      {/* Modal pequeño para pedir registro - RECUADRO DISCRETO */}
       <AnimatePresence>
         {showAuthPrompt && (
           <motion.div 
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 pb-24"
             onClick={() => setShowAuthPrompt(false)}
           >
             <motion.div 
-              initial={{ scale: 0.9 }} 
-              animate={{ scale: 1 }} 
-              exit={{ scale: 0.9 }}
-              className="glass w-full max-w-sm p-6 text-center"
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 50, opacity: 0 }}
+              className="bg-gray-800 border border-yellow-500/50 rounded-xl px-4 py-3 max-w-xs mx-4 shadow-xl"
               onClick={e => e.stopPropagation()}
             >
-              <div className="text-5xl mb-4">🎰</div>
-              <h3 className="text-xl font-bold mb-2">¡Regístrate para jugar!</h3>
-              <p className="text-white/70 mb-4">
-                Crea una cuenta y participá en nuestros sorteos de premios exclusivos.
-              </p>
-              <p className="text-white/50 text-sm mb-4">
-                Es gratis y rápido.
-              </p>
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => {
-                    setShowAuthPrompt(false);
-                    // Aquí deberíamos abrir el modal de login
-                    // Por ahora usamos el evento custom
-                    window.dispatchEvent(new CustomEvent('openAuthModal'));
-                  }}
-                  className="btn-primary flex-1"
-                >
-                  Iniciar Sesión
-                </button>
+              <div className="flex items-center gap-3">
+                <div className="text-2xl">🎰</div>
+                <div className="flex-1">
+                  <p className="text-white text-sm font-medium">¡Regístrate para jugar!</p>
+                  <p className="text-white/60 text-xs">Es gratis y rápido</p>
+                </div>
                 <button 
                   onClick={() => {
                     setShowAuthPrompt(false);
                     window.dispatchEvent(new CustomEvent('openAuthModal', { detail: 'register' }));
                   }}
-                  className="btn-secondary flex-1"
+                  className="bg-yellow-500 hover:bg-yellow-400 text-gray-900 text-xs font-bold px-3 py-1.5 rounded-lg"
                 >
-                  Registrarse
+                  Registrar
                 </button>
               </div>
             </motion.div>
