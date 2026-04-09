@@ -14,6 +14,8 @@ export const useApp = () => {
   const bannersQuery = useBanners();
   const settingsQuery = useSettings();
   const termsQuery = useTerms();
+  const allServicesQuery = useAllServices();
+  const allBannersQuery = useAllBanners();
   
   return {
     // Auth
@@ -39,8 +41,19 @@ export const useApp = () => {
     terms: termsQuery.data || '',
     
     // For admin: get all (including inactive)
-    allServices: useAllServices().data || [],
-    allBanners: useAllBanners().data || [],
+    allServices: allServicesQuery.data || [],
+    allBanners: allBannersQuery.data || [],
+    
+    // Refresh functions
+    refreshServices: () => {
+      servicesQuery.refetch();
+      allServicesQuery.refetch();
+    },
+    refreshBanners: () => {
+      bannersQuery.refetch();
+      allBannersQuery.refetch();
+    },
+    refreshSettings: () => settingsQuery.refetch(),
   };
 };
 
