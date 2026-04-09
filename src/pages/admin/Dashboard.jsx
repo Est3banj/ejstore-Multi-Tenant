@@ -1,8 +1,8 @@
 import { useApp } from '../../context/AppContext';
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Package, Tag, Image, Settings, Users, Wallet, Search } from 'lucide-react';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Package, Tag, Image, Settings, Users, Wallet, Search, X, Plus } from 'lucide-react';
+import { collection, getDocs, query, where, orderBy, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 
 const Dashboard = () => {
@@ -12,6 +12,9 @@ const Dashboard = () => {
   const [customers, setCustomers] = useState([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [rechargeAmount, setRechargeAmount] = useState('');
+  const [recharging, setRecharging] = useState(false);
   const [stats, setStats] = useState({
     totalServices: 0,
     activeServices: 0,
@@ -219,7 +222,10 @@ const Dashboard = () => {
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      <button className="text-primary-400 hover:text-primary-300 text-sm font-medium">
+                      <button 
+                        onClick={() => setSelectedCustomer(customer)}
+                        className="text-primary-400 hover:text-primary-300 text-sm font-medium"
+                      >
                         Cargar Saldo
                       </button>
                     </td>
@@ -230,6 +236,86 @@ const Dashboard = () => {
           </table>
         </div>
       </motion.div>
+
+      {/* Modal para cargar saldo */}
+      <AnimatePresence>
+        {selectedCustomer && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+            onClick={() => setSelectedCustomer(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="bg-gray-800 rounded-xl p-6 w-full max-w-md border border-gray-700"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-white">Cargar Saldo</h3>
+                <button onClick={() => setSelectedCustomer(null)} className="text-gray-400 hover:text-white">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="mb-4 p-3 bg-gray-900 rounded-lg">
+                <p className="text-gray-400 text-sm">Cliente</p>
+                <p className="text-white font-medium">{selectedCustomer.firstName} {selectedCustomer.lastName}</p>
+                <p className="text-gray-400 text-sm">{selectedCustomer.email}</p>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm text-gray-400 mb-2">Monto a agregar (COP)</label>
+                <input
+                  type="number"
+                  value={rechargeAmount}
+                  onChange={(e) => setRechargeAmount(e.target.value)}
+                  placeholder="Ej: 10000"
+                  className="w-full bg-gray-900 border border-gray-700 rounded-lg py-3 px-4 text-white placeholder-gray-500 focus:outline-none focus:border-primary-500"
+                  min={1000}
+                />
+              </div>
+
+              <button
+                onClick={async () => {
+                  const amount = parseInt(rechargeAmount);
+                  if (!amount || amount < 1000) {
+                    alert('El monto mínimo es $1,000');
+                    return;
+                  }
+                  setRecharging(true);
+                  try {
+                    await updateDoc(doc(db, 'customers', selectedCustomer.id), {
+                      balance: (selectedCustomer.balance || 0) + amount
+                    });
+                    // Actualizar la lista de clientes
+                    setCustomers(customers.map(c => 
+                      c.id === selectedCustomer.id 
+                        ? { ...c, balance: (c.balance || 0) + amount }
+                        : c
+                    ));
+                    setSelectedCustomer(null);
+                    setRechargeAmount('');
+                    alert('Saldo cargado correctamente');
+                  } catch (error) {
+                    console.error('Error recargando:', error);
+                    alert('Error al cargar saldo');
+                  } finally {
+                    setRecharging(false);
+                  }
+                }}
+                disabled={recharging || !rechargeAmount}
+                className="w-full bg-primary-600 hover:bg-primary-500 text-white font-medium py-3 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {recharging ? 'Cargando...' : 'Confirmar Recarga'}
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
