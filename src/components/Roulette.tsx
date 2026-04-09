@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Roulette as RouletteWheel } from 'react-custom-roulette';
+import { Wheel } from 'react-custom-roulette';
 import { DEFAULT_PRIZES, DEFAULT_PAYMENT_INFO } from '../utils/roulette';
 import { getUserSpinData, useSpin, spinWheel, getSpinPrice, getSpinsForFreeSpin } from '../hooks/useRoulette';
 import type { RoulettePrize, UserSpinData } from '../types';
@@ -206,7 +206,7 @@ const Roulette = ({ tenantId }: RouletteProps) => {
               {/* La Ruleta (librería) */}
               <div className="relative flex justify-center items-center my-4">
                 <div className="w-64 h-64 md:w-72 md:h-72">
-                  <RouletteWheel
+                  <Wheel
                     ref={wheelRef}
                     mustStartSpinning={mustSpin}
                     spinDuration={1}
