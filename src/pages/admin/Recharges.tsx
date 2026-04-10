@@ -85,20 +85,20 @@ const Recharges = () => {
   const rejectedCount = recharges.filter(r => r.status === 'rejected').length;
 
   return (
-    <div className="p-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+    <div className="p-4 md:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Recargas</h1>
-          <p className="text-white/60">Gestión de solicitudes de recarga</p>
+          <h1 className="text-xl md:text-2xl font-bold text-white">Recargas</h1>
+          <p className="text-white/60 text-sm">Gestión de solicitudes</p>
         </div>
         
-        {/* Filtros */}
-        <div className="flex gap-2">
+        {/* Filtros - responsive */}
+        <div className="flex flex-wrap gap-2">
           {(['all', 'pending', 'approved', 'rejected'] as const).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-3 py-1 rounded-full text-sm ${
+              className={`px-2 md:px-3 py-1 rounded-full text-xs md:text-sm whitespace-nowrap ${
                 filter === f 
                   ? 'bg-primary-500 text-white' 
                   : 'bg-white/10 text-white/60 hover:text-white'
@@ -159,7 +159,8 @@ const Recharges = () => {
                   </p>
                 </div>
                 
-                <div className="flex flex-col items-end gap-2">
+                {/* Botones responsive */}
+                <div className="flex sm:flex-col items-center gap-2">
                   {recharge.status === 'pending' ? (
                     <div className="flex gap-2">
                       <button
@@ -178,7 +179,7 @@ const Recharges = () => {
                         onClick={() => handleApprove(recharge)}
                         disabled={!!processing}
                         className="p-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 disabled:opacity-50"
-                        title="Aprobar y agregar saldo"
+                        title="Aprobar"
                       >
                         {processing === recharge.id ? (
                           <Loader className="w-4 h-4 animate-spin" />

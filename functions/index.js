@@ -320,3 +320,109 @@ exports.verifyTenantAccess = functions.https.onCall(async (data, context) => {
 
   return { valid: true };
 });
+
+// ========== TELEGRAM WEBHOOK ==========
+// Procesa comandos de approve/reject desde Telegram
+exports.telegramWebhook = functions.https.onRequest(async (req, res) => {
+  // Solo aceptar POST
+  if (req.method !== 'POST') {
+    res.status(405).send('Method Not Allowed');
+    return;
+  }
+
+  const update = req.body.message || req.body.callback_query;
+  if (!update) {
+    res.status(200).send('OK');
+    return;
+  }
+
+  // Verificar que es del admin
+  const chatId = update.chat?.id || update.message?.chat?.id;
+  if (chatId !== ADMIN_CHAT_ID) {
+    res.status(200).send('OK');
+    return;
+  }
+
+  const text = update.text || '';
+  
+  // Parsear comando: ✅ 10000 o ❌ pago no válido
+  let action = null;
+  let amount = 0;
+  let reason = '';
+  
+  if (text.startsWith('✅') || text.startsWith('aprobar') || text.startsWith('APROBAR')) {
+    action = 'approve';
+    // Extraer monto: "✅ 10000" o "aprobar 10000"
+    const match = text.match(/(\d+)/);
+    if (match) amount = parseInt(match[1]);
+  } else if (text.startsWith('❌') || text.startsWith('rechazar') || text.startsWith('RECHAZAR')) {
+    action = 'reject';
+    reason = text.replace(/^(❌|rechazar|RECHAZAR)\s*/i, '').trim() || 'Pago no válido o no verificado';
+  }
+
+  if (!action) {
+    res.status(200).send('OK');
+    return;
+  }
+
+  // Buscar recargas pendientes
+  const pendingSnap = await db.collection('recharges')
+    .where('status', '==', 'pending')
+    .orderBy('createdAt', 'desc')
+    .limit(10)
+    .get();
+
+  let processed = false;
+  
+  for (const doc of pendingSnap.docs) {
+    const recharge = doc.data();
+    
+    if (action === 'approve') {
+      // Buscar coincidencia por monto
+      if (amount > 0 && Math.abs(recharge.amount - amount) < 500) {
+        // Aprobar
+        await doc.ref.update({
+          status: 'approved',
+          processedAt: admin.firestore.FieldValue.serverTimestamp(),
+          processedBy: 'telegram'
+        });
+        
+        // Agregar saldo al cliente
+        const customerRef = db.collection('customers').doc(recharge.customerId);
+        const customerSnap = await customerRef.get();
+        if (customerSnap.exists) {
+          const currentBalance = customerSnap.data().balance || 0;
+          await customerRef.update({
+            balance: currentBalance + recharge.amount
+          });
+        }
+        
+        await sendTelegramMessage(chatId, `✅ *RECARGA APROBADA*\n\nMonto: $${recharge.amount.toLocaleString()}\nCliente: ${recharge.customerName}\nSaldo agregado exitosamente.`);
+        processed = true;
+        break;
+      }
+    } else if (action === 'reject') {
+      // Rechazar el primero pendiente
+      await doc.ref.update({
+        status: 'rejected',
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+        processedBy: 'telegram',
+        rejectionReason: reason
+      });
+      
+      await sendTelegramMessage(chatId, `❌ *RECARGA RECHAZADA*\n\nMonto: $${recharge.amount.toLocaleString()}\nCliente: ${recharge.customerName}\nMotivo: ${reason}`);
+      processed = true;
+      break;
+    }
+  }
+
+  if (!processed) {
+    if (action === 'approve' && amount > 0) {
+      await sendTelegramMessage(chatId, `⚠️ No se encontró recarga pendiente de ~$${amount.toLocaleString()}`);
+    } else if (action === 'reject') {
+      await sendTelegramMessage(chatId, `⚠️ No hay recargas pendientes para rechazar`);
+    }
+  }
+
+  res.status(200).send('OK');
+});
