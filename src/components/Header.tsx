@@ -37,7 +37,9 @@ const Header = (): JSX.Element => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [toast, setToast] = useState<{message: string; type: 'error' | 'success'} | null>(null);
   const [showRechargeModal, setShowRechargeModal] = useState(false);
+  const showRechargeToast = (msg: string, type: 'error'|'success') => showToast(msg, type);
 
   const isActive = (path: string): boolean => location.pathname === path;
 
@@ -59,6 +61,12 @@ const Header = (): JSX.Element => {
 
   const handleLogout = async () => {
     await logout();
+  };
+
+  // Toast helper
+  const showToast = (message: string, type: 'error' | 'success' = 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
   };
 
   // Escuchar eventos para abrir modal de auth desde otros componentes
@@ -412,6 +420,13 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
   const [amount, setAmount] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<{msg: string; type: 'error'|'success'} | null>(null);
+
+  // Toast helper
+  const showToast = (msg: string, type: 'error'|'success' = 'error') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   // Configuración de BRE-B
   const BRE_B_KEY = '0035443571';
@@ -425,7 +440,7 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
 
   const handleTransfer = () => {
     if (!amount || parseInt(amount) < 1000) {
-      alert('Por favor ingresa un monto válido (mínimo $1,000)');
+      showToast('Por favor ingresa un monto válido (mínimo $1,000)');
       return;
     }
     setStep('transfer');
@@ -433,7 +448,7 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
 
   const handleConfirmPayment = async () => {
     if (!fullName || !amount) {
-      alert('Por favor completa todos los campos');
+      showToast('Por favor completa todos los campos');
       return;
     }
 
@@ -471,11 +486,11 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
       // Notificar a Telegram
       await sendTelegramMessage(message);
       
-      alert('✅ Tu recarga ha sido registrada. Será validada y cargada en tu cuenta en pocos minutos.');
+      showToast('✅ Tu recarga ha sido registrada. Será validada y cargada en minutos.', 'success');
       onClose();
     } catch (error) {
       console.error('Error:', error);
-      alert('Error al procesar la solicitud. Intenta de nuevo.');
+      showToast('Error al procesar la solicitud. Intenta de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -616,6 +631,24 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
             💡 Tu recarga será verificada y confirmada manualmente
           </p>
         </div>
+
+        {/* Toast notification */}
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 50, opacity: 0 }}
+              className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-3 rounded-xl shadow-2xl z-50 ${
+                toast.type === 'error' 
+                  ? 'bg-red-500/90 text-white' 
+                  : 'bg-green-500/90 text-white'
+              }`}
+            >
+              <p className="font-medium">{toast.msg}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </motion.div>
   );
