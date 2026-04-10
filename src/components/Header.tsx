@@ -632,14 +632,14 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
           </p>
         </div>
 
-        {/* Toast notification */}
+        {/* Toast notification - centered at top */}
         <AnimatePresence>
           {toast && (
             <motion.div
-              initial={{ y: 50, opacity: 0 }}
+              initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 50, opacity: 0 }}
-              className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-3 rounded-xl shadow-2xl z-50 ${
+              exit={{ y: -20, opacity: 0 }}
+              className={`fixed top-20 left-1/2 -translate-x-1/2 px-4 py-3 rounded-xl shadow-2xl z-50 ${
                 toast.type === 'error' 
                   ? 'bg-red-500/90 text-white' 
                   : 'bg-green-500/90 text-white'
