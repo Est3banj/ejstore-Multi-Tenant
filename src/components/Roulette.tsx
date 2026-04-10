@@ -315,7 +315,7 @@ const Roulette = () => {
           )}
           {/* Tooltip "Prueba tu suerte" - visible on mobile, hover on desktop */}
           <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-sm px-3 py-2 rounded-lg opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none md:pointer-events-auto">
-            🎰 Prueba tu suerte
+            <span className="animate-pulse">🎰</span> Prueba tu suerte
             <div className="absolute left-full top-1/2 -translate-y-1/2 w-2 h-2 bg-gray-800 rotate-45 hidden md:block"></div>
           </div>
         </div>
