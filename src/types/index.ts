@@ -53,6 +53,7 @@ export interface Settings {
   logo?: string;
   whatsappNumber?: string;
   contactEmail?: string;
+  qrImage?: string; // URL de imagen QR para recargas
 }
 
 export interface User {

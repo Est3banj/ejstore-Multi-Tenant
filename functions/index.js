@@ -1,9 +1,204 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const axios = require('axios');
 
 admin.initializeApp();
 
 const db = admin.firestore();
+
+// ========== CONFIG ==========
+const TELEGRAM_BOT_TOKEN = '8597739575:AAFuw__aMizR6sSPfUx6bU9da_r4PlNjnuI';
+const ADMIN_CHAT_ID = '1666952441';
+const BRE_B_KEY = '0035443571';
+
+// ========== HELPER: Enviar mensaje a Telegram ==========
+async function sendTelegramMessage(chatId, text, keyboard = null) {
+  try {
+    const payload = { chat_id: chatId, text };
+    if (keyboard) {
+      payload.reply_markup = keyboard;
+    }
+    await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, payload);
+  } catch (error) {
+    console.error('Error sending Telegram message:', error.message);
+  }
+}
+
+// ========== NOTIFICAR PREMIO GANADO ==========
+exports.notifyPrizeWon = functions.https.onCall(async (data, context) => {
+  const { userName, phone, prize, prizeId } = data;
+
+  // No enviar notificación si es "nada"
+  if (prizeId === 'nothing') {
+    return { success: true, message: 'No se notifica porque no ganó nada' };
+  }
+
+  const message = `
+🎁 *NUEVO GANADOR*
+━━━━━━━━━━━━━━━━
+👤 *Nombre:* ${userName}
+📱 *WhatsApp:* ${phone}
+🎉 *Premio:* ${prize}
+🕐 *Fecha:* ${new Date().toLocaleString('America/Bogota', { timeZone: 'America/Bogota' })}
+━━━━━━━━━━━━━━━━
+`;
+
+  // Crear teclado con botones para marcar como entregado
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: '✅ Marcar entregado', callback_data: `delivered_${phone}` }],
+      [{ text: '❌ Descartar', callback_data: `discard_${phone}` }]
+    ]
+  };
+
+  await sendTelegramMessage(ADMIN_CHAT_ID, message, keyboard);
+  return { success: true };
+});
+
+// ========== CREAR SOLICITUD DE RECARGA ==========
+exports.createRechargeRequest = functions.https.onCall(async (data, context) => {
+  // Verificar que el usuario esté autenticado
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+  }
+
+  const { amount, userName, phone, transferProof } = data;
+
+  if (!amount || !userName || !phone) {
+    throw new functions.https.HttpsError('invalid-argument', 'Monto, nombre y teléfono son requeridos');
+  }
+
+  // Crear documento de recarga
+  const rechargeRef = await db.collection('recharges').add({
+    userId: context.auth.uid,
+    userName,
+    phone,
+    amount: parseInt(amount),
+    transferProof: transferProof || null,
+    status: 'pending', // pending, approved, rejected
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+
+  // Notificar al admin por Telegram
+  const message = `
+💰 *NUEVA RECARGA*
+━━━━━━━━━━━━━━━━
+👤 *Nombre:* ${userName}
+📱 *WhatsApp:* ${phone}
+💵 *Monto:* $${parseInt(amount).toLocaleString()} COP
+🕐 *Fecha:* ${new Date().toLocaleString('America/Bogota', { timeZone: 'America/Bogota' })}
+━━━━━━━━━━━━━━━━
+`;
+
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: '✅ Aprobar', callback_data: `approve_${rechargeRef.id}` }],
+      [{ text: '❌ Rechazar', callback_data: `reject_${rechargeRef.id}` }]
+    ]
+  };
+
+  await sendTelegramMessage(ADMIN_CHAT_ID, message, keyboard);
+
+  return { success: true, rechargeId: rechargeRef.id };
+});
+
+// ========== APROBAR/RECHAZAR RECARGA (Admin) ==========
+exports.processRecharge = functions.https.onCall(async (data, context) => {
+  // Verificar que sea admin
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+  }
+
+  const claims = context.auth.token;
+  if (claims.role !== 'superadmin' && claims.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'No tiene permisos de admin');
+  }
+
+  const { rechargeId, action } = data; // action: 'approve' | 'reject'
+
+  if (!rechargeId || !action) {
+    throw new functions.https.HttpsError('invalid-argument', 'rechargeId y action son requeridos');
+  }
+
+  const rechargeRef = db.collection('recharges').doc(rechargeId);
+  const rechargeDoc = await rechargeRef.get();
+
+  if (!rechargeDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Recarga no encontrada');
+  }
+
+  const rechargeData = rechargeDoc.data();
+  const newStatus = action === 'approve' ? 'approved' : 'rejected';
+
+  // Actualizar estado
+  await rechargeRef.update({
+    status: newStatus,
+    processedAt: admin.firestore.FieldValue.serverTimestamp(),
+    processedBy: context.auth.uid
+  });
+
+  // Si se aprueba, actualizar saldo del usuario
+  if (action === 'approve') {
+    const customerRef = db.collection('customers').doc(rechargeData.userId);
+    await customerRef.update({
+      balance: admin.firestore.FieldValue.increment(rechargeData.amount)
+    });
+  }
+
+  // Notificar al usuario por Telegram
+  const statusText = action === 'approve' ? '✅ Aprobada' : '❌ Rechazada';
+  const userMessage = `Tu recarga de $${rechargeData.amount.toLocaleString()} COP ha sido ${statusText.toLowerCase()}.`;
+
+  if (rechargeData.phone) {
+    // Enviar mensaje al usuario (si tiene Telegram linked, si no solo guardamos en Firestore)
+    await db.collection('notifications').add({
+      userId: rechargeData.userId,
+      type: 'recharge_status',
+      message: userMessage,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+  }
+
+  return { success: true, status: newStatus };
+});
+
+// ========== WEBHOOK PARA CALLBACKS DE TELEGRAM ==========
+exports.telegramWebhook = functions.https.onRequest(async (req, res) => {
+  if (req.method !== 'POST') {
+    res.status(200).send('OK');
+    return;
+  }
+
+  const update = req.body;
+
+  // Manejar callbacks (botones presionados)
+  if (update.callback_query) {
+    const callbackData = update.callback_query.data;
+    const chatId = update.callback_query.message.chat.id;
+
+    if (callbackData.startsWith('delivered_')) {
+      const phone = callbackData.replace('delivered_', '');
+      await sendTelegramMessage(chatId, `✅ Premio marcado como entregado al usuario ${phone}`);
+    } else if (callbackData.startsWith('discard_')) {
+      const phone = callbackData.replace('discard_', '');
+      await sendTelegramMessage(chatId, `❌ Premio descartado para el usuario ${phone}`);
+    } else if (callbackData.startsWith('approve_')) {
+      const rechargeId = callbackData.replace('approve_', '');
+      // Aquí podrías llamar a la función internamente o hacer un redirect
+      await sendTelegramMessage(chatId, `ℹ️ Para aprobar la recarga ${rechargeId}, hazlo desde el panel admin`);
+    } else if (callbackData.startsWith('reject_')) {
+      const rechargeId = callbackData.replace('reject_', '');
+      await sendTelegramMessage(chatId, `ℹ️ Para rechazar la recarga ${rechargeId}, hazlo desde el panel admin`);
+    }
+
+    // Responder al callback
+    await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+      callback_query_id: update.callback_query.id
+    });
+  }
+
+  res.status(200).send('OK');
+});
 
 // ========== SET CUSTOM CLAIMS ==========
 // LLamada desde el frontend para setear claims del usuario

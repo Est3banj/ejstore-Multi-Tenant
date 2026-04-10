@@ -36,7 +36,8 @@ export const useApp = () => {
       contactEmail: '',
       siteName: 'Mi Tienda',
       primaryColor: '#E50914',
-      secondaryColor: '#1A1A1A'
+      secondaryColor: '#1A1A1A',
+      qrImage: ''
     },
     terms: termsQuery.data || '',
     

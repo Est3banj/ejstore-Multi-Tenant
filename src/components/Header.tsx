@@ -412,7 +412,7 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
 
   // Configuración de BRE-B
   const BRE_B_KEY = '0035443571';
-  const bankInfo = 'Bancolombia - Cuenta de Ahorros';
+  const bankInfo = 'BRE-B - Cuenta de Ahorros'; //BRE-B soporta transferencias de cualquier banco
 
   const handleWhatsapp = () => {
     const message = encodeURIComponent('Hola, quiero recargar saldo en mi cuenta. ¿Me puedes ayudar?');
@@ -436,14 +436,22 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
 
     setLoading(true);
     
-    // Enviar notificación directa a Telegram (sin Cloud Functions)
+// Enviar notificación directa a Telegram (sin Cloud Functions)
+    const now = new Date();
+    const fechaHora = now.toLocaleString('es-CO', { 
+      timeZone: 'America/Bogota',
+      dateStyle: 'full',
+      timeStyle: 'short'
+    });
     const message = `
 💰 *NUEVA SOLICITUD DE RECARGA*
-━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━
 👤 *Nombre:* ${fullName}
 📱 *WhatsApp:* ${customer?.phone || 'No registrado'}
 💵 *Monto:* $${parseInt(amount).toLocaleString()} COP
-━━━━━━━━━━━━━━━━
+🕐 *Fecha:* ${fechaHora}
+━━━━━━━━━━━━
+*Acciones:* /aprobar_${customer?.uid} /rechazar_${customer?.uid}
 `;
 
     try {
@@ -536,6 +544,13 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
             <h2 className="text-xl font-bold gradient-text mb-4">Datos para transferir</h2>
             
             <div className="bg-white/5 rounded-xl p-4 space-y-3 mb-4">
+              {/* QR Image si está configurado */}
+              {settings.qrImage && (
+                <div className="text-center">
+                  <img src={settings.qrImage} alt="QR" className="w-40 h-40 mx-auto rounded-lg" />
+                  <p className="text-white/50 text-xs mt-1">Escanea para pagar</p>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-white/60">Banco:</span>
                 <span className="font-bold text-white">{bankInfo}</span>
@@ -575,7 +590,7 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
                 disabled={loading || !fullName}
                 className="btn-primary w-full py-3"
               >
-                {loading ? 'Enviando...' : '✅ Ya realicé la transferencia'}
+                {loading ? 'Enviando...' : 'Ya realicé la transferencia'}
               </button>
             </div>
           </>

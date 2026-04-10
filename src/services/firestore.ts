@@ -347,6 +347,7 @@ export const deleteBanner = async (id: string, _tenantId: string): Promise<void>
 interface SettingsOutput extends Settings {
   primaryColor?: string;
   secondaryColor?: string;
+  qrImage?: string;
 }
 
 export const getSettings = async (tenantId: string): Promise<SettingsOutput | null> => {
@@ -363,7 +364,8 @@ export const getSettings = async (tenantId: string): Promise<SettingsOutput | nu
         contactEmail: data.contactEmail || '',
         siteName: data.name || 'Mi Tienda',
         primaryColor: data.primaryColor || '#E50914',
-        secondaryColor: data.secondaryColor || '#1A1A1A'
+        secondaryColor: data.secondaryColor || '#1A1A1A',
+        qrImage: data.qrImage || ''
       };
     }
     return null;
@@ -380,6 +382,7 @@ interface SettingsInput {
   contactEmail?: string;
   primaryColor?: string;
   secondaryColor?: string;
+  qrImage?: string;
 }
 
 export const updateSettings = async (tenantId: string, settings: SettingsInput): Promise<void> => {
@@ -393,6 +396,7 @@ export const updateSettings = async (tenantId: string, settings: SettingsInput):
       contactEmail: settings.contactEmail,
       primaryColor: settings.primaryColor,
       secondaryColor: settings.secondaryColor,
+      qrImage: settings.qrImage,
       updatedAt: serverTimestamp()
     };
     await setDoc(docRef, firestoreData, { merge: true });
