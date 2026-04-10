@@ -59,13 +59,13 @@ export const register = async (
     
     console.log('📝 Creando cliente con UID:', user.uid);
     
-    // Crear documento de cliente en Firestore
+    // Crear documento de cliente en Firestore con $1000 de saldo inicial
     await setDoc(doc(db, 'customers', user.uid), {
       email,
       firstName,
       lastName,
       phone,
-      balance: 0,
+      balance: 1000, // Saldo inicial para probar la ruleta
       createdAt: serverTimestamp()
     });
     
