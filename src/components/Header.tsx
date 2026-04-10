@@ -412,7 +412,7 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
 
   // Configuración de BRE-B
   const BRE_B_KEY = '0035443571';
-  const bankInfo = 'BRE-B - Cuenta de Ahorros'; //BRE-B soporta transferencias de cualquier banco
+  const bankInfo = 'BRE-B - GIO TECH'; // BRE-B soporta transferencias de cualquier banco
 
   const handleWhatsapp = () => {
     const message = encodeURIComponent('Hola, quiero recargar saldo en mi cuenta. ¿Me puedes ayudar?');
