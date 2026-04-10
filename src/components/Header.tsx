@@ -454,6 +454,8 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
 💵 *Monto:* $${parseInt(amount).toLocaleString()} COP
 🕐 *Fecha:* ${fechaHora}
 ━━━━━━━━━━━━
+*Para APROBAR:* responder con: ✅ +monto
+*Para RECHAZAR:* responder con: ❌ +motivo
 `;
 
     try {

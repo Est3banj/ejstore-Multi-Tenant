@@ -13,6 +13,7 @@ const Recharges = () => {
   const [recharges, setRecharges] = useState<Recharge[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
   useEffect(() => {
     if (tenantId) loadRecharges();
@@ -59,10 +60,12 @@ const Recharges = () => {
 
   const handleReject = async (recharge: Recharge) => {
     if (!tenantId || !user?.email) return;
-    const reason = prompt('Motivo del rechazo (opcional):');
+    // Mensaje predeterminado por pago no válido
+    const defaultReason = 'Pago no válido o no verificado';
+    const reason = prompt('Motivo del rechazo (Enter para "Pago no válido"):', defaultReason);
     setProcessing(recharge.id);
     try {
-      await rejectRecharge(recharge.id, user.email, reason || undefined);
+      await rejectRecharge(recharge.id, user.email, reason || defaultReason);
       await loadRecharges();
     } catch (error) {
       console.error('Error rejecting:', error);
@@ -72,34 +75,57 @@ const Recharges = () => {
     }
   };
 
+  // Filtrar recargas
+  const filteredRecharges = filter === 'all' 
+    ? recharges 
+    : recharges.filter(r => r.status === filter);
+    
   const pendingCount = recharges.filter(r => r.status === 'pending').length;
+  const approvedCount = recharges.filter(r => r.status === 'approved').length;
+  const rejectedCount = recharges.filter(r => r.status === 'rejected').length;
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white">Recargas</h1>
-          <p className="text-white/60">Solicitudes de recarga de saldo</p>
+          <p className="text-white/60">Gestión de solicitudes de recarga</p>
         </div>
-        {pendingCount > 0 && (
-          <div className="flex items-center gap-2 px-3 py-1 bg-yellow-500/20 rounded-full">
-            <Clock size={16} className="text-yellow-400" />
-            <span className="text-yellow-400 font-medium">{pendingCount} pendientes</span>
-          </div>
-        )}
+        
+        {/* Filtros */}
+        <div className="flex gap-2">
+          {(['all', 'pending', 'approved', 'rejected'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1 rounded-full text-sm ${
+                filter === f 
+                  ? 'bg-primary-500 text-white' 
+                  : 'bg-white/10 text-white/60 hover:text-white'
+              }`}
+            >
+              {f === 'all' && `Todas (${recharges.length})`}
+              {f === 'pending' && `Pendientes (${pendingCount})`}
+              {f === 'approved' && `Aprobadas (${approvedCount})`}
+              {f === 'rejected' && `Rechazadas (${rejectedCount})`}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader className="w-8 h-8 animate-spin text-primary-400" />
         </div>
-      ) : recharges.length === 0 ? (
+      ) : filteredRecharges.length === 0 ? (
         <div className="glass p-12 text-center">
-          <p className="text-white/50">No hay solicitudes de recarga</p>
+          <p className="text-white/50">
+            {filter === 'all' ? 'No hay solicitudes de recarga' : `No hay solicitudes ${filter}`}
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
-          {recharges.map(recharge => (
+          {filteredRecharges.map(recharge => (
             <motion.div
               key={recharge.id}
               initial={{ opacity: 0, y: 10 }}
