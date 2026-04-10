@@ -6,6 +6,27 @@ import { useAuth } from '../hooks/useAuth';
 import { Menu, X, User, LogOut, Wallet, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// Configuración de Telegram (hardcodeada para evitar Cloud Functions)
+const TELEGRAM_BOT_TOKEN = '8597739575:AAFuw__aMizR6sSPfUx6bU9da_r4PlNjnuI';
+const ADMIN_CHAT_ID = '1666952441';
+
+// Función para enviar mensaje a Telegram
+async function sendTelegramMessage(text: string) {
+  try {
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: ADMIN_CHAT_ID,
+        text,
+        parse_mode: 'Markdown'
+      })
+    });
+  } catch (error) {
+    console.error('Error sending to Telegram:', error);
+  }
+}
+
 const Header = (): JSX.Element => {
   const { settings } = useApp();
   const { user, customer, logout } = useAuthStore();
@@ -182,6 +203,13 @@ const Header = (): JSX.Element => {
                     <Wallet size={16} className="text-yellow-400" />
                     <span className="text-white font-medium">${customer.balance.toLocaleString()}</span>
                   </div>
+                  <button
+                    onClick={() => { setShowRechargeModal(true); setMobileMenuOpen(false); }}
+                    className="flex items-center gap-2 w-full px-4 py-2 text-yellow-400 hover:bg-yellow-500/10 rounded-lg"
+                  >
+                    <Plus size={16} />
+                    Recargar saldo
+                  </button>
                   <button
                     onClick={handleLogout}
                     className="flex items-center gap-2 w-full px-4 py-2 text-white/70 hover:text-white hover:bg-white/5 rounded-lg"
@@ -376,23 +404,58 @@ const AuthModal = ({ mode, onModeChange, onClose }: {
 // Modal para recargar saldo
 const RechargeModal = ({ onClose }: { onClose: () => void }) => {
   const { customer, refreshCustomer } = useAuthStore();
+  const { settings } = useApp();
+  const [step, setStep] = useState<'select' | 'transfer' | 'confirm'>('select');
   const [amount, setAmount] = useState('');
+  const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleRecharge = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const rechargeAmount = parseInt(amount);
-    if (!rechargeAmount || rechargeAmount < 1000) {
-      alert('El monto mínimo es $1,000');
+  // Configuración de BRE-B
+  const BRE_B_KEY = '0035443571';
+  const bankInfo = 'Bancolombia - Cuenta de Ahorros';
+
+  const handleWhatsapp = () => {
+    const message = encodeURIComponent('Hola, quiero recargar saldo en mi cuenta. ¿Me puedes ayudar?');
+    const whatsappNumber = settings.whatsappNumber || '3101234567';
+    window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
+  };
+
+  const handleTransfer = () => {
+    if (!amount || parseInt(amount) < 1000) {
+      alert('Por favor ingresa un monto válido (mínimo $1,000)');
       return;
     }
-    
+    setStep('transfer');
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!fullName || !amount) {
+      alert('Por favor completa todos los campos');
+      return;
+    }
+
     setLoading(true);
-    // Aquí después se integrará con el sistema de pagos real
-    // Por ahora solo muestra la info de pago
-    alert('Gracias por tu interés en recargar. El sistema de pagos estará disponible pronto.');
-    setLoading(false);
-    onClose();
+    
+    // Enviar notificación directa a Telegram (sin Cloud Functions)
+    const message = `
+💰 *NUEVA SOLICITUD DE RECARGA*
+━━━━━━━━━━━━━━━━
+👤 *Nombre:* ${fullName}
+📱 *WhatsApp:* ${customer?.phone || 'No registrado'}
+💵 *Monto:* $${parseInt(amount).toLocaleString()} COP
+━━━━━━━━━━━━━━━━
+`;
+
+    try {
+      await sendTelegramMessage(message);
+      alert('✅ Tu solicitud de recarga ha sido enviada. Te notificaremos cuando sea procesada.');
+      onClose();
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al procesar la solicitud. Intenta de nuevo.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -417,36 +480,110 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
           <X size={20} />
         </button>
 
-        <h2 className="text-2xl font-bold gradient-text mb-2">Cargar Saldo</h2>
-        <p className="text-white/60 text-sm mb-6">Tu saldo actual: <span className="text-yellow-400 font-bold">${customer?.balance?.toLocaleString() || 0}</span></p>
+        {step === 'select' && (
+          <>
+            <h2 className="text-2xl font-bold gradient-text mb-2">Cargar Saldo</h2>
+            <p className="text-white/60 text-sm mb-4">Tu saldo actual: <span className="text-yellow-400 font-bold">${customer?.balance?.toLocaleString() || 0}</span></p>
 
-        <form onSubmit={handleRecharge} className="space-y-4">
-          <div>
-            <label className="block text-sm text-white/70 mb-1">Monto a cargar (COP)</label>
-            <input
-              type="number"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              className="input-field"
-              placeholder="Ej: 5000"
-              min={1000}
-              required
-            />
-            <p className="text-white/40 text-xs mt-1">Monto mínimo: $1,000 COP</p>
-          </div>
+            <div className="mb-4">
+              <label className="block text-sm text-white/70 mb-1">Monto a cargar (COP)</label>
+              <input
+                type="number"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                className="input-field"
+                placeholder="Ej: 10000"
+                min={1000}
+              />
+              <p className="text-white/40 text-xs mt-1">Monto mínimo: $1,000 COP</p>
+            </div>
 
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="btn-primary w-full py-3"
-          >
-            {loading ? 'Procesando...' : 'Continuar con el pago'}
-          </button>
-        </form>
+            <div className="space-y-3">
+              <button 
+                onClick={handleWhatsapp}
+                className="w-full bg-green-500 hover:bg-green-600 text-white py-4 px-4 rounded-xl flex items-center gap-3 transition-all"
+              >
+                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.195.194 1.666.179.47-.015 1.725-.652 1.972-1.469.247-.817.347-1.732.372-1.817.025-.085.025-.16.05-.248.025-.098.05-.198.075-.298.049-.099.124-.199.199-.347.074-.149.124-.298.174-.447.05-.149.025-.298-.025-.447-.049-.149-.174-.298-.347-.447-.174-.149-.347-.223-.52-.298-.174-.074-.347-.149-.52-.223-.174-.074-.298-.124-.447-.174-.149-.05-.223-.124-.298-.174-.074-.05-.124-.074-.174-.099-.149-.025-.223-.074-.298-.124-.074-.049-.149-.099-.223-.149z"/>
+                </svg>
+                <div className="text-left">
+                  <div className="font-bold">Hablar con asesor</div>
+                  <div className="text-xs text-white/80">Te atendemos por WhatsApp</div>
+                </div>
+              </button>
+
+              <button 
+                onClick={handleTransfer}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 px-4 rounded-xl flex items-center gap-3 transition-all"
+              >
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+                <div className="text-left">
+                  <div className="font-bold">Transferencia BRE-B</div>
+                  <div className="text-xs text-white/80">Desde cualquier banco</div>
+                </div>
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === 'transfer' && (
+          <>
+            <button onClick={() => setStep('select')} className="text-white/50 hover:text-white mb-2 flex items-center gap-1 text-sm">
+              ← Volver
+            </button>
+            <h2 className="text-xl font-bold gradient-text mb-4">Datos para transferir</h2>
+            
+            <div className="bg-white/5 rounded-xl p-4 space-y-3 mb-4">
+              <div className="flex justify-between">
+                <span className="text-white/60">Banco:</span>
+                <span className="font-bold text-white">{bankInfo}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-white/60">CLAVE BRE-B:</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-bold text-primary-400 text-lg">{BRE_B_KEY}</span>
+                  <button 
+                    onClick={() => navigator.clipboard.writeText(BRE_B_KEY)}
+                    className="text-white/40 hover:text-white"
+                    title="Copiar"
+                  >
+                    📋
+                  </button>
+                </div>
+              </div>
+              <div className="border-t border-white/10 pt-2 mt-2">
+                <p className="text-yellow-400 text-sm text-center">Monto a transferir: <span className="font-bold text-lg">${parseInt(amount || '0').toLocaleString()} COP</span></p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm text-white/70 mb-1">Nombre completo (como aparece en la transferencia)</label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={e => setFullName(e.target.value)}
+                  className="input-field"
+                  placeholder="Juan Perez"
+                  required
+                />
+              </div>
+              <button 
+                onClick={handleConfirmPayment}
+                disabled={loading || !fullName}
+                className="btn-primary w-full py-3"
+              >
+                {loading ? 'Enviando...' : '✅ Ya realicé la transferencia'}
+              </button>
+            </div>
+          </>
+        )}
 
         <div className="mt-4 p-3 bg-white/5 rounded-lg">
           <p className="text-white/50 text-xs text-center">
-            💳 Puedes pagar con Nequi, Daviplata o transferencia Bancolombia
+            💡 Tu recarga será verificada y confirmada manualmente
           </p>
         </div>
       </motion.div>
