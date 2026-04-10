@@ -300,10 +300,10 @@ const Roulette = () => {
       <motion.button 
         initial={{ scale: 0 }} 
         animate={{ scale: 1 }} 
-        className="fixed bottom-6 right-6 z-40"
+        className="fixed bottom-6 right-6 z-40 group"
         onClick={handleOpenRoulette}
       >
-        <div className="relative group">
+        <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 rounded-full blur-lg opacity-75 group-hover:opacity-100"></div>
           <div className="relative bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 p-4 rounded-full shadow-2xl hover:scale-110">
             <Gift size={28} className="text-white" />
@@ -313,6 +313,11 @@ const Roulette = () => {
               {userData.spinsFree}
             </div>
           )}
+          {/* Tooltip "Prueba tu suerte" */}
+          <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-sm px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+            🎰 Prueba tu suerte
+            <div className="absolute left-full top-1/2 -translate-y-1/2 w-2 h-2 bg-gray-800 rotate-45"></div>
+          </div>
         </div>
       </motion.button>
 
