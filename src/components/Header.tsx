@@ -471,7 +471,7 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
       // Notificar a Telegram
       await sendTelegramMessage(message);
       
-      alert('Tu solicitud de recarga ha sido enviada. Te notificaremos cuando sea procesada.');
+      alert('✅ Tu recarga ha sido registrada. Será validada y cargada en tu cuenta en pocos minutos.');
       onClose();
     } catch (error) {
       console.error('Error:', error);
