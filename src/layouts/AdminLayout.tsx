@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { logout } from '../services/auth';
-import { Menu, X, LayoutDashboard, Package, Image, FileText, Settings, LogOut, LucideIcon, Gift } from 'lucide-react';
+import { Menu, X, LayoutDashboard, Package, Image, FileText, Settings, LogOut, LucideIcon, Gift, Wallet } from 'lucide-react';
 
 interface MenuItem {
   path: string;
@@ -30,6 +30,7 @@ const AdminLayout = (): JSX.Element => {
     { path: '/admin/services', label: 'Servicios', icon: Package },
     { path: '/admin/banners', label: 'Banners', icon: Image },
     { path: '/admin/roulette', label: 'Ruleta', icon: Gift },
+    { path: '/admin/recargas', label: 'Recargas', icon: Wallet },
     { path: '/admin/terms', label: 'Términos', icon: FileText },
     { path: '/admin/settings', label: 'Configuración', icon: Settings }
   ];

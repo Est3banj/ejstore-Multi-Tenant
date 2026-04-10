@@ -16,6 +16,7 @@ const Banners = lazy(() => import('./pages/admin/Banners'));
 const Terms = lazy(() => import('./pages/admin/Terms'));
 const Settings = lazy(() => import('./pages/admin/Settings'));
 const RouletteSettings = lazy(() => import('./pages/admin/RouletteSettings'));
+const Recharges = lazy(() => import('./pages/admin/Recharges'));
 
 // Hook que combina loading states
 const useAppLoading = () => {
@@ -68,6 +69,7 @@ const AdminRoutes = () => {
         <Route path="terms" element={<Terms />} />
         <Route path="settings" element={<Settings />} />
         <Route path="roulette" element={<RouletteSettings />} />
+          <Route path="recargas" element={<Recharges />} />
         <Route index element={<Navigate to="/admin/dashboard" replace />} />
       </Route>
     </Routes>

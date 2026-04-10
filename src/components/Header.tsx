@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useAuthStore } from '../store/authStore';
+import { useTenantStore } from '../store';
 import { useAuth } from '../hooks/useAuth';
 import { Menu, X, User, LogOut, Wallet, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createRechargeRequest } from '../services/firestore';
 
 // Configuración de Telegram (hardcodeada para evitar Cloud Functions)
 const TELEGRAM_BOT_TOKEN = '8597739575:AAFuw__aMizR6sSPfUx6bU9da_r4PlNjnuI';
@@ -405,6 +407,7 @@ const AuthModal = ({ mode, onModeChange, onClose }: {
 const RechargeModal = ({ onClose }: { onClose: () => void }) => {
   const { customer, refreshCustomer } = useAuthStore();
   const { settings } = useApp();
+  const tenantId = useTenantStore((state: any) => state.tenant?.id || state.userTenantId);
   const [step, setStep] = useState<'select' | 'transfer' | 'confirm'>('select');
   const [amount, setAmount] = useState('');
   const [fullName, setFullName] = useState('');
@@ -436,13 +439,13 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
 
     setLoading(true);
     
-// Enviar notificación directa a Telegram (sin Cloud Functions)
     const now = new Date();
     const fechaHora = now.toLocaleString('es-CO', { 
       timeZone: 'America/Bogota',
       dateStyle: 'full',
       timeStyle: 'short'
     });
+    
     const message = `
 💰 *NUEVA SOLICITUD DE RECARGA*
 ━━━━━━━━━━━━
@@ -451,12 +454,22 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
 💵 *Monto:* $${parseInt(amount).toLocaleString()} COP
 🕐 *Fecha:* ${fechaHora}
 ━━━━━━━━━━━━
-*Acciones:* /aprobar_${customer?.uid} /rechazar_${customer?.uid}
 `;
 
     try {
+      // Guardar en Firestore
+      await createRechargeRequest({
+        tenantId: tenantId || '',
+        customerId: customer?.uid || '',
+        customerName: fullName,
+        customerPhone: customer?.phone || '',
+        amount: parseInt(amount)
+      });
+      
+      // Notificar a Telegram
       await sendTelegramMessage(message);
-      alert('✅ Tu solicitud de recarga ha sido enviada. Te notificaremos cuando sea procesada.');
+      
+      alert('Tu solicitud de recarga ha sido enviada. Te notificaremos cuando sea procesada.');
       onClose();
     } catch (error) {
       console.error('Error:', error);

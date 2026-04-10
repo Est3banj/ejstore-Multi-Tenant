@@ -419,3 +419,68 @@ export const updateTenant = async (tenantId: string, data: Partial<Tenant>): Pro
     throw error;
   }
 };
+
+// === RECARGAS ===
+import type { Recharge } from '../types';
+
+export const createRechargeRequest = async (recharge: Omit<Recharge, 'id' | 'createdAt' | 'status'>): Promise<string> => {
+  try {
+    const docRef = await addDoc(collection(db, 'recharges'), {
+      ...recharge,
+      status: 'pending',
+      createdAt: serverTimestamp()
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error('Error creating recharge request:', error);
+    throw error;
+  }
+};
+
+export const getRecharges = async (tenantId: string): Promise<Recharge[]> => {
+  if (!tenantId) throw new Error('tenantId required');
+  try {
+    const q = query(
+      collection(db, 'recharges'),
+      where('tenantId', '==', tenantId)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate?.() || new Date()
+    })) as Recharge[];
+  } catch (error) {
+    console.error('Error getting recharges:', error);
+    return [];
+  }
+};
+
+export const approveRecharge = async (rechargeId: string, adminId: string): Promise<void> => {
+  try {
+    const docRef = doc(db, 'recharges', rechargeId);
+    await updateDoc(docRef, {
+      status: 'approved',
+      processedAt: serverTimestamp(),
+      processedBy: adminId
+    });
+  } catch (error) {
+    console.error('Error approving recharge:', error);
+    throw error;
+  }
+};
+
+export const rejectRecharge = async (rechargeId: string, adminId: string, reason?: string): Promise<void> => {
+  try {
+    const docRef = doc(db, 'recharges', rechargeId);
+    await updateDoc(docRef, {
+      status: 'rejected',
+      processedAt: serverTimestamp(),
+      processedBy: adminId,
+      rejectionReason: reason || 'Rechazado por el administrador'
+    });
+  } catch (error) {
+    console.error('Error rejecting recharge:', error);
+    throw error;
+  }
+};

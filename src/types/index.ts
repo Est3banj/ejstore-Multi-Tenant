@@ -106,3 +106,18 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'tenantId'> = {
   contactEmail: '',
   siteName: 'EJStore',
 };
+
+// Tipos para recargas
+export interface Recharge {
+  id: string;
+  tenantId: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  amount: number;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: Date;
+  processedAt?: Date;
+  processedBy?: string;
+  rejectionReason?: string;
+}
