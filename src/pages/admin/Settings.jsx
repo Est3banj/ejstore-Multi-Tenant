@@ -17,7 +17,8 @@ const Settings = () => {
     whatsappNumber: '',
     contactEmail: '',
     primaryColor: '#E50914',
-    secondaryColor: '#1A1A1A'
+    secondaryColor: '#1A1A1A',
+    qrImage: ''
   });
   const [logoFile, setLogoFile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -297,6 +298,25 @@ const Settings = () => {
               className="input-field"
               placeholder="contacto@ejstore.com"
             />
+          </div>
+
+          <div>
+            <label className="block text-white/70 mb-2">URL de Imagen QR (Recargas)</label>
+            <input
+              type="url"
+              value={formData.qrImage || ''}
+              onChange={(e) => setFormData({ ...formData, qrImage: e.target.value })}
+              className="input-field"
+              placeholder="https://ejemplo.com/qr-recarga.png"
+            />
+            <p className="text-white/50 text-sm mt-2">
+              Imagen QR que se mostrará en el modal de recarga. Sube la imagen a Storage y pega la URL aquí.
+            </p>
+            {formData.qrImage && (
+              <div className="mt-2">
+                <img src={formData.qrImage} alt="QR Preview" className="w-24 h-24 rounded-lg border border-white/20" />
+              </div>
+            )}
           </div>
         </div>
 
