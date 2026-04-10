@@ -35,17 +35,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (currentUser) {
         // Verificar si es admin (tiene documento en users collection)
         const userData = await checkUserRole(currentUser.uid);
-        if (userData?.tenantId) {
-          set({ userTenantId: userData.tenantId, isAdmin: true });
+        const isAdminUser = !!userData?.tenantId;
+        
+        if (isAdminUser) {
+          set({ userTenantId: userData.tenantId, isAdmin: true, customer: null });
+          console.log('🔐 Admin logueado:', currentUser.email);
         } else {
           set({ userTenantId: null, isAdmin: false });
+          // Solo cargar datos de cliente si NO es admin
+          console.log('📄 Cargando datos del cliente:', currentUser.uid);
+          const customerData = await getCustomerData(currentUser.uid, currentUser.email || '');
+          console.log('📊 Customer data:', customerData);
+          set({ customer: customerData });
         }
-        
-        // Cargar datos del cliente
-        console.log('📄 Cargando datos del cliente:', currentUser.uid);
-        const customerData = await getCustomerData(currentUser.uid, currentUser.email || '');
-        console.log('📊 Customer data:', customerData);
-        set({ customer: customerData });
       } else {
         console.log('❌ Usuario no autenticado');
         set({ userTenantId: null, customer: null, isAdmin: false });
