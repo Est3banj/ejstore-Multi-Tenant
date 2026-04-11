@@ -39,13 +39,15 @@ async function notifyWinner(userName: string, phone: string, prize: string, priz
 
   console.log('=== notifyWinner called ===', { userName, phone, prize, prizeId });
 
+  const fecha = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' });
+  
   const message = `
 🎁 *NUEVO GANADOR - RULETA*
 ━━━━━━━━━━━━━━━━━━━━━━━━
 👤 *Nombre:* ${userName}
 📱 *WhatsApp:* ${phone || 'Sin teléfono'}
 🎉 *Premio:* ${prize}
-🕐 *Fecha:* ${new Date().toLocaleString('America/Bogota', { timeZone: 'America/Bogota' })}
+🕐 *Fecha:* ${fecha}
 ━━━━━━━━━━━━━━━━━━━━━━━━
 `;
 
