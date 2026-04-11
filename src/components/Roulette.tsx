@@ -7,18 +7,48 @@ import { useTenantStore } from '../store/tenantStore';
 import { updateBalance } from '../services/auth';
 import type { RoulettePrize, UserSpinData } from '../types';
 import { Gift, X, Zap } from 'lucide-react';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../services/firebase';
 
-// Función para notificar premio ganado via Cloud Function
-async function notifyWinner(userName: string, phone: string, prize: string, prizeId: string) {
+// Configuración de Telegram
+const TELEGRAM_BOT_TOKEN = '8597739575:AAFuw__aMizR6sSPfUx6bU9da_r4PlNjnuI';
+const ADMIN_CHAT_ID = '1666952441';
+
+// Función para enviar mensaje a Telegram
+async function sendTelegramMessage(text: string) {
   try {
-    const notifyPrizeWon = httpsCallable(functions, 'notifyPrizeWon');
-    await notifyPrizeWon({ userName, phone, prize, prizeId });
-    console.log('Notificación de premio enviada');
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: ADMIN_CHAT_ID,
+        text,
+        parse_mode: 'Markdown'
+      })
+    });
   } catch (error) {
-    console.error('Error notifyPrizeWon:', error);
+    console.error('Error sending to Telegram:', error);
   }
+}
+
+// Función para notificar premio ganado
+async function notifyWinner(userName: string, phone: string, prize: string, prizeId: string) {
+  // No enviar notificación si es "nada"
+  if (prizeId === 'nothing') {
+    console.log('No se notifica porque no ganó nada');
+    return;
+  }
+
+  const message = `
+🎁 *NUEVO GANADOR - RULETA*
+━━━━━━━━━━━━━━━━━━━━━━━━
+👤 *Nombre:* ${userName}
+📱 *WhatsApp:* ${phone}
+🎉 *Premio:* ${prize}
+🕐 *Fecha:* ${new Date().toLocaleString('America/Bogota', { timeZone: 'America/Bogota' })}
+━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+
+  await sendTelegramMessage(message);
+  console.log('Notificación de premio enviada a Telegram');
 }
 
 const COLORES: Record<string, string> = {
