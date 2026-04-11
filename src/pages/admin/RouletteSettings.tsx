@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { DEFAULT_PRIZES, DEFAULT_ROULETTE_CONFIG, DEFAULT_PAYMENT_INFO } from '../../utils/roulette';
+import { DEFAULT_PRIZES, DEFAULT_ROULETTE_CONFIG } from '../../utils/roulette';
 import type { RoulettePrize } from '../../types';
 import { motion } from 'framer-motion';
 import { Save, RotateCcw } from 'lucide-react';
@@ -14,8 +14,6 @@ const RouletteSettings = () => {
   const [pricePerSpin, setPricePerSpin] = useState(DEFAULT_ROULETTE_CONFIG.pricePerSpin);
   const [spinsForFreeSpin, setSpinsForFreeSpin] = useState(DEFAULT_ROULETTE_CONFIG.spinsForFreeSpin);
   const [prizes, setPrizes] = useState<RoulettePrize[]>(DEFAULT_PRIZES);
-  const [nequiNumber, setNequiNumber] = useState(DEFAULT_PAYMENT_INFO.nequi);
-  const [daviplataNumber, setDaviplataNumber] = useState(DEFAULT_PAYMENT_INFO.daviplata);
   const [saving, setSaving] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
@@ -30,8 +28,6 @@ const RouletteSettings = () => {
         pricePerSpin,
         spinsForFreeSpin,
         prizes,
-        nequiNumber,
-        daviplataNumber,
       }));
       
       alert('Configuración guardada correctamente!');
@@ -56,8 +52,6 @@ const RouletteSettings = () => {
         setPricePerSpin(config.pricePerSpin ?? DEFAULT_ROULETTE_CONFIG.pricePerSpin);
         setSpinsForFreeSpin(config.spinsForFreeSpin ?? DEFAULT_ROULETTE_CONFIG.spinsForFreeSpin);
         setPrizes(config.prizes ?? DEFAULT_PRIZES);
-        setNequiNumber(config.nequiNumber ?? DEFAULT_PAYMENT_INFO.nequi);
-        setDaviplataNumber(config.daviplataNumber ?? DEFAULT_PAYMENT_INFO.daviplata);
       } catch (error) {
         console.error('Error loading roulette config:', error);
       }
@@ -70,8 +64,6 @@ const RouletteSettings = () => {
     setPricePerSpin(DEFAULT_ROULETTE_CONFIG.pricePerSpin);
     setSpinsForFreeSpin(DEFAULT_ROULETTE_CONFIG.spinsForFreeSpin);
     setPrizes(DEFAULT_PRIZES);
-    setNequiNumber(DEFAULT_PAYMENT_INFO.nequi);
-    setDaviplataNumber(DEFAULT_PAYMENT_INFO.daviplata);
     setShowResetConfirm(false);
   };
 
@@ -162,39 +154,6 @@ const RouletteSettings = () => {
                 onChange={(e) => setSpinsForFreeSpin(parseInt(e.target.value) || 1)}
                 className="input-field"
                 min="1"
-              />
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Números de Pago */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="glass p-6 rounded-xl mb-6"
-        >
-          <h3 className="text-xl font-bold text-white mb-4">💳 Números de Pago</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-white/70 mb-2">📱 Número Nequi</label>
-              <input
-                type="tel"
-                value={nequiNumber}
-                onChange={(e) => setNequiNumber(e.target.value)}
-                className="input-field"
-                placeholder="3101234567"
-              />
-            </div>
-            <div>
-              <label className="block text-white/70 mb-2">📱 Número Daviplata</label>
-              <input
-                type="tel"
-                value={daviplataNumber}
-                onChange={(e) => setDaviplataNumber(e.target.value)}
-                className="input-field"
-                placeholder="3101234567"
               />
             </div>
           </div>
