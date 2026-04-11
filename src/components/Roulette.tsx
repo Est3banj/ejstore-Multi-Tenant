@@ -32,12 +32,7 @@ async function sendTelegramMessage(text: string) {
 // Función para notificar premio ganado
 async function notifyWinner(userName: string, phone: string, prize: string, prizeId: string) {
   // No enviar notificación si es "nada"
-  if (prizeId === 'nothing') {
-    console.log('No se notifica porque no ganó nada');
-    return;
-  }
-
-  console.log('=== notifyWinner called ===', { userName, phone, prize, prizeId });
+  if (prizeId === 'nothing') return;
 
   const fecha = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' });
   
@@ -51,12 +46,7 @@ async function notifyWinner(userName: string, phone: string, prize: string, priz
 ━━━━━━━━━━━━━━━━━━━━━━━━
 `;
 
-  try {
-    await sendTelegramMessage(message);
-    console.log('Notificación de premio enviada a Telegram');
-  } catch (error) {
-    console.error('Error enviando notificación:', error);
-  }
+  await sendTelegramMessage(message);
 }
 
 const COLORES: Record<string, string> = {
@@ -302,8 +292,6 @@ const Roulette = () => {
   };
 
   const handleSpinEnd = useCallback(() => {
-    console.log('=== handleSpinEnd called ===', { result, customer });
-    
     const data = getUserSpinData();
     const useFree = useFreeSpin && data.spinsFree > 0;
     const newData = useSpin(useFree, data);
@@ -313,8 +301,6 @@ const Roulette = () => {
     setShowResult(true);
 
     if (result && result.id !== 'nothing' && customer) {
-      console.log('=== Calling notifyWinner ===');
-      // Notificar via Cloud Function (usa Telegram configurado en Firebase)
       notifyWinner(
         customer.firstName || customer.email || 'Usuario',
         customer.phone || '',
