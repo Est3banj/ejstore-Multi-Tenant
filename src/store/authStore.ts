@@ -30,7 +30,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initialize: () => {
     const unsubscribe = onAuthChange(async (currentUser) => {
       set({ user: currentUser, loading: true });
-      console.log('🔐 Auth change:', currentUser?.email);
       
       if (currentUser) {
         // Verificar si es admin (tiene documento en users collection)
@@ -39,17 +38,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         
         if (isAdminUser) {
           set({ userTenantId: userData.tenantId, isAdmin: true, customer: null });
-          console.log('🔐 Admin logueado:', currentUser.email);
         } else {
           set({ userTenantId: null, isAdmin: false });
           // Solo cargar datos de cliente si NO es admin
-          console.log('📄 Cargando datos del cliente:', currentUser.uid);
           const customerData = await getCustomerData(currentUser.uid, currentUser.email || '');
-          console.log('📊 Customer data:', customerData);
           set({ customer: customerData });
         }
       } else {
-        console.log('❌ Usuario no autenticado');
         set({ userTenantId: null, customer: null, isAdmin: false });
       }
       
@@ -78,6 +73,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     const { logout: authLogout } = await import('../services/auth');
     await authLogout();
+    
+    // Limpiar localStorage de ruleta
+    localStorage.removeItem('ejstore_roulette_data');
+    localStorage.removeItem('roulette_dont_ask');
+    
     set({ user: null, userTenantId: null, customer: null, isAdmin: false });
   }
 }));

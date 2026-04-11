@@ -1,8 +1,47 @@
-import { DEFAULT_PRIZES, DEFAULT_ROULETTE_CONFIG } from '../utils/roulette';
+import { DEFAULT_PRIZES, DEFAULT_ROULETTE_CONFIG, DEFAULT_PAYMENT_INFO } from '../utils/roulette';
 import type { RoulettePrize, UserSpinData } from '../types';
 
 // Clave para localStorage
 const STORAGE_KEY = 'ejstore_roulette_data';
+const STORAGE_CONFIG_KEY = 'roulette_config_';
+
+// Interfaz para la configuración guardada
+export interface RouletteConfig {
+  isEnabled?: boolean;
+  pricePerSpin?: number;
+  spinsForFreeSpin?: number;
+  prizes?: RoulettePrize[];
+  nequiNumber?: string;
+  daviplataNumber?: string;
+}
+
+// Función para obtener la configuración del tenant desde localStorage
+export function getRouletteConfig(tenantId: string): RouletteConfig | null {
+  if (typeof window === 'undefined') return null;
+  
+  const configKey = `${STORAGE_CONFIG_KEY}${tenantId}`;
+  const stored = localStorage.getItem(configKey);
+  
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+// Función para obtener números de pago (del tenant config o defaults)
+export function getPaymentInfo(tenantId: string): { nequi: string; daviplata: string; breb: string } {
+  const config = getRouletteConfig(tenantId);
+  
+  return {
+    nequi: config?.nequiNumber || DEFAULT_PAYMENT_INFO.nequi,
+    daviplata: config?.daviplataNumber || DEFAULT_PAYMENT_INFO.daviplata,
+    breb: '', // BRE-B no está en la config actual
+  };
+}
 
 // Función para obtener los datos del usuario
 export function getUserSpinData(): UserSpinData {

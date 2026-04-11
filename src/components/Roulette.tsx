@@ -1,29 +1,24 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DEFAULT_PRIZES, DEFAULT_PAYMENT_INFO } from '../utils/roulette';
-import { getUserSpinData, useSpin, spinWheel, getSpinPrice, getSpinsForFreeSpin } from '../hooks/useRoulette';
+import { getUserSpinData, useSpin, spinWheel, getSpinPrice, getSpinsForFreeSpin, getPaymentInfo } from '../hooks/useRoulette';
 import { useAuthStore } from '../store/authStore';
+import { useTenantStore } from '../store/tenantStore';
 import { updateBalance } from '../services/auth';
 import type { RoulettePrize, UserSpinData } from '../types';
 import { Gift, X, Zap } from 'lucide-react';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../services/firebase';
+import RechargeModal from './RechargeModal';
 
-// Configuración de Telegram
-const TELEGRAM_BOT_TOKEN = '8597739575:AAFuw__aMizR6sSPfUx6bU9da_r4PlNjnuI';
-const ADMIN_CHAT_ID = '1666952441';
-
-async function sendTelegramMessage(text: string) {
+// Función para notificar premio ganado via Cloud Function
+async function notifyWinner(userName: string, phone: string, prize: string, prizeId: string) {
   try {
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: ADMIN_CHAT_ID,
-        text,
-        parse_mode: 'Markdown'
-      })
-    });
+    const notifyPrizeWon = httpsCallable(functions, 'notifyPrizeWon');
+    await notifyPrizeWon({ userName, phone, prize, prizeId });
+    console.log('Notificación de premio enviada');
   } catch (error) {
-    console.error('Error sending to Telegram:', error);
+    console.error('Error notifyPrizeWon:', error);
   }
 }
 
@@ -131,11 +126,14 @@ const RouletteWheel = ({
 
 const Roulette = () => {
   const { user, customer, refreshCustomer } = useAuthStore();
+  const tenant = useTenantStore((state) => state.tenant);
+  const tenantId = tenant?.id || '';
   const [userData, setUserData] = useState<UserSpinData>({ spinsPaid: 0, spinsFree: 0, todaySpins: 0, lastSpinDate: '' });
   const [isSpinning, setIsSpinning] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [result, setResult] = useState<RoulettePrize | null>(null);
-  const [showPayment, setShowPayment] = useState(false);
+  const [showPayment, setShowPayment] = useState(false); // Modal viejo de Nequi (ya no se usa para recargas)
+  const [showRechargeModal, setShowRechargeModal] = useState(false); // Modal nuevo de recargas
   const [showRoulette, setShowRoulette] = useState(false);
   const [phone, setPhone] = useState('');
   const [useFreeSpin, setUseFreeSpin] = useState(false);
@@ -145,6 +143,9 @@ const Roulette = () => {
   const [showConfirmSpin, setShowConfirmSpin] = useState(false);
   const [dontAskAgain, setDontAskAgain] = useState(false);
 
+  // Obtener info de pago desde la config del tenant
+  const paymentInfo = tenantId ? getPaymentInfo(tenantId) : { nequi: DEFAULT_PAYMENT_INFO.nequi, daviplata: DEFAULT_PAYMENT_INFO.daviplata, breb: '' };
+  
   const price = getSpinPrice();
 
   // Cargar preferencia de no preguntar
@@ -189,13 +190,9 @@ const Roulette = () => {
     const data = getUserSpinData();
     const wantsFree = useFreeSpin && data.spinsFree > 0;
     
-    if (!wantsFree && !customer) { 
-      setShowPayment(true); 
-      return; 
-    }
-    
-    if (customer && !wantsFree && customer.balance < price) {
-      alert('Saldo insuficiente. Recarga para seguir jugando.');
+    // Si no está logueado o no tiene saldo, mostrar modal de recarga real (BRE-B)
+    if (!customer || (customer.balance < price && !wantsFree)) {
+      setShowRechargeModal(true);
       return;
     }
     
@@ -204,7 +201,7 @@ const Roulette = () => {
       setShowConfirmSpin(true);
       return;
     }
-    
+
     // Ejecutar el giro
     await executeSpin(wantsFree);
   }, [isSpinning, mustSpin, useFreeSpin, customer, price, prizes, refreshCustomer, dontAskAgain]);
@@ -234,7 +231,6 @@ const Roulette = () => {
     }
     
     const prizeIndex = prizes.findIndex(p => p.id === prize.id);
-    console.log('🎰 Giro:', prize?.id, 'index:', prizeIndex);
     
     setResult(prize);
     setShowResult(false);
@@ -266,19 +262,13 @@ const Roulette = () => {
     setShowResult(true);
 
     if (result && result.id !== 'nothing' && customer) {
-      const now = new Date();
-      const fecha = `${now.toLocaleDateString('es-CO')} a las ${now.toLocaleTimeString('es-CO')}`;
-      
-      const message = `
-🎁 *NUEVO GANADOR*
-━━━━━━━━━━━━━━━━
-👤 *Nombre:* ${customer.firstName || customer.email || 'Usuario'}
-📱 *WhatsApp:* ${customer.phone || 'No registrado'}
-🎉 *Premio:* ${result.name}
-🕐 *Fecha:* ${fecha}
-━━━━━━━━━━━━━━━━
-`;
-      sendTelegramMessage(message);
+      // Notificar via Cloud Function (usa Telegram configurado en Firebase)
+      notifyWinner(
+        customer.firstName || customer.email || 'Usuario',
+        customer.phone || '',
+        result.name,
+        result.id
+      );
     }
   }, [result, useFreeSpin, customer]);
 
@@ -405,7 +395,7 @@ const Roulette = () => {
               {result.id === 'nothing' ? (
                 <><div className="text-5xl mb-3">😢</div><h3 className="text-xl font-bold">¡Casi!</h3><p className="text-white/70">No fue esta vez.</p></>
               ) : (
-                <><div className="text-5xl mb-3">🎉</div><h3 className="text-xl font-bold">¡Felicidades!</h3><p className="text-white/70">Ganaste:</p><p className="text-2xl font-bold gradient-text">{result.name}</p></>
+                <><div className="text-5xl mb-3">🎉</div><h3 className="text-xl font-bold">¡Felicidades!</h3><p className="text-white/70">Ganaste:</p><p className="text-2xl font-bold gradient-text mb-2">{result.name}</p><p className="text-white/60 text-xs bg-white/5 rounded-lg p-2">🎁 Tu premio será entregado en minutos al WhatsApp registrado</p></>
               )}
               <button className="btn-primary w-full mt-4" onClick={() => setShowResult(false)}>Continuar</button>
             </motion.div>
@@ -462,7 +452,7 @@ const Roulette = () => {
         )}
       </AnimatePresence>
 
-      {/* Modal pago */}
+      {/* Modal pago (deprecated - ya no se usa para recargas) */}
       <AnimatePresence>
         {showPayment && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -470,8 +460,8 @@ const Roulette = () => {
             <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }} className="glass p-5 max-w-sm w-full" onClick={e => e.stopPropagation()}>
               <h3 className="text-lg font-bold text-center mb-3">💳 Pago</h3>
               <div className="space-y-2 mb-3">
-                <div className="bg-white/5 p-2 rounded"><div className="flex gap-2"><span>💚</span><span className="font-bold">Nequi</span></div><p className="text-xs text-white/50">Envía ${price} a:</p><p className="font-bold text-primary-400">{DEFAULT_PAYMENT_INFO.nequi}</p></div>
-                <div className="bg-white/5 p-2 rounded"><div className="flex gap-2"><span>💙</span><span className="font-bold">Daviplata</span></div><p className="text-xs text-white/50">Envía ${price} a:</p><p className="font-bold text-primary-400">{DEFAULT_PAYMENT_INFO.daviplata}</p></div>
+                {paymentInfo.nequi && <div className="bg-white/5 p-2 rounded"><div className="flex gap-2"><span>💚</span><span className="font-bold">Nequi</span></div><p className="text-xs text-white/50">Envía ${price} a:</p><p className="font-bold text-primary-400">{paymentInfo.nequi}</p></div>}
+                {paymentInfo.daviplata && <div className="bg-white/5 p-2 rounded"><div className="flex gap-2"><span>💙</span><span className="font-bold">Daviplata</span></div><p className="text-xs text-white/50">Envía ${price} a:</p><p className="font-bold text-primary-400">{paymentInfo.daviplata}</p></div>}
               </div>
               <div className="mb-3"><label className="block text-sm mb-1">Tu número:</label><input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="3101234567" className="input-field" /></div>
               <div className="flex gap-2">
@@ -482,6 +472,11 @@ const Roulette = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Modal de recarga (cuando no tiene saldo) */}
+      {showRechargeModal && (
+        <RechargeModal onClose={() => setShowRechargeModal(false)} />
+      )}
     </>
   );
 };

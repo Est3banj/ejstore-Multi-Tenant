@@ -40,8 +40,22 @@ export const login = async (email: string, password: string): Promise<AuthUser> 
     }
     
     return user as AuthUser;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error logging in:', error);
+    
+    // Traducir códigos de error de Firebase a mensajes amigables
+    if (error.code === 'auth/invalid-credential') {
+      throw new Error('Correo o contraseña incorrectos');
+    } else if (error.code === 'auth/user-not-found') {
+      throw new Error('Usuario no encontrado');
+    } else if (error.code === 'auth/wrong-password') {
+      throw new Error('Contraseña incorrecta');
+    } else if (error.code === 'auth/invalid-email') {
+      throw new Error('Correo electrónico inválido');
+    } else if (error.code === 'auth/too-many-requests') {
+      throw new Error('Demasiados intentos. Intenta más tarde');
+    }
+    
     throw error;
   }
 };
@@ -57,8 +71,6 @@ export const register = async (
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     
-    console.log('📝 Creando cliente con UID:', user.uid);
-    
     // Crear documento de cliente en Firestore con $1000 de saldo inicial
     await setDoc(doc(db, 'customers', user.uid), {
       email,
@@ -68,8 +80,6 @@ export const register = async (
       balance: 1000, // Saldo inicial para probar la ruleta
       createdAt: serverTimestamp()
     });
-    
-    console.log('✅ Cliente creado en Firestore');
     
     return user as AuthUser;
   } catch (error) {
@@ -112,17 +122,13 @@ export const checkUserRole = async (uid: string): Promise<AppUser | null> => {
 
 export const getCustomerData = async (uid: string, userEmail?: string): Promise<CustomerUser | null> => {
   try {
-    console.log('🔍 Buscando cliente en:', uid);
     const customerDoc = await getDoc(doc(db, 'customers', uid));
-    console.log('📄 Doc existe:', customerDoc.exists());
     if (customerDoc.exists()) {
       const data = customerDoc.data();
-      console.log('📊 Datos:', data);
       
       // Si no tiene email pero tenemos el email del usuario, actualizarlo
       if (!data.email && userEmail) {
-        console.log('📝 Actualizando email del cliente...');
-        await updateDoc(doc(db, 'customers', uid), { email: userEmail });
+        await setDoc(doc(db, 'customers', uid), { email: userEmail }, { merge: true });
         return {
           uid,
           email: userEmail,
@@ -146,7 +152,6 @@ export const getCustomerData = async (uid: string, userEmail?: string): Promise<
     }
     
     // Si no existe, crear documento automáticamente
-    console.log('➕ Creando cliente automáticamente...');
     await setDoc(doc(db, 'customers', uid), {
       email: userEmail || '',
       firstName: 'Usuario',
@@ -155,7 +160,6 @@ export const getCustomerData = async (uid: string, userEmail?: string): Promise<
       balance: 0,
       createdAt: serverTimestamp()
     });
-    console.log('✅ Cliente creado automáticamente');
     
     return {
       uid,
