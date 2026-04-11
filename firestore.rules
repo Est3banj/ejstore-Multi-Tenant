@@ -84,5 +84,14 @@ service cloud.firestore {
       // Update: solo admins del tenant
       allow update: if request.auth != null && isAdminOrSuperadmin();
     }
+
+    // ========== RULETA CONFIG ==========
+    // Configuración de la ruleta por tenant
+    match /rouletteConfig/{tenantId} {
+      // Leer: público (para que los clientes vean la config)
+      allow read: if true;
+      // Crear/Actualizar: solo admins del tenant
+      allow write: if request.auth != null && isAdminOrSuperadmin() && userTenantId() == tenantId;
+    }
   }
 }

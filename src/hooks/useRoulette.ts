@@ -1,9 +1,10 @@
 import { DEFAULT_PRIZES, DEFAULT_ROULETTE_CONFIG, DEFAULT_PAYMENT_INFO } from '../utils/roulette';
 import type { RoulettePrize, UserSpinData } from '../types';
+import { db } from '../services/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 // Clave para localStorage
 const STORAGE_KEY = 'ejstore_roulette_data';
-const STORAGE_CONFIG_KEY = 'roulette_config_';
 
 // Interfaz para la configuración guardada
 export interface RouletteConfig {
@@ -11,36 +12,30 @@ export interface RouletteConfig {
   pricePerSpin?: number;
   spinsForFreeSpin?: number;
   prizes?: RoulettePrize[];
-  nequiNumber?: string;
-  daviplataNumber?: string;
 }
 
-// Función para obtener la configuración del tenant desde localStorage
-export function getRouletteConfig(tenantId: string): RouletteConfig | null {
-  if (typeof window === 'undefined') return null;
+// Función para obtener la configuración del tenant desde Firestore
+export async function fetchRouletteConfig(tenantId: string): Promise<RouletteConfig | null> {
+  if (!tenantId || typeof window === 'undefined') return null;
   
-  const configKey = `${STORAGE_CONFIG_KEY}${tenantId}`;
-  const stored = localStorage.getItem(configKey);
-  
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch {
-      return null;
+  try {
+    const docRef = doc(db, 'rouletteConfig', tenantId);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      return {
+        isEnabled: data.isEnabled,
+        pricePerSpin: data.pricePerSpin,
+        spinsForFreeSpin: data.spinsForFreeSpin,
+        prizes: data.prizes,
+      };
     }
+    return null;
+  } catch (error) {
+    console.error('Error fetching roulette config:', error);
+    return null;
   }
-  return null;
-}
-
-// Función para obtener números de pago (del tenant config o defaults)
-export function getPaymentInfo(tenantId: string): { nequi: string; daviplata: string; breb: string } {
-  const config = getRouletteConfig(tenantId);
-  
-  return {
-    nequi: config?.nequiNumber || DEFAULT_PAYMENT_INFO.nequi,
-    daviplata: config?.daviplataNumber || DEFAULT_PAYMENT_INFO.daviplata,
-    breb: '', // BRE-B no está en la config actual
-  };
 }
 
 // Función para obtener los datos del usuario

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DEFAULT_PRIZES, DEFAULT_PAYMENT_INFO } from '../utils/roulette';
-import { getUserSpinData, useSpin, spinWheel, getSpinPrice, getSpinsForFreeSpin, getPaymentInfo } from '../hooks/useRoulette';
+import { DEFAULT_PRIZES, DEFAULT_ROULETTE_CONFIG } from '../utils/roulette';
+import { getUserSpinData, useSpin, spinWheel, getSpinPrice, getSpinsForFreeSpin, fetchRouletteConfig } from '../hooks/useRoulette';
 import { useAuthStore } from '../store/authStore';
 import { useTenantStore } from '../store/tenantStore';
 import { updateBalance } from '../services/auth';
@@ -168,11 +168,35 @@ const Roulette = () => {
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   const [showConfirmSpin, setShowConfirmSpin] = useState(false);
   const [dontAskAgain, setDontAskAgain] = useState(false);
+  const [rouletteConfig, setRouletteConfig] = useState<{
+    pricePerSpin: number;
+    spinsForFreeSpin: number;
+    prizes: RoulettePrize[];
+    isEnabled: boolean;
+  } | null>(null);
 
-  // Obtener info de pago desde la config del tenant
-  const paymentInfo = tenantId ? getPaymentInfo(tenantId) : { nequi: DEFAULT_PAYMENT_INFO.nequi, daviplata: DEFAULT_PAYMENT_INFO.daviplata, breb: '' };
-  
-  const price = getSpinPrice();
+  // Cargar configuración de Firestore
+  useEffect(() => {
+    if (!tenantId) return;
+    
+    const loadConfig = async () => {
+      const config = await fetchRouletteConfig(tenantId);
+      if (config) {
+        setRouletteConfig({
+          pricePerSpin: config.pricePerSpin || DEFAULT_ROULETTE_CONFIG.pricePerSpin,
+          spinsForFreeSpin: config.spinsForFreeSpin || DEFAULT_ROULETTE_CONFIG.spinsForFreeSpin,
+          prizes: config.prizes || DEFAULT_PRIZES,
+          isEnabled: config.isEnabled !== false,
+        });
+      }
+    };
+    
+    loadConfig();
+  }, [tenantId]);
+
+  // Obtener valores (de config o defaults)
+  const price = rouletteConfig?.pricePerSpin || getSpinPrice();
+  const prizes = rouletteConfig?.prizes || DEFAULT_PRIZES;
 
   // Cargar preferencia de no preguntar
   useEffect(() => {
@@ -187,8 +211,7 @@ const Roulette = () => {
     setDontAskAgain(checked);
     localStorage.setItem('roulette_dont_ask', String(checked));
   };
-  const spinsForFree = getSpinsForFreeSpin();
-  const prizes = DEFAULT_PRIZES;
+  const spinsForFree = rouletteConfig?.spinsForFreeSpin || getSpinsForFreeSpin();
 
   useEffect(() => { 
     if (customer) {
@@ -490,21 +513,18 @@ const Roulette = () => {
         )}
       </AnimatePresence>
 
-      {/* Modal pago (deprecated - ya no se usa para recargas) */}
+      {/* Modal pago (deprecated - ya no se usa, las recargas van por el modal del Header) */}
       <AnimatePresence>
         {showPayment && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setShowPayment(false)}>
             <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }} className="glass p-5 max-w-sm w-full" onClick={e => e.stopPropagation()}>
-              <h3 className="text-lg font-bold text-center mb-3">💳 Pago</h3>
-              <div className="space-y-2 mb-3">
-                {paymentInfo.nequi && <div className="bg-white/5 p-2 rounded"><div className="flex gap-2"><span>💚</span><span className="font-bold">Nequi</span></div><p className="text-xs text-white/50">Envía ${price} a:</p><p className="font-bold text-primary-400">{paymentInfo.nequi}</p></div>}
-                {paymentInfo.daviplata && <div className="bg-white/5 p-2 rounded"><div className="flex gap-2"><span>💙</span><span className="font-bold">Daviplata</span></div><p className="text-xs text-white/50">Envía ${price} a:</p><p className="font-bold text-primary-400">{paymentInfo.daviplata}</p></div>}
-              </div>
-              <div className="mb-3"><label className="block text-sm mb-1">Tu número:</label><input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="3101234567" className="input-field" /></div>
-              <div className="flex gap-2">
-                <button onClick={() => setShowPayment(false)} className="btn-secondary flex-1">Cancelar</button>
-                <button onClick={handlePaymentConfirm} disabled={!phone} className="btn-primary flex-1">Ya pagué</button>
+              <h3 className="text-lg font-bold text-center mb-3">💳 información de pago</h3>
+              <p className="text-white/70 text-center">
+                Usa el botón "Recargar saldo" del menú para realizar recargas.
+              </p>
+              <div className="flex gap-2 mt-4">
+                <button onClick={() => setShowPayment(false)} className="btn-primary flex-1">Cerrar</button>
               </div>
             </motion.div>
           </motion.div>

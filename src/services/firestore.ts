@@ -484,3 +484,56 @@ export const rejectRecharge = async (rechargeId: string, adminId: string, reason
     throw error;
   }
 };
+
+// ========== CONFIGURACIÓN DE RULETA ==========
+export interface RouletteConfigData {
+  tenantId: string;
+  isEnabled: boolean;
+  pricePerSpin: number;
+  spinsForFreeSpin: number;
+  prizes: {
+    id: string;
+    name: string;
+    probability: number;
+    cost: number;
+    isActive: boolean;
+  }[];
+  updatedAt: Date;
+}
+
+export const getRouletteConfig = async (tenantId: string): Promise<RouletteConfigData | null> => {
+  if (!tenantId) return null;
+  try {
+    const docRef = doc(db, 'rouletteConfig', tenantId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      return {
+        tenantId: data.tenantId,
+        isEnabled: data.isEnabled,
+        pricePerSpin: data.pricePerSpin,
+        spinsForFreeSpin: data.spinsForFreeSpin,
+        prizes: data.prizes,
+        updatedAt: data.updatedAt?.toDate() || new Date()
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting roulette config:', error);
+    return null;
+  }
+};
+
+export const saveRouletteConfig = async (config: Omit<RouletteConfigData, 'updatedAt'>): Promise<void> => {
+  if (!config.tenantId) throw new Error('tenantId required');
+  try {
+    const docRef = doc(db, 'rouletteConfig', config.tenantId);
+    await setDoc(docRef, {
+      ...config,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  } catch (error) {
+    console.error('Error saving roulette config:', error);
+    throw error;
+  }
+};

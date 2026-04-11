@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { DEFAULT_PRIZES, DEFAULT_ROULETTE_CONFIG } from '../../utils/roulette';
 import type { RoulettePrize } from '../../types';
+import { getRouletteConfig, saveRouletteConfig } from '../../services/firestore';
 import { motion } from 'framer-motion';
-import { Save, RotateCcw } from 'lucide-react';
+import { Save, RotateCcw, Loader } from 'lucide-react';
 
 const RouletteSettings = () => {
   const { tenant } = useApp();
@@ -15,20 +16,45 @@ const RouletteSettings = () => {
   const [spinsForFreeSpin, setSpinsForFreeSpin] = useState(DEFAULT_ROULETTE_CONFIG.spinsForFreeSpin);
   const [prizes, setPrizes] = useState<RoulettePrize[]>(DEFAULT_PRIZES);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-  // Guardar configuración en localStorage
+  // Cargar configuración desde Firestore
+  useEffect(() => {
+    if (!tenantId) return;
+    
+    const loadConfig = async () => {
+      setLoading(true);
+      try {
+        const config = await getRouletteConfig(tenantId);
+        if (config) {
+          setIsEnabled(config.isEnabled);
+          setPricePerSpin(config.pricePerSpin);
+          setSpinsForFreeSpin(config.spinsForFreeSpin);
+          setPrizes(config.prizes);
+        }
+      } catch (error) {
+        console.error('Error loading roulette config:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadConfig();
+  }, [tenantId]);
+
+  // Guardar configuración en Firestore
   const handleSave = async () => {
+    if (!tenantId) return;
     setSaving(true);
     try {
-      // Guardar en localStorage para el tenant actual
-      const configKey = `roulette_config_${tenantId}`;
-      localStorage.setItem(configKey, JSON.stringify({
+      await saveRouletteConfig({
+        tenantId,
         isEnabled,
         pricePerSpin,
         spinsForFreeSpin,
         prizes,
-      }));
+      });
       
       alert('Configuración guardada correctamente!');
     } catch (error) {
@@ -38,25 +64,6 @@ const RouletteSettings = () => {
       setSaving(false);
     }
   };
-
-  // Cargar configuración
-  useEffect(() => {
-    if (!tenantId) return;
-    
-    const configKey = `roulette_config_${tenantId}`;
-    const saved = localStorage.getItem(configKey);
-    if (saved) {
-      try {
-        const config = JSON.parse(saved);
-        setIsEnabled(config.isEnabled ?? true);
-        setPricePerSpin(config.pricePerSpin ?? DEFAULT_ROULETTE_CONFIG.pricePerSpin);
-        setSpinsForFreeSpin(config.spinsForFreeSpin ?? DEFAULT_ROULETTE_CONFIG.spinsForFreeSpin);
-        setPrizes(config.prizes ?? DEFAULT_PRIZES);
-      } catch (error) {
-        console.error('Error loading roulette config:', error);
-      }
-    }
-  }, [tenantId]);
 
   // Resetear a valores por defecto
   const handleReset = () => {
