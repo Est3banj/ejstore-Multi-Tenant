@@ -74,20 +74,33 @@ export const RechargeModal = ({ onClose, showToast }: RechargeModalProps) => {
       return;
     }
 
+    // Validar que tenga sesión
+    if (!customer) {
+      showToastLocal('Debes iniciar sesión para recargar');
+      return;
+    }
+
+    if (!tenantId) {
+      showToastLocal('Error de configuración. Intenta más tarde.');
+      console.error('RechargeModal: tenantId es requerido pero está vacío');
+      return;
+    }
+
     setLoading(true);
     
     try {
-      if (customer && tenantId) {
-        await createRechargeRequest({
-          tenantId,
-          customerId: customer.uid,
-          customerName: `${customer.firstName} ${customer.lastName}`,
-          customerPhone: customer.phone,
-          amount: parseInt(amount),
-        });
-        
-        // Notificar a Telegram
-        const message = `
+      console.log('Creando recarga:', { tenantId, customerId: customer.uid, amount: parseInt(amount) });
+      
+      await createRechargeRequest({
+        tenantId,
+        customerId: customer.uid,
+        customerName: `${customer.firstName} ${customer.lastName}`,
+        customerPhone: customer.phone,
+        amount: parseInt(amount),
+      });
+      
+      // Notificar a Telegram
+      const message = `
 💰 *NUEVA RECARGA (RULETA)*
 ━━━━━━━━━━━━━━━━━━━━
 👤 *Nombre:* ${customer.firstName} ${customer.lastName}
@@ -96,16 +109,17 @@ export const RechargeModal = ({ onClose, showToast }: RechargeModalProps) => {
 🕐 *Fecha:* ${new Date().toLocaleString('America/Bogota', { timeZone: 'America/Bogota' })}
 ━━━━━━━━━━━━━━━━━━━━
 `;
-        await sendTelegramMessage(message);
-        
-        showToastLocal('✅ Tu recarga ha sido registrada. Será validada y cargada en minutos.', 'success');
-        await refreshCustomer();
-      }
+      await sendTelegramMessage(message);
+      
+      showToastLocal('✅ Tu recarga ha sido registrada. Será validada y cargada en minutos.', 'success');
+      await refreshCustomer();
       
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating recharge:', error);
-      showToastLocal('Error al procesar la recarga. Intenta de nuevo.');
+      // Mostrar mensaje más específico del error
+      const errorMsg = error?.message || 'Error al procesar la recarga. Intenta de nuevo.';
+      showToastLocal(errorMsg);
     } finally {
       setLoading(false);
     }

@@ -190,21 +190,33 @@ const Roulette = () => {
     const data = getUserSpinData();
     const wantsFree = useFreeSpin && data.spinsFree > 0;
     
-    // Si no está logueado o no tiene saldo, mostrar modal de recarga real (BRE-B)
-    if (!customer || (customer.balance < price && !wantsFree)) {
-      setShowRechargeModal(true);
+    // Si no está logueado, pedir que se registre/logue
+    if (!user) {
+      setShowAuthPrompt(true);
       return;
     }
     
-    // Si no tiene spins gratis y no ha pedido no preguntar, mostrar confirmación
-    if (!wantsFree && !dontAskAgain && !useFreeSpin) {
-      setShowConfirmSpin(true);
+    // Si está logueado pero no tiene customer (no debería pasar pero por seguridad)
+    if (!customer) {
+      setShowAuthPrompt(true);
       return;
     }
-
-    // Ejecutar el giro
-    await executeSpin(wantsFree);
-  }, [isSpinning, mustSpin, useFreeSpin, customer, price, prizes, refreshCustomer, dontAskAgain]);
+    
+    // Si tiene saldo, puede jugar
+    if (customer.balance >= price || wantsFree) {
+      // Si no tiene spins gratis y no ha pedido no preguntar, mostrar confirmación
+      if (!wantsFree && !dontAskAgain && !useFreeSpin) {
+        setShowConfirmSpin(true);
+        return;
+      }
+      // Ejecutar el giro
+      await executeSpin(wantsFree);
+      return;
+    }
+    
+    // Si no tiene saldo, mostrar modal de recarga
+    setShowRechargeModal(true);
+  }, [isSpinning, mustSpin, useFreeSpin, user, customer, price, prizes, refreshCustomer, dontAskAgain]);
 
   // Función que ejecuta el giro (separada para reuse)
   const executeSpin = useCallback(async (wantsFree: boolean) => {
