@@ -212,7 +212,8 @@ const Roulette = () => {
       return;
     }
     
-    // Si no tiene saldo, abrir el modal de recarga del Header (que ya funciona)
+    // Si no tiene saldo, abrir el modal de recarga del Header y cerrar la ruleta
+    setShowRoulette(false);
     window.dispatchEvent(new CustomEvent('openRechargeModal'));
   }, [isSpinning, mustSpin, useFreeSpin, user, customer, price, prizes, refreshCustomer, dontAskAgain]);
 
