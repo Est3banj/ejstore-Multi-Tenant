@@ -504,8 +504,11 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
       // Notificar a Telegram
       await sendTelegramMessage(message);
       
+      // Mostrar toast y cerrar automáticamente después de 2 segundos
       showToast('✅ Tu recarga ha sido registrada. Será validada y cargada en minutos.', 'success');
-      onClose();
+      setTimeout(() => {
+        onClose();
+      }, 2000);
     } catch (error) {
       console.error('Error:', error);
       showToast('Error al procesar la solicitud. Intenta de nuevo.');
