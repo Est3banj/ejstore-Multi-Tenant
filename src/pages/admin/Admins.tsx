@@ -63,7 +63,7 @@ const Admins = (): JSX.Element => {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-white">Administradores</h1>
         <a
-          href="https://console.firebase.google.com/project/ejstore-web/authentication/users"
+          href="https://console.firebase.google.com/u/0/project/ejstore-web/authentication/users"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center space-x-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg transition-colors"
