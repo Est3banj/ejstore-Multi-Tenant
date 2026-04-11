@@ -7,8 +7,10 @@ import { motion } from 'framer-motion';
 import { Save, RotateCcw, Loader } from 'lucide-react';
 
 const RouletteSettings = () => {
-  const { tenant } = useApp();
-  const tenantId = tenant?.id || '';
+  const { tenant, userTenantId } = useApp();
+  const tenantId = tenant?.id || userTenantId || '';
+  
+  console.log('=== RouletteSettings debug ===', { tenant, userTenantId, tenantId });
   
   // Estado para la configuración
   const [isEnabled, setIsEnabled] = useState(true);
