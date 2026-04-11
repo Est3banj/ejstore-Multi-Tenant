@@ -2,8 +2,10 @@ import { useApp } from '../../context/AppContext';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Package, Tag, Image, Settings, Users, Wallet, Search, X, Plus } from 'lucide-react';
-import { collection, getDocs, query, where, orderBy, updateDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../../services/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../../services/firebase';
 
 const Dashboard = () => {
   const { services, banners, tenant, userTenantId } = useApp();
@@ -342,21 +344,27 @@ const Dashboard = () => {
                   }
                   setRecharging(true);
                   try {
-                    await updateDoc(doc(db, 'customers', selectedCustomer.id), {
-                      balance: (selectedCustomer.balance || 0) + amount
+                    // Usar Cloud Function para cargar saldo (server-side)
+                    const loadBalance = httpsCallable(functions, 'loadCustomerBalance');
+                    const result = await loadBalance({
+                      customerId: selectedCustomer.id,
+                      amount: amount
                     });
-                    // Actualizar la lista de clientes
-                    setCustomers(customers.map(c => 
-                      c.id === selectedCustomer.id 
-                        ? { ...c, balance: (c.balance || 0) + amount }
-                        : c
-                    ));
-                    setSelectedCustomer(null);
-                    setRechargeAmount('');
-                    alert('Saldo cargado correctamente');
+                    
+                    if (result.data.success) {
+                      // Actualizar la lista de clientes
+                      setCustomers(customers.map(c => 
+                        c.id === selectedCustomer.id 
+                          ? { ...c, balance: (c.balance || 0) + amount }
+                          : c
+                      ));
+                      setSelectedCustomer(null);
+                      setRechargeAmount('');
+                      alert('Saldo cargado correctamente');
+                    }
                   } catch (error) {
                     console.error('Error recargando:', error);
-                    alert('Error al cargar saldo');
+                    alert('Error al cargar saldo: ' + (error.message || 'Intente de nuevo'));
                   } finally {
                     setRecharging(false);
                   }

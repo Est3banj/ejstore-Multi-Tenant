@@ -6,10 +6,17 @@ admin.initializeApp();
 
 const db = admin.firestore();
 
-// ========== CONFIG ==========
-const TELEGRAM_BOT_TOKEN = '8597739575:AAFuw__aMizR6sSPfUx6bU9da_r4PlNjnuI';
-const ADMIN_CHAT_ID = '1666952441';
-const BRE_B_KEY = '0035443571';
+// ========== CONFIG - Secrets (env vars) ==========
+// IMPORTANTE: Configurar en Firebase Console > Functions > Environment Configuration
+// Desarrollo: Usar procesos.env
+// Producción: firebase functions:config:set telegram.bot_token="TOKEN" telegram.admin_chat_id="CHAT_ID"
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || functions.config().telegram?.bot_token;
+const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || functions.config().telegram?.admin_chat_id;
+
+// Warn en desarrollo
+if (!TELEGRAM_BOT_TOKEN || !ADMIN_CHAT_ID) {
+  console.warn('⚠️ Telegram config no encontrada. Usar: firebase functions:config:set telegram.bot_token="TOKEN" telegram.admin_chat_id="CHAT_ID"');
+}
 
 // ========== HELPER: Enviar mensaje a Telegram ==========
 async function sendTelegramMessage(chatId, text, keyboard = null) {
@@ -100,6 +107,68 @@ exports.createRechargeRequest = functions.https.onCall(async (data, context) => 
   await sendTelegramMessage(ADMIN_CHAT_ID, message, keyboard);
 
   return { success: true, rechargeId: rechargeRef.id };
+});
+
+// ========== CARGAR SALDO A CLIENTE (Admin directo) ==========
+exports.loadCustomerBalance = functions.https.onCall(async (data, context) => {
+  // Verificar que sea admin
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+  }
+
+  const claims = context.auth.token;
+  if (claims.role !== 'superadmin' && claims.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'No tiene permisos de admin');
+  }
+
+  const { customerId, amount } = data;
+
+  if (!customerId || !amount) {
+    throw new functions.https.HttpsError('invalid-argument', 'customerId y amount son requeridos');
+  }
+
+  const parsedAmount = parseInt(amount);
+  if (isNaN(parsedAmount) || parsedAmount < 1000) {
+    throw new functions.https.HttpsError('invalid-argument', 'El monto mínimo es $1,000 COP');
+  }
+
+  // Verificar que el cliente existe
+  const customerRef = db.collection('customers').doc(customerId);
+  const customerDoc = await customerRef.get();
+
+  if (!customerDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Cliente no encontrado');
+  }
+
+  // Usar atomic increment para evitar race conditions
+  await customerRef.update({
+    balance: admin.firestore.FieldValue.increment(parsedAmount)
+  });
+
+  // Registrar la transacción
+  await db.collection('balanceTransactions').add({
+    customerId,
+    amount: parsedAmount,
+    type: 'admin_load',
+    processedBy: context.auth.uid,
+    adminEmail: context.auth.token.email || null,
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+
+  // Notificar por Telegram
+  const customerData = customerDoc.data();
+  const message = `
+💵 *CARGA DE SALDO*
+━━━━━━━━━━━━━━━
+👤 *Cliente:* ${customerData.firstName} ${customerData.lastName}
+📧 *Email:* ${customerData.email}
+💰 *Monto:* $${parsedAmount.toLocaleString()} COP
+👤 *Cargado por:* ${context.auth.token.email}
+━━━━━━━━━━━━━━━
+  `;
+  await sendTelegramMessage(ADMIN_CHAT_ID, message);
+
+  return { success: true, newAmount: parsedAmount };
 });
 
 // ========== APROBAR/RECHAZAR RECARGA (Admin) ==========
@@ -410,7 +479,7 @@ exports.telegramWebhook = functions.https.onRequest(async (req, res) => {
         rejectionReason: reason
       });
       
-      await sendTelegramMessage(chatId, `❌ *RECARGA RECHAZADA*\n\nMonto: $${recharge.amount.toLocaleString()}\nCliente: ${recharge.customerName}\nMotivo: ${reason}`);
+await sendTelegramMessage(chatId, `❌ *RECARGA RECHAZADA*\n\nMonto: $${recharge.amount.toLocaleString()}\nCliente: ${recharge.customerName}\nMotivo: ${reason}`);
       processed = true;
       break;
     }
@@ -419,7 +488,7 @@ exports.telegramWebhook = functions.https.onRequest(async (req, res) => {
   if (!processed) {
     if (action === 'approve' && amount > 0) {
       await sendTelegramMessage(chatId, `⚠️ No se encontró recarga pendiente de ~$${amount.toLocaleString()}`);
-    } else if (action === 'reject') {
+    } else if (action === 'reject' && amount === 0) {
       await sendTelegramMessage(chatId, `⚠️ No hay recargas pendientes para rechazar`);
     }
   }

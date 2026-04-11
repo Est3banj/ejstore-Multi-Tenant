@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { useAuthStore } from '../store/authStore';
 import { useTenantStore } from '../store';
 import { useAuth } from '../hooks/useAuth';
-import { Menu, X, User, LogOut, Wallet, Plus } from 'lucide-react';
+import { Menu, X, User, LogOut, Wallet, Plus, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createRechargeRequest } from '../services/firestore';
 
@@ -32,7 +32,6 @@ async function sendTelegramMessage(text: string) {
 const Header = (): JSX.Element => {
   const { settings } = useApp();
   const { user, customer, logout } = useAuthStore();
-  console.log('🎨 Header render:', { user: user?.email, customer: customer?.firstName });
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -82,6 +81,15 @@ const Header = (): JSX.Element => {
     };
     window.addEventListener('openAuthModal', handleOpenAuth);
     return () => window.removeEventListener('openAuthModal', handleOpenAuth);
+  }, []);
+
+  // Escuchar eventos para abrir modal de recarga desde otros componentes (ej: ruleta)
+  useEffect(() => {
+    const handleOpenRecharge = () => {
+      setShowRechargeModal(true);
+    };
+    window.addEventListener('openRechargeModal', handleOpenRecharge);
+    return () => window.removeEventListener('openRechargeModal', handleOpenRecharge);
   }, []);
 
   return (
@@ -270,6 +278,7 @@ const AuthModal = ({ mode, onModeChange, onClose }: {
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
@@ -373,14 +382,23 @@ const AuthModal = ({ mode, onModeChange, onClose }: {
           
           <div>
             <label className="block text-sm text-white/70 mb-1">Contraseña</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="input-field"
-              required
-              minLength={6}
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="input-field pr-10"
+                required
+                minLength={6}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           {error && (

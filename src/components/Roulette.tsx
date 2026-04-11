@@ -9,7 +9,6 @@ import type { RoulettePrize, UserSpinData } from '../types';
 import { Gift, X, Zap } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../services/firebase';
-import RechargeModal from './RechargeModal';
 
 // Función para notificar premio ganado via Cloud Function
 async function notifyWinner(userName: string, phone: string, prize: string, prizeId: string) {
@@ -133,7 +132,6 @@ const Roulette = () => {
   const [showResult, setShowResult] = useState(false);
   const [result, setResult] = useState<RoulettePrize | null>(null);
   const [showPayment, setShowPayment] = useState(false); // Modal viejo de Nequi (ya no se usa para recargas)
-  const [showRechargeModal, setShowRechargeModal] = useState(false); // Modal nuevo de recargas
   const [showRoulette, setShowRoulette] = useState(false);
   const [phone, setPhone] = useState('');
   const [useFreeSpin, setUseFreeSpin] = useState(false);
@@ -214,8 +212,8 @@ const Roulette = () => {
       return;
     }
     
-    // Si no tiene saldo, mostrar modal de recarga
-    setShowRechargeModal(true);
+    // Si no tiene saldo, abrir el modal de recarga del Header (que ya funciona)
+    window.dispatchEvent(new CustomEvent('openRechargeModal'));
   }, [isSpinning, mustSpin, useFreeSpin, user, customer, price, prizes, refreshCustomer, dontAskAgain]);
 
   // Función que ejecuta el giro (separada para reuse)
@@ -485,10 +483,8 @@ const Roulette = () => {
         )}
       </AnimatePresence>
 
-      {/* Modal de recarga (cuando no tiene saldo) */}
-      {showRechargeModal && (
-        <RechargeModal onClose={() => setShowRechargeModal(false)} />
-      )}
+      {/* Modal de recarga (deprecated - ahora usa el del Header via CustomEvent) */}
+      {/* Este modal ya no se renderiza - se abre via window.dispatchEvent(new CustomEvent('openRechargeModal')) */}
     </>
   );
 };

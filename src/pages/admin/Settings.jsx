@@ -45,8 +45,7 @@ const Settings = () => {
         contactEmail: '',
         primaryColor: '#E50914',
         secondaryColor: '#1A1A1A',
-        ...restSettings,
-        logoUrlInput: ''
+        ...restSettings
       });
     } catch (error) {
       console.error('Error loading settings:', error);

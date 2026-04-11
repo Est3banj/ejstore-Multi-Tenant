@@ -2,48 +2,87 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ========== HELPER FUNCTIONS ==========
+    
+    // Check if user document exists and has admin role
+    function isAdminOrSuperadmin() {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return userDoc != null && userDoc.data.role in ['admin', 'superadmin'];
+    }
+    
+    // Get current user's tenantId (returns null if not admin)
+    function userTenantId() {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return userDoc != null ? userDoc.data.tenantId : null;
+    }
+
     // ========== TENANTS ==========
+    // Configuración de cada tienda
     match /tenants/{tenantId} {
+      // Leer: público (info básica de la tienda)
       allow read: if true;
-      allow write: if request.auth != null;
+      // Crear: denegado (superadmin lo hace por Cloud Function)
+      allow create: if false;
+      // Actualizar: solo admins del tenant
+      allow update: if request.auth != null && isAdminOrSuperadmin() && userTenantId() == tenantId;
     }
 
     // ========== SERVICES ==========
+    // Servicios que ofrece cada tenant
     match /services/{serviceId} {
+      // Leer: público (para la tienda)
       allow read: if true;
-      allow create, update, delete: if request.auth != null;
+      // Escribir: solo admin del tenant
+      allow create, update, delete: if request.auth != null && isAdminOrSuperadmin() && userTenantId() == resource(serviceId).data.tenantId;
     }
 
     // ========== BANNERS ==========
+    // Banners de cada tenant
     match /banners/{bannerId} {
+      // Leer: público
       allow read: if true;
-      allow create, update, delete: if request.auth != null;
+      // Escribir: solo admin del tenant
+      allow create, update, delete: if request.auth != null && isAdminOrSuperadmin() && userTenantId() == resource(bannerId).data.tenantId;
     }
 
     // ========== USERS ==========
+    // Usuarios administradores (rol y tenantId) - colección del sistema
     match /users/{userId} {
+      // Leer: solo el propio usuario
       allow read: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && request.auth.uid == userId;
+      // Crear: denegado (Cloud Function)
+      allow create: if false;
+      // Update: denegado desde cliente
+      allow update: if false;
     }
 
     // ========== CUSTOMERS ==========
+    // Clientes registrados (datos sensibles)
     match /customers/{customerId} {
-      allow read: if true;
-      allow create: if request.auth != null;
-      // Leer el role desde el documento users
-      allow write: if request.auth != null && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin'] ||
+      // Leer: solo admins del tenant O el propio cliente
+      allow read: if request.auth != null && (
+        isAdminOrSuperadmin() ||
+        request.auth.uid == customerId
+      );
+      // Auto-creación: permitir registo público cuando NO existe el doc
+      // IMPORTANTE: esto es para el flujo de registro - luego se maneja en backend
+      allow create: if request.auth != null && request.auth.uid == customerId;
+      // Update: admins del tenant O el propio cliente
+      allow update: if request.auth != null && (
+        (isAdminOrSuperadmin() && userTenantId() == resource(customerId).data.tenantId) ||
         request.auth.uid == customerId
       );
     }
 
     // ========== RECARGAS ==========
+    // Solicitudes de recarga de saldo
     match /recharges/{rechargeId} {
-      allow read: if request.auth != null;
+      // Leer: solo admins del tenant
+      allow read: if request.auth != null && isAdminOrSuperadmin();
+      // Crear: cualquier usuario logueado
       allow create: if request.auth != null;
-      allow update: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin'];
+      // Update: solo admins del tenant
+      allow update: if request.auth != null && isAdminOrSuperadmin();
     }
   }
 }
