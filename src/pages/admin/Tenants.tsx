@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, getDocs, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Plus, Trash2, ExternalLink, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface Tenant {
   id: string;
@@ -66,17 +67,17 @@ const Tenants = (): JSX.Element => {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">Tiendas</h1>
+    <div className="p-8">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-4xl font-bold gradient-text">Gestión de Tiendas</h1>
         <a
           href="https://console.firebase.google.com/u/0/project/ejstore-web/firestore/data/~2Ftenants"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center space-x-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg transition-colors"
+          className="btn-primary flex items-center space-x-2"
         >
           <Plus size={20} />
-          <span>Agregar Tienda</span>
+          <span>Nueva Tienda</span>
         </a>
       </div>
 
@@ -92,45 +93,46 @@ const Tenants = (): JSX.Element => {
           <p className="text-sm">Crea la primera desde Firebase Console</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {tenants.map((tenant) => (
-            <div
+            <motion.div
               key={tenant.id}
-              className="glass-dark rounded-xl p-4 flex items-center justify-between"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="glass rounded-xl overflow-hidden"
             >
-              <div className="flex items-center space-x-4">
-                <div
-                  className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold"
-                  style={{ backgroundColor: tenant.primaryColor || '#6366f1' }}
-                >
+              <div 
+                className="h-40 flex items-center justify-center"
+                style={{ background: `linear-gradient(135deg, ${tenant.primaryColor || '#6366f1'}20, ${tenant.primaryColor || '#6366f1'}05)` }}
+              >
+                <span className="text-6xl font-bold" style={{ color: tenant.primaryColor || '#6366f1' }}>
                   {tenant.name.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <h3 className="text-white font-semibold">{tenant.name}</h3>
-                  <p className="text-white/50 text-sm">{tenant.subdomain}</p>
-                  {tenant.whatsappNumber && (
-                    <p className="text-white/30 text-xs">📱 {tenant.whatsappNumber}</p>
-                  )}
+                </span>
+              </div>
+              <div className="p-5">
+                <h3 className="text-xl font-bold mb-2 text-white">{tenant.name}</h3>
+                <p className="text-white/70 text-sm mb-2">/{tenant.subdomain}</p>
+                {tenant.whatsappNumber && (
+                  <p className="text-white/50 text-sm">📱 {tenant.whatsappNumber}</p>
+                )}
+                <div className="flex items-center justify-between mt-4">
+                  <button
+                    onClick={() => openTenant(tenant.subdomain)}
+                    className="flex items-center space-x-1 text-primary-400 hover:text-primary-300"
+                  >
+                    <ExternalLink size={16} />
+                    <span className="text-sm">Ver tienda</span>
+                  </button>
+                  <button
+                    onClick={() => handleDelete(tenant.id)}
+                    className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                    title="Eliminar"
+                  >
+                    <Trash2 size={18} />
+                  </button>
                 </div>
               </div>
-
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => openTenant(tenant.subdomain)}
-                  className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                  title="Abrir tienda"
-                >
-                  <ExternalLink size={20} />
-                </button>
-                <button
-                  onClick={() => handleDelete(tenant.id)}
-                  className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
-                  title="Eliminar"
-                >
-                  <Trash2 size={20} />
-                </button>
-              </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       )}

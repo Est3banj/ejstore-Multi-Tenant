@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, doc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Loader2, Crown, Shield } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface AppUser {
   uid: string;
@@ -29,7 +30,6 @@ const Admins = (): JSX.Element => {
       const data: AppUser[] = [];
       snapshot.forEach((doc) => {
         const userData = doc.data();
-        // Solo mostrar admins
         if (userData.role === 'admin' || userData.role === 'superadmin') {
           data.push({ 
             uid: doc.id, 
@@ -59,16 +59,16 @@ const Admins = (): JSX.Element => {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">Administradores</h1>
+    <div className="p-8">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-4xl font-bold gradient-text">Administradores</h1>
         <a
           href="https://console.firebase.google.com/u/0/project/ejstore-web/authentication/users"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center space-x-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg transition-colors"
+          className="btn-primary flex items-center space-x-2"
         >
-          <span>Agregar Admin</span>
+          <span>Nuevo Admin</span>
         </a>
       </div>
 
@@ -83,14 +83,20 @@ const Admins = (): JSX.Element => {
           <p>No hay administradores</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {users.map((user) => (
-            <div
+            <motion.div
               key={user.uid}
-              className="glass-dark rounded-xl p-4 flex items-center justify-between"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="glass rounded-xl p-5"
             >
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-500 to-orange-600 flex items-center justify-center">
+              <div className="flex items-center space-x-4 mb-4">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                  user.role === 'superadmin' 
+                    ? 'bg-gradient-to-br from-yellow-500 to-orange-600' 
+                    : 'bg-gradient-to-br from-primary-500 to-red-600'
+                }`}>
                   {user.role === 'superadmin' ? (
                     <Crown size={24} className="text-white" />
                   ) : (
@@ -105,14 +111,14 @@ const Admins = (): JSX.Element => {
                 </div>
               </div>
 
-              <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+              <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
                 user.role === 'superadmin' 
                   ? 'bg-yellow-500/20 text-yellow-400' 
                   : 'bg-primary-500/20 text-primary-400'
               }`}>
                 {user.role === 'superadmin' ? 'Superadmin' : 'Admin'}
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       )}
