@@ -10,8 +10,6 @@ const RouletteSettings = () => {
   const { tenant, userTenantId } = useApp();
   const tenantId = tenant?.id || userTenantId || '';
   
-  console.log('=== RouletteSettings debug ===', { tenant, userTenantId, tenantId });
-  
   // Estado para la configuración
   const [isEnabled, setIsEnabled] = useState(true);
   const [pricePerSpin, setPricePerSpin] = useState(DEFAULT_ROULETTE_CONFIG.pricePerSpin);
