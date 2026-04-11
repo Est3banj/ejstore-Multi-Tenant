@@ -5,15 +5,14 @@ service cloud.firestore {
     // ========== HELPER FUNCTIONS ==========
     
     // Check if user document exists and has admin role
+    // Usa custom claims de Firebase Auth (más confiable y rápido)
     function isAdminOrSuperadmin() {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return userDoc != null && userDoc.data.role in ['admin', 'superadmin'];
+      return request.auth.token.role in ['admin', 'superadmin'];
     }
     
-    // Get current user's tenantId (returns null if not admin)
+    // Get current user's tenantId
     function userTenantId() {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return userDoc != null ? userDoc.data.tenantId : null;
+      return request.auth.token.tenantId;
     }
 
     // ========== TENANTS ==========
@@ -32,8 +31,8 @@ service cloud.firestore {
     match /services/{serviceId} {
       // Leer: público (para la tienda)
       allow read: if true;
-      // Escribir: solo admin del tenant
-      allow create, update, delete: if request.auth != null && isAdminOrSuperadmin() && userTenantId() == resource(serviceId).data.tenantId;
+      // Escribir: solo admin
+      allow create, update, delete: if request.auth != null && isAdminOrSuperadmin();
     }
 
     // ========== BANNERS ==========
@@ -41,15 +40,18 @@ service cloud.firestore {
     match /banners/{bannerId} {
       // Leer: público
       allow read: if true;
-      // Escribir: solo admin del tenant
-      allow create, update, delete: if request.auth != null && isAdminOrSuperadmin() && userTenantId() == resource(bannerId).data.tenantId;
+      // Escribir: solo admin
+      allow create, update, delete: if request.auth != null && isAdminOrSuperadmin();
     }
 
     // ========== USERS ==========
     // Usuarios administradores (rol y tenantId) - colección del sistema
     match /users/{userId} {
-      // Leer: solo el propio usuario
-      allow read: if request.auth != null && request.auth.uid == userId;
+      // Leer: propio usuario O superadmin puede leer todos
+      allow read: if request.auth != null && (
+        request.auth.uid == userId ||
+        request.auth.token.role == 'superadmin'
+      );
       // Crear: denegado (Cloud Function)
       allow create: if false;
       // Update: denegado desde cliente
@@ -59,17 +61,16 @@ service cloud.firestore {
     // ========== CUSTOMERS ==========
     // Clientes registrados (datos sensibles)
     match /customers/{customerId} {
-      // Leer: solo admins del tenant O el propio cliente
+      // Leer: solo admins O el propio cliente
       allow read: if request.auth != null && (
         isAdminOrSuperadmin() ||
         request.auth.uid == customerId
       );
-      // Auto-creación: permitir registo público cuando NO existe el doc
-      // IMPORTANTE: esto es para el flujo de registro - luego se maneja en backend
+      // Auto-creación: permitir registro público
       allow create: if request.auth != null && request.auth.uid == customerId;
-      // Update: admins del tenant O el propio cliente
+      // Update: admins O el propio cliente
       allow update: if request.auth != null && (
-        (isAdminOrSuperadmin() && userTenantId() == resource(customerId).data.tenantId) ||
+        isAdminOrSuperadmin() ||
         request.auth.uid == customerId
       );
     }
@@ -77,11 +78,11 @@ service cloud.firestore {
     // ========== RECARGAS ==========
     // Solicitudes de recarga de saldo
     match /recharges/{rechargeId} {
-      // Leer: solo admins del tenant
+      // Leer: solo admins (cualquier tenant)
       allow read: if request.auth != null && isAdminOrSuperadmin();
       // Crear: cualquier usuario logueado
       allow create: if request.auth != null;
-      // Update: solo admins del tenant
+      // Update: solo admins (cualquier tenant por ahora)
       allow update: if request.auth != null && isAdminOrSuperadmin();
     }
 

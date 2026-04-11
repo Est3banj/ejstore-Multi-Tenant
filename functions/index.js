@@ -18,6 +18,45 @@ if (!TELEGRAM_BOT_TOKEN || !ADMIN_CHAT_ID) {
   console.warn('⚠️ Telegram config no encontrada. Usar: firebase functions:config:set telegram.bot_token="TOKEN" telegram.admin_chat_id="CHAT_ID"');
 }
 
+// ========== BOOTSTRAP - Crear primer superadmin ==========
+// Solo funciona si NO existe ningún superadmin en el sistema
+// Uso: /createSuperadminBootstrap?uid=XXX&tenantId=xxx&email=xxx
+exports.createSuperadminBootstrap = functions.https.onCall(async (data, context) => {
+  const { uid, tenantId, email } = data;
+
+  if (!uid || !tenantId || !email) {
+    throw new functions.https.HttpsError('invalid-argument', 'uid, tenantId y email son requeridos');
+  }
+
+  // Verificar si ya existe algún superadmin
+  const superadminSnap = await db.collection('users').where('role', '==', 'superadmin').limit(1).get();
+  if (!superadminSnap.empty) {
+    throw new functions.https.HttpsError('permission-denied', 'Ya existe un superadmin. Use setTenantClaims');
+  }
+
+  try {
+    // Setear custom claims
+    await admin.auth().setCustomUserClaims(uid, {
+      tenantId,
+      role: 'superadmin'
+    });
+
+    // Crear documento en Firestore
+    await db.collection('users').doc(uid).set({
+      tenantId,
+      role: 'superadmin',
+      email,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    return { success: true, message: 'Superadmin creado correctamente' };
+  } catch (error) {
+    console.error('Error bootstrap:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
 // ========== HELPER: Enviar mensaje a Telegram ==========
 async function sendTelegramMessage(chatId, text, keyboard = null) {
   try {

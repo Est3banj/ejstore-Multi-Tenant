@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useAuthStore } from '../store/authStore';
 import { logout } from '../services/auth';
-import { Menu, X, LayoutDashboard, Package, Image, FileText, Settings, LogOut, LucideIcon, Gift, Wallet } from 'lucide-react';
+import { Menu, X, LayoutDashboard, Package, Image, FileText, Settings, LogOut, LucideIcon, Gift, Wallet, Users, Store } from 'lucide-react';
 
 interface MenuItem {
   path: string;
@@ -12,6 +13,7 @@ interface MenuItem {
 
 const AdminLayout = (): JSX.Element => {
   const { user } = useApp();
+  const { role } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -34,6 +36,14 @@ const AdminLayout = (): JSX.Element => {
     { path: '/admin/terms', label: 'Términos', icon: FileText },
     { path: '/admin/settings', label: 'Configuración', icon: Settings }
   ];
+
+  // Menú adicional para superadmin
+  const superadminMenuItems: MenuItem[] = [
+    { path: '/admin/tenants', label: 'Tiendas', icon: Store },
+    { path: '/admin/admins', label: 'Admins', icon: Users }
+  ];
+
+  const isSuperadmin = role === 'superadmin';
 
   if (!user) {
     return <></>;
@@ -84,6 +94,36 @@ const AdminLayout = (): JSX.Element => {
                 </Link>
               );
             })}
+
+            {/* Sección Superadmin */}
+            {isSuperadmin && (
+              <>
+                <div className="pt-4 pb-2">
+                  <span className="text-xs font-bold text-yellow-500 uppercase tracking-wider px-4">
+                    Superadmin
+                  </span>
+                </div>
+                {superadminMenuItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.path;
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => setSidebarOpen(false)}
+                      className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
+                        isActive
+                          ? 'bg-yellow-600 text-white shadow-lg shadow-yellow-500/30'
+                          : 'text-yellow-400 hover:text-yellow-300 hover:bg-white/5'
+                      }`}
+                    >
+                      <Icon size={20} />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </>
+            )}
           </nav>
 
           <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10">
