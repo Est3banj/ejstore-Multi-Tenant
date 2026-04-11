@@ -5,6 +5,27 @@ import { useApp } from '../context/AppContext';
 import { useTenantStore } from '../store/tenantStore';
 import { createRechargeRequest } from '../services/firestore';
 
+// Configuración de Telegram
+const TELEGRAM_BOT_TOKEN = '8597739575:AAFuw__aMizR6sSPfUx6bU9da_r4PlNjnuI';
+const ADMIN_CHAT_ID = '1666952441';
+
+// Función para enviar mensaje a Telegram
+async function sendTelegramMessage(text: string) {
+  try {
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: ADMIN_CHAT_ID,
+        text,
+        parse_mode: 'Markdown'
+      })
+    });
+  } catch (error) {
+    console.error('Error sending to Telegram:', error);
+  }
+}
+
 interface RechargeModalProps {
   onClose: () => void;
   showToast?: (msg: string, type: 'error'|'success') => void;
@@ -64,6 +85,18 @@ export const RechargeModal = ({ onClose, showToast }: RechargeModalProps) => {
           customerPhone: customer.phone,
           amount: parseInt(amount),
         });
+        
+        // Notificar a Telegram
+        const message = `
+💰 *NUEVA RECARGA (RULETA)*
+━━━━━━━━━━━━━━━━━━━━
+👤 *Nombre:* ${customer.firstName} ${customer.lastName}
+📱 *WhatsApp:* ${customer.phone}
+💵 *Monto:* $${parseInt(amount).toLocaleString()} COP
+🕐 *Fecha:* ${new Date().toLocaleString('America/Bogota', { timeZone: 'America/Bogota' })}
+━━━━━━━━━━━━━━━━━━━━
+`;
+        await sendTelegramMessage(message);
         
         showToastLocal('✅ Tu recarga ha sido registrada. Será validada y cargada en minutos.', 'success');
         await refreshCustomer();
