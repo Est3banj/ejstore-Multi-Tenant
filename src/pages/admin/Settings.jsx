@@ -18,7 +18,9 @@ const Settings = () => {
     contactEmail: '',
     primaryColor: '#E50914',
     secondaryColor: '#1A1A1A',
-    qrImage: ''
+    qrImage: '',
+    brebKey: '',
+    brebBankName: ''
   });
   const [logoFile, setLogoFile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -317,6 +319,34 @@ const Settings = () => {
               </div>
             )}
           </div>
+
+          <div>
+            <label className="block text-white/70 mb-2">Clave BRE-B</label>
+            <input
+              type="text"
+              value={formData.brebKey || ''}
+              onChange={(e) => setFormData({ ...formData, brebKey: e.target.value })}
+              className="input-field"
+              placeholder="0035443571"
+            />
+            <p className="text-white/50 text-sm mt-2">
+              Clave BRE-B para transferencias. Se mostrará en el modal de recarga de saldo.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-white/70 mb-2">Nombre del Banco (BRE-B)</label>
+            <input
+              type="text"
+              value={formData.brebBankName || ''}
+              onChange={(e) => setFormData({ ...formData, brebBankName: e.target.value })}
+              className="input-field"
+              placeholder="GIO TECH"
+            />
+            <p className="text-white/50 text-sm mt-2">
+              Nombre que aparecerá junto a BRE-B en las transferencias.
+            </p>
+          </div>
         </div>
 
         <div className="glass p-6 rounded-xl">
@@ -330,6 +360,7 @@ const Settings = () => {
               <li>El logo se mostrará en el header principal</li>
               <li>El número de WhatsApp debe incluir el código de país</li>
               <li>El email de contacto aparecerá en el footer</li>
+              <li>La clave BRE-B se muestra en el modal de recarga de saldo</li>
             </ul>
           </div>
         </div>
