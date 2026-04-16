@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ShoppingCart } from 'lucide-react';
 import type { Service } from '../types';
+import { useApp } from '../context/AppContext';
 
 interface ServiceCardProps {
   service: Service;
@@ -10,13 +11,21 @@ interface ServiceCardProps {
 
 const ServiceCard = ({ service, index }: ServiceCardProps): JSX.Element => {
   const hasPromo = service.promotionalPrice && service.promotionalPrice < service.price;
+  const { settings } = useApp();
+  const primaryColor = settings?.primaryColor || '#E50914';
+  
+  // Generar color de sombra basado en el color primario del tenant
+  const shadowStyle = {
+    boxShadow: `0 25px 50px -12px ${primaryColor}40`
+  };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: index * 0.1 }}
-      className="glass card-hover overflow-hidden"
+      className="glass overflow-hidden"
+      whileHover={shadowStyle}
     >
       <Link to={`/servicio/${service.id}`}>
         <div className="relative h-48 bg-gradient-to-br from-primary-500/10 to-red-600/5 flex items-center justify-center overflow-hidden">
@@ -58,10 +67,16 @@ const ServiceCard = ({ service, index }: ServiceCardProps): JSX.Element => {
               )}
             </div>
           </div>
-          <button className="w-full btn-primary flex items-center justify-center space-x-2">
-            <ShoppingCart size={20} />
-            <span>Comprar</span>
-          </button>
+          <button 
+              className="w-full flex items-center justify-center space-x-2 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300"
+              style={{
+                background: `linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd)`,
+                boxShadow: `0 4px 15px -3px ${primaryColor}80`
+              }}
+            >
+              <ShoppingCart size={20} />
+              <span>Comprar</span>
+            </button>
         </div>
       </Link>
     </motion.div>

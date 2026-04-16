@@ -40,6 +40,15 @@ const Header = (): JSX.Element => {
   const [showRechargeModal, setShowRechargeModal] = useState(false);
   const showRechargeToast = (msg: string, type: 'error'|'success') => showToast(msg, type);
 
+  // Función para obtener estilos dinámicos del botón según el color del tenant
+  const getBtnStyle = () => {
+    const primary = settings?.primaryColor || '#E50914';
+    return {
+      background: `linear-gradient(135deg, ${primary}, ${primary}dd)`,
+      boxShadow: `0 4px 15px -3px ${primary}80`
+    };
+  };
+
   const isActive = (path: string): boolean => location.pathname === path;
 
   const handleNavigation = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string | null): void => {
@@ -169,7 +178,8 @@ const Header = (): JSX.Element => {
               ) : (
                 <button
                   onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}
-                  className="btn-primary py-2 px-4 text-sm"
+                  className="py-2 px-4 text-sm text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105"
+                  style={getBtnStyle()}
                 >
                   Login
                 </button>
@@ -239,7 +249,8 @@ const Header = (): JSX.Element => {
               ) : (
                 <button
                   onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}
-                  className="btn-primary w-full py-2 mt-2"
+                  className="w-full py-2 mt-2 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105"
+                  style={getBtnStyle()}
                 >
                   Login
                 </button>
@@ -276,6 +287,7 @@ const AuthModal = ({ mode, onModeChange, onClose }: {
   onModeChange: (mode: 'login' | 'register') => void;
   onClose: () => void;
 }) => {
+  const { settings } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -286,6 +298,15 @@ const AuthModal = ({ mode, onModeChange, onClose }: {
   const [error, setError] = useState('');
   
   const { login, register } = useAuth();
+  
+  // Función para obtener estilos dinámicos del botón según el color del tenant
+  const getBtnStyle = () => {
+    const primary = settings?.primaryColor || '#E50914';
+    return {
+      background: `linear-gradient(135deg, ${primary}, ${primary}dd)`,
+      boxShadow: `0 4px 15px -3px ${primary}80`
+    };
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -408,7 +429,8 @@ const AuthModal = ({ mode, onModeChange, onClose }: {
           <button 
             type="submit" 
             disabled={loading}
-            className="btn-primary w-full py-3"
+            className="w-full py-3 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50"
+            style={getBtnStyle()}
           >
             {loading ? 'Cargando...' : mode === 'login' ? 'Iniciar Sesión' : 'Registrarse'}
           </button>
@@ -440,6 +462,15 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{msg: string; type: 'error'|'success'} | null>(null);
 
+  // Función para obtener estilos dinámicos del botón según el color del tenant
+  const getBtnStyle = () => {
+    const primary = settings?.primaryColor || '#E50914';
+    return {
+      background: `linear-gradient(135deg, ${primary}, ${primary}dd)`,
+      boxShadow: `0 4px 15px -3px ${primary}80`
+    };
+  };
+  
   // Toast helper
   const showToast = (msg: string, type: 'error'|'success' = 'error') => {
     setToast({ msg, type });
@@ -639,7 +670,8 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
               <button 
                 onClick={handleConfirmPayment}
                 disabled={loading || !fullName}
-                className="btn-primary w-full py-3"
+                className="w-full py-3 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50"
+                style={getBtnStyle()}
               >
                 {loading ? 'Enviando...' : 'Ya realicé la transferencia'}
               </button>
