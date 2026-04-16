@@ -55,6 +55,7 @@ export const useApp = () => {
       allBannersQuery.refetch();
     },
     refreshSettings: () => settingsQuery.refetch(),
+    refreshTerms: () => termsQuery.refetch(),
   };
 };
 

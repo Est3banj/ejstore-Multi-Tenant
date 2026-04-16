@@ -1,4 +1,5 @@
 import { useApp } from '../../context/AppContext';
+import { useAuthStore } from '../../store/authStore';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Package, Tag, Image, Settings, Users, Wallet, Search, X, Plus } from 'lucide-react';
@@ -9,7 +10,9 @@ import { functions } from '../../services/firebase';
 
 const Dashboard = () => {
   const { services, banners, tenant, userTenantId } = useApp();
+  const { role } = useAuthStore(); // Agregar acceso al role
   const effectiveTenantId = tenant?.id || userTenantId;
+  const isSuperadmin = role === 'superadmin';
   const [allServices, setAllServices] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
@@ -33,14 +36,24 @@ const Dashboard = () => {
         const all = await getAllServices(effectiveTenantId);
         setAllServices(all);
         
-        // Cargar clientes SOLO del tenant actual
+        // Cargar clientes: superadmin ve todos, admin ve solo los de su tenant
         setLoadingCustomers(true);
         try {
-          const customersQuery = query(
-            collection(db, 'customers'),
-            where('tenantId', '==', effectiveTenantId),
-            orderBy('createdAt', 'desc')
-          );
+          let customersQuery;
+          if (isSuperadmin) {
+            // Superadmin puede ver todos los clientes
+            customersQuery = query(
+              collection(db, 'customers'),
+              orderBy('createdAt', 'desc')
+            );
+          } else {
+            // Admin solo ve clientes de su tenant
+            customersQuery = query(
+              collection(db, 'customers'),
+              where('tenantId', '==', effectiveTenantId),
+              orderBy('createdAt', 'desc')
+            );
+          }
           const customerSnap = await getDocs(customersQuery);
           const customerList = customerSnap.docs.map(doc => ({
             id: doc.id,
