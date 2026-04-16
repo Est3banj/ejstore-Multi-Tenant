@@ -7,9 +7,10 @@ import Roulette from '../components/Roulette';
 import { motion } from 'framer-motion';
 
 const Home = () => {
-  const { services } = useApp();
+  const { services, settings } = useApp();
   const [selectedCategory, setSelectedCategory] = useState('all');
-
+  const primaryColor = settings?.primaryColor || '#E50914';
+  
   // Filtrar servicios populares
   const popularServices = services.filter((service) => service.isPopular === true);
 
@@ -58,10 +59,11 @@ const Home = () => {
         <div className="flex flex-wrap justify-center gap-4 mb-12">
           <button
             onClick={() => setSelectedCategory('all')}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all ${selectedCategory === 'all'
-                ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/50'
-                : 'glass text-white/80 hover:text-white hover:bg-white/5'
-              }`}
+            className="px-6 py-3 rounded-lg font-semibold transition-all glass"
+            style={{
+              backgroundColor: selectedCategory === 'all' ? primaryColor : undefined,
+              boxShadow: selectedCategory === 'all' ? `0 10px 25px -5px ${primaryColor}80` : undefined
+            }}
           >
             Todos
           </button>
@@ -69,10 +71,11 @@ const Home = () => {
             <button
               key={category.id}
               onClick={() => setSelectedCategory(category.id)}
-              className={`px-6 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${selectedCategory === category.id
-                  ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/50'
-                  : 'glass text-white/80 hover:text-white hover:bg-white/5'
-                }`}
+              className="px-6 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 glass"
+              style={{
+                backgroundColor: selectedCategory === category.id ? primaryColor : undefined,
+                boxShadow: selectedCategory === category.id ? `0 10px 25px -5px ${primaryColor}80` : undefined
+              }}
             >
               {category.icon && <category.icon className="w-5 h-5" />}
               {category.name}

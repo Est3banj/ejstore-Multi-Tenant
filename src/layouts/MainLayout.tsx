@@ -128,6 +128,11 @@ const MainLayout = (): JSX.Element => {
         .shadow-xl { --tw-shadow-color: ${primaryHex}50 !important; }
         .shadow-2xl { --tw-shadow-color: ${primaryHex}50 !important; }
         
+        /* Sombra dinámica de tarjetas */
+        .card-shadow {
+          --tw-shadow-color: ${primaryHex}25 !important;
+        }
+        
         /* Sombras con opacity */
         .shadow-lg\/40 { --tw-shadow-color: ${primaryHex}40 !important; }
         .shadow-xl\/50 { --tw-shadow-color: ${primaryHex}50 !important; }
@@ -222,9 +227,14 @@ const MainLayout = (): JSX.Element => {
           background-color: ${primaryHex} !important;
         }
         
-        /* Errores/warnings - mantener en rojo para no perder funcionalidad */
-        .text-red-400.font-medium, .text-red-500.font-bold, p.text-red-400.text-sm {
-          /* Mantener rojo para mensajes de error */
+        /* Botones específicos de tarjetas y badges */
+        .bg-red-500\\/20 { background-color: ${primaryHex}20 !important; }
+        .bg-red-500\\/10 { background-color: ${primaryHex}15 !important; }
+        .text-red-400 { color: ${primaryHex} !important; }
+        
+        /* Estados activo adicionales */
+        .active, [data-active="true"] {
+          background-color: ${primaryHex} !important;
         }
       `;
     }

@@ -1,16 +1,46 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login } from '../../services/auth';
+import { useTenantStore } from '../../store';
 import { motion } from 'framer-motion';
 import { Lock, Mail, Eye, EyeOff } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
+  const { settings } = useTenantStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Aplicar colores dinámicos del tenant
+  useEffect(() => {
+    if (settings?.primaryColor) {
+      const primary = settings.primaryColor || '#E50914';
+      const primaryHex = primary;
+      
+      let styleElement = document.getElementById('login-tenant-colors');
+      if (!styleElement) {
+        styleElement = document.createElement('style');
+        styleElement.id = 'login-tenant-colors';
+        document.head.appendChild(styleElement);
+      }
+      
+      styleElement.textContent = `
+        .btn-primary {
+          background: linear-gradient(135deg, ${primaryHex}, ${primaryHex}dd) !important;
+          border-color: ${primaryHex} !important;
+        }
+        .btn-primary:hover {
+          background: linear-gradient(135deg, ${primaryHex}cc, ${primaryHex}aa) !important;
+        }
+        .shadow-primary\\/50 {
+          --tw-shadow-color: ${primaryHex}80 !important;
+        }
+      `;
+    }
+  }, [settings]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
