@@ -33,11 +33,12 @@ const Dashboard = () => {
         const all = await getAllServices(effectiveTenantId);
         setAllServices(all);
         
-        // Cargar clientes
+        // Cargar clientes SOLO del tenant actual
         setLoadingCustomers(true);
         try {
           const customersQuery = query(
             collection(db, 'customers'),
+            where('tenantId', '==', effectiveTenantId),
             orderBy('createdAt', 'desc')
           );
           const customerSnap = await getDocs(customersQuery);

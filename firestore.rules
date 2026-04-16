@@ -4,95 +4,144 @@ service cloud.firestore {
 
     // ========== HELPER FUNCTIONS ==========
     
-    // Check if user document exists and has admin role
-    // Usa custom claims de Firebase Auth (más confiable y rápido)
-    function isAdminOrSuperadmin() {
-      return request.auth.token.role in ['admin', 'superadmin'];
+    // Obtener documento del usuario actual desde Firestore
+    // Fuente de verdad para roles y tenantId
+    function getUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
     }
     
-    // Get current user's tenantId
-    function userTenantId() {
-      return request.auth.token.tenantId;
+    // Verificar si el documento del usuario existe
+    function userDocExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    
+    // Obtener el role del usuario desde Firestore
+    function getUserRole() {
+      return userDocExists() ? getUserDoc().data.role : null;
+    }
+    
+    // Obtener el tenantId del usuario desde Firestore
+    function getUserTenantId() {
+      return userDocExists() ? getUserDoc().data.tenantId : null;
+    }
+    
+    // Verificar si es superadmin
+    function isSuperadmin() {
+      return getUserRole() == 'superadmin';
+    }
+    
+    // Verificar si es admin (de cualquier tenant)
+    function isAdmin() {
+      return getUserRole() in ['admin', 'superadmin'];
+    }
+    
+    // Verificar si el admin pertenece al tenant del documento que intenta acceder
+    function isTenantAdminFor(resourceTenantId) {
+      return getUserTenantId() == resourceTenantId;
     }
 
     // ========== TENANTS ==========
-    // Configuración de cada tienda
     match /tenants/{tenantId} {
       // Leer: público (info básica de la tienda)
       allow read: if true;
-      // Crear: denegado (superadmin lo hace por Cloud Function)
+      // Crear: solo superadmin desde Cloud Function
       allow create: if false;
-      // Actualizar: solo admins del tenant
-      allow update: if request.auth != null && isAdminOrSuperadmin() && userTenantId() == tenantId;
+      // Actualizar: superadmin O admin del mismo tenant
+      allow update: if request.auth != null && (
+        isSuperadmin() || 
+        (isAdmin() && isTenantAdminFor(tenantId))
+      );
     }
 
     // ========== SERVICES ==========
-    // Servicios que ofrece cada tenant
     match /services/{serviceId} {
       // Leer: público (para la tienda)
       allow read: if true;
-      // Escribir: solo admin
-      allow create, update, delete: if request.auth != null && isAdminOrSuperadmin();
+      // Escribir: superadmin O admin de ese tenant específico
+      allow create: if request.auth != null && (
+        isSuperadmin() || 
+        (isAdmin() && isTenantAdminFor(request.resource.data.tenantId))
+      );
+      allow update, delete: if request.auth != null && (
+        isSuperadmin() || 
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId))
+      );
     }
 
     // ========== BANNERS ==========
-    // Banners de cada tenant
     match /banners/{bannerId} {
       // Leer: público
       allow read: if true;
-      // Escribir: solo admin
-      allow create, update, delete: if request.auth != null && isAdminOrSuperadmin();
+      // Escribir: superadmin O admin de ese tenant específico
+      allow create: if request.auth != null && (
+        isSuperadmin() || 
+        (isAdmin() && isTenantAdminFor(request.resource.data.tenantId))
+      );
+      allow update, delete: if request.auth != null && (
+        isSuperadmin() || 
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId))
+      );
     }
 
     // ========== USERS ==========
-    // Usuarios administradores (rol y tenantId) - colección del sistema
+    // Colección de administradores (no clientes)
+    // IMPORTANTE: El usuario debe poder leer su propio documento para que las reglas funcionen
     match /users/{userId} {
-      // Leer: propio usuario O superadmin puede leer todos
-      allow read: if request.auth != null && (
-        request.auth.uid == userId ||
-        request.auth.token.role == 'superadmin'
-      );
-      // Crear: denegado (Cloud Function)
-      allow create: if false;
-      // Update: denegado desde cliente
-      allow update: if false;
+      // Leer: cualquier usuario autenticado puede leer su propio documento
+      // Esto es necesario para que las funciones de reglas puedan verificar el role
+      allow read: if request.auth != null && request.auth.uid == userId;
+      // Crear/Update: denegado (solo desde Cloud Function)
+      allow create, update: if false;
+      // Delete: solo superadmin
+      allow delete: if false;
     }
 
     // ========== CUSTOMERS ==========
-    // Clientes registrados (datos sensibles)
+    // Clientes registrados (compradores)
     match /customers/{customerId} {
-      // Leer: solo admins O el propio cliente
+      // Leer: admins de su tenant O el propio cliente
       allow read: if request.auth != null && (
-        isAdminOrSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId)) ||
         request.auth.uid == customerId
       );
       // Auto-creación: permitir registro público
       allow create: if request.auth != null && request.auth.uid == customerId;
-      // Update: admins O el propio cliente
+      // Update: admins de su tenant O el propio cliente
       allow update: if request.auth != null && (
-        isAdminOrSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId)) ||
         request.auth.uid == customerId
       );
+      // Delete: solo superadmin
+      allow delete: if isSuperadmin();
     }
 
     // ========== RECARGAS ==========
-    // Solicitudes de recarga de saldo
     match /recharges/{rechargeId} {
-      // Leer: solo admins (cualquier tenant)
-      allow read: if request.auth != null && isAdminOrSuperadmin();
+      // Leer: admins de ese tenant
+      allow read: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId))
+      );
       // Crear: cualquier usuario logueado
       allow create: if request.auth != null;
-      // Update: solo admins (cualquier tenant por ahora)
-      allow update: if request.auth != null && isAdminOrSuperadmin();
+      // Update: admins de ese tenant
+      allow update: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId))
+      );
+      // Delete: solo superadmin
+      allow delete: if isSuperadmin();
     }
 
     // ========== RULETA CONFIG ==========
-    // Configuración de la ruleta por tenant
     match /rouletteConfig/{tenantId} {
       // Leer: público (para que los clientes vean la config)
       allow read: if true;
-      // Crear/Actualizar: solo admins del tenant
-      allow write: if request.auth != null && isAdminOrSuperadmin() && userTenantId() == tenantId;
+      // Escribir: superadmin O admin de ese tenant
+      allow write: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(tenantId))
+      );
     }
   }
 }

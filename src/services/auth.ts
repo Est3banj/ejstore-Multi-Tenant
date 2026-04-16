@@ -65,21 +65,30 @@ export const register = async (
   password: string,
   firstName: string,
   lastName: string,
-  phone: string
+  phone: string,
+  tenantId?: string
 ): Promise<AuthUser> => {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     
     // Crear documento de cliente en Firestore con $1000 de saldo inicial
-    await setDoc(doc(db, 'customers', user.uid), {
+    // Si se provee tenantId, incluirlo para identificar de qué tienda es el cliente
+    const customerData: Record<string, unknown> = {
       email,
       firstName,
       lastName,
       phone,
       balance: 1000, // Saldo inicial para probar la ruleta
       createdAt: serverTimestamp()
-    });
+    };
+    
+    // Incluir tenantId si se proporciona
+    if (tenantId) {
+      customerData.tenantId = tenantId;
+    }
+    
+    await setDoc(doc(db, 'customers', user.uid), customerData);
     
     return user as AuthUser;
   } catch (error) {
