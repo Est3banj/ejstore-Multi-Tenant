@@ -1,6 +1,7 @@
 import { login as loginService, register as registerService } from '../services/auth';
 import { useAuthStore } from '../store/authStore';
 import { useTenantStore } from '../store/tenantStore';
+import { detectTenantFromUrl } from '../services/tenant';
 
 export const useAuth = () => {
   const { setCustomer, refreshCustomer } = useAuthStore();
@@ -19,8 +20,9 @@ export const useAuth = () => {
     lastName: string,
     phone: string
   ) => {
-    // Obtener el tenantId actual para asociar el cliente con la tienda correcta
-    const currentTenantId = tenant?.id || undefined;
+    // Obtener el tenantId desde el store O desde la URL como fallback
+    // La URL es más confiable porque se determina antes de que el store esté listo
+    const currentTenantId = tenant?.id || detectTenantFromUrl() || undefined;
     const user = await registerService(email, password, firstName, lastName, phone, currentTenantId);
     await refreshCustomer();
     return user;
