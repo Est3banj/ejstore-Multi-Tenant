@@ -477,9 +477,9 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Configuración de BRE-B
-  const BRE_B_KEY = '0035443571';
-  const bankInfo = 'BRE-B - GIO TECH'; // BRE-B soporta transferencias de cualquier banco
+  // Configuración de BRE-B - usa la clave y nombre del tenant, o fallback al default
+  const BRE_B_KEY = settings?.brebKey || '0035443571';
+  const bankInfo = settings?.brebBankName ? `BRE-B - ${settings.brebBankName}` : 'BRE-B - GIO TECH'; // BRE-B soporta transferencias de cualquier banco
 
   const handleWhatsapp = () => {
     const message = encodeURIComponent('Hola, quiero recargar saldo en mi cuenta. ¿Me puedes ayudar?');

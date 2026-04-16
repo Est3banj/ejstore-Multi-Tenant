@@ -348,6 +348,8 @@ interface SettingsOutput extends Settings {
   primaryColor?: string;
   secondaryColor?: string;
   qrImage?: string;
+  brebKey?: string;
+  brebBankName?: string;
 }
 
 export const getSettings = async (tenantId: string): Promise<SettingsOutput | null> => {
@@ -365,7 +367,9 @@ export const getSettings = async (tenantId: string): Promise<SettingsOutput | nu
         siteName: data.name || 'Mi Tienda',
         primaryColor: data.primaryColor || '#E50914',
         secondaryColor: data.secondaryColor || '#1A1A1A',
-        qrImage: data.qrImage || ''
+        qrImage: data.qrImage || '',
+        brebKey: data.brebKey || '',
+        brebBankName: data.brebBankName || ''
       };
     }
     return null;
@@ -383,6 +387,8 @@ interface SettingsInput {
   primaryColor?: string;
   secondaryColor?: string;
   qrImage?: string;
+  brebKey?: string;
+  brebBankName?: string;
 }
 
 export const updateSettings = async (tenantId: string, settings: SettingsInput): Promise<void> => {
@@ -397,6 +403,8 @@ export const updateSettings = async (tenantId: string, settings: SettingsInput):
       primaryColor: settings.primaryColor,
       secondaryColor: settings.secondaryColor,
       qrImage: settings.qrImage,
+      brebKey: settings.brebKey,
+      brebBankName: settings.brebBankName,
       updatedAt: serverTimestamp()
     };
     await setDoc(docRef, firestoreData, { merge: true });

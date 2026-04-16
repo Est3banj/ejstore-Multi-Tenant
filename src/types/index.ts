@@ -54,6 +54,8 @@ export interface Settings {
   whatsappNumber?: string;
   contactEmail?: string;
   qrImage?: string; // URL de imagen QR para recargas
+  brebKey?: string; // Clave BRE-B personalizada por tenant
+  brebBankName?: string; // Nombre del banco para BRE-B
 }
 
 export interface User {

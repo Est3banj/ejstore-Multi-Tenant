@@ -37,7 +37,9 @@ export const useApp = () => {
       siteName: 'Mi Tienda',
       primaryColor: '#E50914',
       secondaryColor: '#1A1A1A',
-      qrImage: ''
+      qrImage: '',
+      brebKey: '',
+      brebBankName: ''
     },
     terms: termsQuery.data || '',
     
