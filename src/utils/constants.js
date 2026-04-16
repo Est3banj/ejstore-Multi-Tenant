@@ -1,15 +1,16 @@
+import { Monitor, User, Music, Tv, Gift } from 'lucide-react';
+
 export const CATEGORIES = [
-  { id: 'pantallas', name: 'Pantallas', icon: '📺' },
-  { id: 'cuentas', name: 'Cuentas', icon: '👤' },
-  { id: 'musica-video', name: 'Música y Video', icon: '🎵' },
-  { id: 'tv-deportes', name: 'TV / Deportes', icon: '⚽' },
-  { id: 'combos', name: 'Combos', icon: '🎁' }
+  { id: 'pantallas', name: 'Pantallas', icon: Monitor },
+  { id: 'cuentas', name: 'Cuentas', icon: User },
+  { id: 'musica-video', name: 'Música y Video', icon: Music },
+  { id: 'tv-deportes', name: 'TV / Deportes', icon: Tv },
+  { id: 'combos', name: 'Combos', icon: Gift }
 ];
 
 export const PAYMENT_METHODS = [
-  { id: 'nequi', name: 'Nequi', icon: '💚' },
-  { id: 'daviplata', name: 'Daviplata', icon: '💙' },
-  { id: 'llaves-bre-b', name: 'Llaves Bre-B', icon: '🔑' }
+  { id: 'nequi', name: 'Nequi', icon: '/nequi.png', logo: true },
+  { id: 'llaves-bre-b', name: 'Llaves BRE-B', icon: '/breb.svg', logo: true }
 ];
 
 export const PLANS = [

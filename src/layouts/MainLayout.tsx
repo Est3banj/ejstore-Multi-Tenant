@@ -82,10 +82,151 @@ const MainLayout = (): JSX.Element => {
       const primaryHsl = hexToHsl(primary);
       const secondaryHsl = hexToHsl(secondary);
       
+      // Aplicar variables CSS para Tailwind
       root.style.setProperty('--primary', `${primaryHsl.h} ${primaryHsl.s}% ${primaryHsl.l}%`);
       root.style.setProperty('--primary-foreground', '0 0% 100%');
       root.style.setProperty('--secondary', `${secondaryHsl.h} ${secondaryHsl.s}% ${secondaryHsl.l}%`);
       root.style.setProperty('--secondary-foreground', '0 0% 100%');
+      root.style.setProperty('--ring', `${primaryHsl.h} ${primaryHsl.s}% ${primaryHsl.l}%`);
+      
+      // Crear estilos dinámicos para elementos Tailwind hardcodeados
+      let styleElement = document.getElementById('tenant-colors');
+      if (!styleElement) {
+        styleElement = document.createElement('style');
+        styleElement.id = 'tenant-colors';
+        document.head.appendChild(styleElement);
+      }
+      
+      // Generar clases dinámicas basadas en los colores del tenant
+      // Colores base del tenant
+      const primaryHex = primary;
+      const secondaryHex = secondary;
+      
+      // Para el rojo que está hardcodeado, usamos el color primario
+      styleElement.textContent = `
+        /* Reemplazar rojo con el color primario del tenant */
+        .text-red-400, .text-red-500, .text-red-600 { color: ${primaryHex} !important; }
+        .bg-red-500, .bg-red-600, .bg-red-500\\/20 { background-color: ${primaryHex} !important; }
+        .border-red-500 { border-color: ${primaryHex} !important; }
+        .hover\\:text-red-400:hover { color: ${primaryHex} !important; }
+        .hover\\:bg-red-500\\/10:hover { background-color: ${primaryHex}20 !important; }
+        .hover\\:bg-red-500\\/30:hover { background-color: ${primaryHex}40 !important; }
+        
+/* Sombras con rojo - más específico */
+        .shadow-red-500\/30, .shadow-primary-500\/30 { 
+          --tw-shadow-color: ${primaryHex}50 !important; 
+        }
+        .shadow-lg.shadow-primary-500\/30 {
+          --tw-shadow-color: ${primaryHex}30 !important;
+        }
+        
+        /* Sobreescribir todas las sombras principales con el color del tenant */
+        .shadow-sm { --tw-shadow-color: ${primaryHex}30 !important; }
+        .shadow { --tw-shadow-color: ${primaryHex}40 !important; }
+        .shadow-md { --tw-shadow-color: ${primaryHex}40 !important; }
+        .shadow-lg { --tw-shadow-color: ${primaryHex}40 !important; }
+        .shadow-xl { --tw-shadow-color: ${primaryHex}50 !important; }
+        .shadow-2xl { --tw-shadow-color: ${primaryHex}50 !important; }
+        
+        /* Sombras con opacity */
+        .shadow-lg\/40 { --tw-shadow-color: ${primaryHex}40 !important; }
+        .shadow-xl\/50 { --tw-shadow-color: ${primaryHex}50 !important; }
+        .shadow-2xl\/50 { --tw-shadow-color: ${primaryHex}50 !important; }
+        .shadow-lg.shadow-primary-500\\/30 {
+          --tw-shadow-color: ${primaryHex}30 !important;
+        }
+        .shadow-xl, .shadow-2xl {
+          --tw-shadow-color: ${primaryHex}40 !important;
+        }
+        
+        /* Checkbox y form elements */
+        input[type="checkbox"]:checked {
+          background-color: ${primaryHex} !important;
+          border-color: ${primaryHex} !important;
+        }
+        
+        /* Links de términos y condiciones */
+        .text-primary-400, .text-primary-300 {
+          color: ${primaryHex} !important;
+        }
+        .hover\\:text-primary-300:hover {
+          color: ${primaryHex}cc !important;
+        }
+        
+        /* Buttons primarios */
+        .btn-primary {
+          background: linear-gradient(135deg, ${primaryHex}, ${primaryHex}dd) !important;
+          border-color: ${primaryHex} !important;
+        }
+        .btn-primary:hover {
+          background: linear-gradient(135deg, ${primaryHex}cc, ${primaryHex}aa) !important;
+        }
+        
+        /* Botones rojos forzados */
+        .\\!bg-red-500, .bg-red-500\\/90 {
+          background-color: ${primaryHex} !important;
+        }
+        .hover\\:\\!bg-red-600:hover {
+          background-color: ${primaryHex}cc !important;
+        }
+        
+        /* Textos destacados */
+        .gradient-text {
+          background: linear-gradient(135deg, ${primaryHex}, ${primaryHex}dd) !important;
+          -webkit-background-clip: text !important;
+          -webkit-text-fill-color: transparent !important;
+        }
+        
+        /* Bordes primarios */
+        .border-primary, .border-primary-500 {
+          border-color: ${primaryHex} !important;
+        }
+        
+        /*Fondos con opacidad del color primario */
+        .bg-primary-500\\/10, .bg-primary-500\\/20, .bg-primary-500\\/5 {
+          background-color: ${primaryHex}20 !important;
+        }
+        
+        /* Fondos con gradiente hacia rojo */
+        .from-primary-500.to-red-600, .from-primary-500.to-red-600\\/5 {
+          --tw-gradient-from: ${primaryHex} !important;
+          --tw-gradient-to: ${primaryHex}dd !important;
+        }
+        .from-primary-500\\/10.to-red-600\\/5 {
+          --tw-gradient-from: ${primaryHex}20 !important;
+          --tw-gradient-to: ${primaryHex}10 !important;
+        }
+        .from-red-500.to-red-600 {
+          --tw-gradient-from: ${primaryHex} !important;
+          --tw-gradient-to: ${primaryHex}cc !important;
+        }
+        .from-yellow-400.via-orange-500.to-red-500 {
+          --tw-gradient-stops: var(--tw-gradient-from), #FFD700, var(--tw-gradient-via), ${primaryHex}, var(--tw-gradient-to) !important;
+        }
+        
+        /* Efectos hover primarios */
+        .hover\\:border-primary-500\\/50:hover {
+          border-color: ${primaryHex}80 !important;
+        }
+        
+        /* Estados activo primary */
+        .bg-primary-600 {
+          background-color: ${primaryHex} !important;
+        }
+        .active.bg-primary-600 {
+          background-color: ${primaryHex}cc !important;
+        }
+        
+        /* Hover states con bg-primary */
+        .hover\\:bg-primary-600:hover {
+          background-color: ${primaryHex} !important;
+        }
+        
+        /* Errores/warnings - mantener en rojo para no perder funcionalidad */
+        .text-red-400.font-medium, .text-red-500.font-bold, p.text-red-400.text-sm {
+          /* Mantener rojo para mensajes de error */
+        }
+      `;
     }
   }, [settings]);
 
