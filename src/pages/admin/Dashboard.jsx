@@ -3,7 +3,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Package, Tag, Image, Settings, Users, Wallet, Search, X, Plus } from 'lucide-react';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../services/firebase';
@@ -41,17 +41,18 @@ const Dashboard = () => {
         try {
           let customersQuery;
           if (isSuperadmin) {
-            // Superadmin puede ver todos los clientes
+            // Superadmin: query simple sin índice compuesto
+            // Usar limit para evitar problemas de rendimiento
             customersQuery = query(
               collection(db, 'customers'),
-              orderBy('createdAt', 'desc')
+              limit(100)
             );
           } else {
             // Admin solo ve clientes de su tenant
             customersQuery = query(
               collection(db, 'customers'),
               where('tenantId', '==', effectiveTenantId),
-              orderBy('createdAt', 'desc')
+              limit(100)
             );
           }
           const customerSnap = await getDocs(customersQuery);
