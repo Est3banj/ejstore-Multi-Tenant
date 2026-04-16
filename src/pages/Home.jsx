@@ -69,12 +69,12 @@ const Home = () => {
             <button
               key={category.id}
               onClick={() => setSelectedCategory(category.id)}
-              className={`px-6 py-3 rounded-lg font-semibold transition-all ${selectedCategory === category.id
+              className={`px-6 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${selectedCategory === category.id
                   ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/50'
                   : 'glass text-white/80 hover:text-white hover:bg-white/5'
                 }`}
             >
-              <span className="mr-2">{category.icon}</span>
+              {category.icon && <category.icon className="w-5 h-5" />}
               {category.name}
             </button>
           ))}

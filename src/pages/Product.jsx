@@ -213,12 +213,16 @@ const Product = () => {
                   <button
                     key={method.id}
                     onClick={() => setSelectedPayment(method)}
-                    className={`p-4 rounded-lg border-2 transition-all flex items-center justify-center space-x-2 ${selectedPayment?.id === method.id
+                    className={`p-4 rounded-lg border-2 transition-all flex items-center justify-center gap-2 ${selectedPayment?.id === method.id
                       ? 'border-primary-500 bg-primary-500/10'
                       : 'border-white/20 hover:border-white/40'
                       }`}
                   >
-                    <span className="text-2xl">{method.icon}</span>
+                    {method.logo ? (
+                      <img src={method.icon} alt={method.name} className="w-8 h-8 object-contain" />
+                    ) : (
+                      <span className="text-2xl">{method.icon}</span>
+                    )}
                     <span className="text-white font-semibold">{method.name}</span>
                   </button>
                 ))}

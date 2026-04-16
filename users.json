@@ -1,0 +1,86 @@
+{"users": [
+{
+  "localId": "1RAsNhLYyHgpPZP0I3vRtn4y7BY2",
+  "email": "test0101@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "UW8I9KQXy9GOBW+CQSkAc8fytXiArLKQlES1T/py77rIZFEAGSjxhjF8O697LL0ughRZDcMKotpTHOvJdzdQIg==",
+  "salt": "yBF/MfmPOIdyIg==",
+  "lastSignedInAt": "1776354953851",
+  "createdAt": "1776354953851",
+  "providerUserInfo": []
+},
+{
+  "localId": "OuTvQaSYTmTy1B4aJRVve7Ga7sD3",
+  "email": "calderonsteven838@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "Z+/JZTbJUz+cNkZgsPmkuwnbAhXW3Ykt1K8acCrWdC/sYlBbDqe+tutoHVO/5U75Yt6CY2GET5aAVytfRZxQiQ==",
+  "salt": "KnRXoy2RbKMh2w==",
+  "lastSignedInAt": "1773954734835",
+  "createdAt": "1773781287278",
+  "disabled": false,
+  "providerUserInfo": []
+},
+{
+  "localId": "QvzcplER19Y3shuHsP9BbxlvXUI2",
+  "email": "test01@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "blEIgJA6Mv3xV+OTqGOtx4BZ16VODTrYasT22iXqpDLkaab1/rHlEfBjaxB582kgRP+BVZNeCuij13q98s6/9w==",
+  "salt": "gX2YiTStVUJNLA==",
+  "lastSignedInAt": "1776091928830",
+  "createdAt": "1775925290259",
+  "providerUserInfo": []
+},
+{
+  "localId": "UZSJodEWzeR9Csgo6B9NT9eJoJL2",
+  "email": "jesusquinteromena.2023@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "FFUzsuL31SzA2NqbHdy6i51anWxvtqea+48UqeMsaix5KhWE7P+apSZRheHyyRNaxB//YX44qxMUw7cfv0k5FA==",
+  "salt": "c/J2FFR+YBP++Q==",
+  "lastSignedInAt": "1775932740221",
+  "createdAt": "1775932740221",
+  "providerUserInfo": []
+},
+{
+  "localId": "YeqsNGP5GIVpUsaTwtnOooOI93N2",
+  "email": "elena26ortiz26@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "Gko7JMyPqfGrxwjGUypViQFioRrpgOKANPfFUBw2kL4nvUscTvnuzVFU6uJp2c986Gcxf+LMYkDf5XzaRliK1Q==",
+  "salt": "QoXO5zugu04MNA==",
+  "lastSignedInAt": "1775926874665",
+  "createdAt": "1775926874665",
+  "providerUserInfo": []
+},
+{
+  "localId": "bylvSoQgQBg7zFPPVj66RlLRgID2",
+  "email": "alejandromunozburbano930@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "Zq9sAYpBgrzKBRQfuap4ohFNnDX/ymMaNp8/CZYCIXC9cc2sX7IXAMGUIetdnHbVM8ZrhilFKZT5SDmahZ3csQ==",
+  "salt": "NxlU1coG/3V6+g==",
+  "lastSignedInAt": "1776354960425",
+  "createdAt": "1776349814213",
+  "disabled": false,
+  "providerUserInfo": []
+},
+{
+  "localId": "igKfPUtUvih7hpoB5l0TyxSsLKq2",
+  "email": "camisubditri@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "yskuOMm6+ErlNi2WG49iQX0iafc+k99zkuXO6LWOBaOkezyJ0xMQdKFFfWsM5UcrYAD6VitGsw5OUNvGNlGJwQ==",
+  "salt": "lnJW67GcnLseeQ==",
+  "lastSignedInAt": "1773975203488",
+  "createdAt": "1773778751673",
+  "disabled": false,
+  "providerUserInfo": []
+},
+{
+  "localId": "o2J9pBuDbCMAg4Nr7uOMqkssKOw2",
+  "email": "juradoesteban001@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "eE4vKyKAPzObeKAHc+Bu/1+5q3Qz84aQBP4S2vz/mPC6sE3LVChcfXZQQG2Al2x6fnFhBx1ZLaRo1N88piyySQ==",
+  "salt": "ZBff4+aNrCJKvA==",
+  "lastSignedInAt": "1776354997013",
+  "createdAt": "1763322521378",
+  "disabled": false,
+  "customAttributes": "{\"tenantId\":\"ej\",\"role\":\"superadmin\"}",
+  "providerUserInfo": []
+}]}
