@@ -79,12 +79,20 @@ service cloud.firestore {
 
     // ========== CUSTOMERS ==========
     match /customers/{customerId} {
+      // Superadmin: puede leer TODOS los customers (sin restricción de tenant)
+      // Admin: solo puede leer customers de su propio tenant
+      // Cliente: solo puede leer su propio documento
       allow read: if request.auth != null && (
+        isSuperadmin() ||
         (isAdmin() && isTenantAdminFor(resource.data.tenantId)) ||
         request.auth.uid == customerId
       );
       allow create: if request.auth != null && request.auth.uid == customerId;
+      // Superadmin puede actualizar cualquier customer
+      // Admin puede actualizar customers de su tenant
+      // Cliente puede actualizar su propio documento
       allow update: if request.auth != null && (
+        isSuperadmin() ||
         (isAdmin() && isTenantAdminFor(resource.data.tenantId)) ||
         request.auth.uid == customerId
       );
