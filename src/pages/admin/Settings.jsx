@@ -4,7 +4,9 @@ import { getSettings, updateSettings } from '../../services/firestore';
 import { uploadImage } from '../../services/storage';
 import { validateImageUrl } from '../../utils/validation';
 import { motion } from 'framer-motion';
-import { Save, Upload, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../../services/firebase';
+import { Save, Upload, AlertCircle, CheckCircle2, Webhook, Loader2 } from 'lucide-react';
 
 const Settings = () => {
   const { refreshSettings, tenant, userTenantId } = useApp();
@@ -20,13 +22,16 @@ const Settings = () => {
     secondaryColor: '#1A1A1A',
     qrImage: '',
     brebKey: '',
-    brebBankName: ''
+    brebBankName: '',
+    discordWebhookUrl: ''
   });
   const [logoFile, setLogoFile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [urlValidation, setUrlValidation] = useState({ isValid: true, error: '', warning: '' });
+  const [testLoading, setTestLoading] = useState(false);
+  const [testResult, setTestResult] = useState(null); // { success, message }
 
   useEffect(() => {
     if (tenantId) {
@@ -112,6 +117,25 @@ const Settings = () => {
       alert('Error al guardar la configuración');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTestWebhook = async () => {
+    if (!formData.discordWebhookUrl?.trim()) {
+      alert('Primero ingresa una URL de webhook de Discord');
+      return;
+    }
+    setTestLoading(true);
+    setTestResult(null);
+    try {
+      const testWebhook = httpsCallable(functions, 'testDiscordWebhook');
+      const result = await testWebhook({ webhookUrl: formData.discordWebhookUrl.trim() });
+      setTestResult({ success: true, message: result.data.message });
+    } catch (error) {
+      setTestResult({ success: false, message: error.message || 'Error al probar el webhook' });
+    } finally {
+      setTestLoading(false);
+      setTimeout(() => setTestResult(null), 5000);
     }
   };
 
@@ -347,6 +371,60 @@ const Settings = () => {
               Nombre que aparecerá junto a BRE-B en las transferencias.
             </p>
           </div>
+
+          {/* ========== DISCORD WEBHOOK ========== */}
+          <div className="border-t border-white/10 pt-6">
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <Webhook className="w-5 h-5 text-indigo-400" />
+              Notificaciones por Discord
+            </h3>
+
+            <div>
+              <label className="block text-white/70 mb-2">URL del Webhook de Discord</label>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={formData.discordWebhookUrl || ''}
+                  onChange={(e) => setFormData({ ...formData, discordWebhookUrl: e.target.value })}
+                  className="input-field flex-1"
+                  placeholder="https://discord.com/api/webhooks/..."
+                />
+                <button
+                  onClick={handleTestWebhook}
+                  disabled={testLoading || !formData.discordWebhookUrl?.trim()}
+                  className="btn-secondary flex items-center gap-2 px-4 whitespace-nowrap"
+                >
+                  {testLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Webhook className="w-4 h-4" />
+                  )}
+                  <span>Probar</span>
+                </button>
+              </div>
+
+              {/* Test result feedback */}
+              {testResult && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`mt-2 px-3 py-2 rounded-lg text-sm ${
+                    testResult.success
+                      ? 'bg-green-500/20 border border-green-500/50 text-green-200'
+                      : 'bg-red-500/20 border border-red-500/50 text-red-200'
+                  }`}
+                >
+                  {testResult.success ? '✅ ' : '❌ '}
+                  {testResult.message}
+                </motion.div>
+              )}
+
+              <p className="text-white/50 text-sm mt-2">
+                Configura un webhook de Discord para recibir notificaciones de recargas y premios de tu tienda.
+                Crea un webhook en un canal de Discord y pega la URL aquí.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="glass p-6 rounded-xl">
@@ -361,6 +439,7 @@ const Settings = () => {
               <li>El número de WhatsApp debe incluir el código de país</li>
               <li>El email de contacto aparecerá en el footer</li>
               <li>La clave BRE-B se muestra en el modal de recarga de saldo</li>
+              <li>El Webhook de Discord envía notificaciones de recargas y premios al canal de tu servidor</li>
             </ul>
           </div>
         </div>
