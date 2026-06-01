@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login } from '../../services/auth';
+import { adminLogin } from '../../services/auth';
 import { useTenantStore } from '../../store';
 import { motion } from 'framer-motion';
 import { Lock, Mail, Eye, EyeOff } from 'lucide-react';
@@ -48,7 +48,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      await login(email, password);
+      await adminLogin(email, password);
       navigate('/admin/dashboard');
     } catch (err) {
       setError('Credenciales incorrectas. Por favor intenta de nuevo.');

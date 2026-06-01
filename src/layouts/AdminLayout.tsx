@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
-import { useAuthStore } from '../store/authStore';
-import { logout } from '../services/auth';
+import { useAdminAuthStore } from '../store/authStore';
+import { adminLogout } from '../services/auth';
 import { Menu, X, LayoutDashboard, Package, Image, FileText, Settings, LogOut, LucideIcon, Gift, Wallet, Users, Store } from 'lucide-react';
 
 interface MenuItem {
@@ -12,16 +11,21 @@ interface MenuItem {
 }
 
 const AdminLayout = (): JSX.Element => {
-  const { user } = useApp();
-  const { role } = useAuthStore();
+  const { user, role, initialize: initAdminAuth } = useAdminAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
 
+  // Inicializar store de auth admin (sesión aislada del cliente)
+  useEffect(() => {
+    const unsubscribe = initAdminAuth();
+    return () => { if (unsubscribe) unsubscribe(); };
+  }, [initAdminAuth]);
+
   const handleLogout = async (): Promise<void> => {
     try {
-      await logout();
+      await adminLogout();
       navigate('/admin/login');
     } catch (error) {
       console.error('Error logging out:', error);
