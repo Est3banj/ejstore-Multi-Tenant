@@ -350,6 +350,7 @@ interface SettingsOutput extends Settings {
   qrImage?: string;
   brebKey?: string;
   brebBankName?: string;
+  discordWebhookUrl?: string;
 }
 
 export const getSettings = async (tenantId: string): Promise<SettingsOutput | null> => {
@@ -369,7 +370,8 @@ export const getSettings = async (tenantId: string): Promise<SettingsOutput | nu
         secondaryColor: data.secondaryColor || '#1A1A1A',
         qrImage: data.qrImage || '',
         brebKey: data.brebKey || '',
-        brebBankName: data.brebBankName || ''
+        brebBankName: data.brebBankName || '',
+        discordWebhookUrl: data.discordWebhookUrl || ''
       };
     }
     return null;
@@ -389,6 +391,7 @@ interface SettingsInput {
   qrImage?: string;
   brebKey?: string;
   brebBankName?: string;
+  discordWebhookUrl?: string;
 }
 
 export const updateSettings = async (tenantId: string, settings: SettingsInput): Promise<void> => {
@@ -405,6 +408,7 @@ export const updateSettings = async (tenantId: string, settings: SettingsInput):
       qrImage: settings.qrImage,
       brebKey: settings.brebKey,
       brebBankName: settings.brebBankName,
+      discordWebhookUrl: settings.discordWebhookUrl || '',
       updatedAt: serverTimestamp()
     };
     await setDoc(docRef, firestoreData, { merge: true });

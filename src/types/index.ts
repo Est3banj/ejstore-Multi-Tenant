@@ -9,6 +9,7 @@ export interface Tenant {
   secondaryColor?: string;
   isActive?: boolean;
   createdAt?: Date;
+  discordWebhookUrl?: string; // URL del webhook de Discord para notificaciones
 }
 
 export interface Service {
@@ -56,6 +57,7 @@ export interface Settings {
   qrImage?: string; // URL de imagen QR para recargas
   brebKey?: string; // Clave BRE-B personalizada por tenant
   brebBankName?: string; // Nombre del banco para BRE-B
+  discordWebhookUrl?: string; // URL del webhook de Discord para notificaciones
 }
 
 export interface User {
@@ -107,6 +109,7 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'tenantId'> = {
   whatsappNumber: '',
   contactEmail: '',
   siteName: 'EJStore',
+  discordWebhookUrl: '',
 };
 
 // Tipos para recargas

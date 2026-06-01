@@ -18,6 +18,55 @@ if (!TELEGRAM_BOT_TOKEN || !ADMIN_CHAT_ID) {
   console.warn('⚠️ Telegram config no encontrada. Usar: firebase functions:config:set telegram.bot_token="TOKEN" telegram.admin_chat_id="CHAT_ID"');
 }
 
+// ========== FEATURE FLAGS ==========
+// Para deshabilitar Telegram sin eliminar código, cambiar a false
+// firebase functions:config:set notifications.enable_telegram="false"
+const ENABLE_TELEGRAM_NOTIFICATIONS = process.env.ENABLE_TELEGRAM_NOTIFICATIONS !== 'false'
+  && (functions.config().notifications?.enable_telegram !== 'false');
+
+// ========== HELPER: Obtener datos del tenant desde Firestore ==========
+async function getTenantById(tenantId) {
+  if (!tenantId) return null;
+  try {
+    const doc = await db.collection('tenants').doc(tenantId).get();
+    if (!doc.exists) return null;
+    return { id: doc.id, ...doc.data() };
+  } catch (error) {
+    console.error('Error getting tenant:', error.message);
+    return null;
+  }
+}
+
+// ========== HELPER: Enviar notificación a Discord via Webhook (Embeds) ==========
+// Colores Discord: Recarga=Azul(3498DB), Premio=Verde(2ECC71), Saldo=Morado(9B59B6), Test=Naranja(F39C12)
+async function sendDiscordNotification(webhookUrl, embedData) {
+  if (!webhookUrl) return false;
+  try {
+    const embed = {
+      title: embedData.title,
+      color: embedData.color || 0x3498DB,
+      fields: embedData.fields || [],
+      timestamp: new Date().toISOString(),
+      footer: { text: 'EJStore - Sistema de Notificaciones' }
+    };
+
+    if (embedData.description) {
+      embed.description = embedData.description;
+    }
+
+    await axios.post(webhookUrl, {
+      embeds: [embed],
+      username: 'EJStore Notificaciones',
+      avatar_url: 'https://ejstore-web.web.app/logoej.jpg'
+    });
+
+    return true;
+  } catch (error) {
+    console.error('Error sending Discord notification:', error.message);
+    return false; // Nunca tirar error que afecte al usuario
+  }
+}
+
 // ========== BOOTSTRAP - Crear primer superadmin ==========
 // Solo funciona si NO existe ningún superadmin en el sistema
 // Uso: /createSuperadminBootstrap?uid=XXX&tenantId=xxx&email=xxx
@@ -72,14 +121,33 @@ async function sendTelegramMessage(chatId, text, keyboard = null) {
 
 // ========== NOTIFICAR PREMIO GANADO ==========
 exports.notifyPrizeWon = functions.https.onCall(async (data, context) => {
-  const { userName, phone, prize, prizeId } = data;
+  const { userName, phone, prize, prizeId, tenantId } = data;
 
   // No enviar notificación si es "nada"
   if (prizeId === 'nothing') {
     return { success: true, message: 'No se notifica porque no ganó nada' };
   }
 
-  const message = `
+  // ========== DISCORD: Enviar notificación si el tenant tiene webhook configurado ==========
+  if (tenantId) {
+    const tenantData = await getTenantById(tenantId);
+    if (tenantData?.discordWebhookUrl) {
+      await sendDiscordNotification(tenantData.discordWebhookUrl, {
+        title: '🎁 NUEVO PREMIO GANADO',
+        color: 0x2ECC71, // Verde
+        fields: [
+          { name: '👤 Cliente', value: userName, inline: true },
+          { name: '📱 WhatsApp', value: phone, inline: true },
+          { name: '🎉 Premio', value: prize, inline: false },
+          { name: '🕐 Fecha', value: new Date().toLocaleString('America/Bogota', { timeZone: 'America/Bogota' }), inline: false }
+        ]
+      });
+    }
+  }
+
+  // ========== TELEGRAM (solo si está habilitado) ==========
+  if (ENABLE_TELEGRAM_NOTIFICATIONS) {
+    const message = `
 🎁 *NUEVO GANADOR*
 ━━━━━━━━━━━━━━━━
 👤 *Nombre:* ${userName}
@@ -89,15 +157,17 @@ exports.notifyPrizeWon = functions.https.onCall(async (data, context) => {
 ━━━━━━━━━━━━━━━━
 `;
 
-  // Crear teclado con botones para marcar como entregado
-  const keyboard = {
-    inline_keyboard: [
-      [{ text: '✅ Marcar entregado', callback_data: `delivered_${phone}` }],
-      [{ text: '❌ Descartar', callback_data: `discard_${phone}` }]
-    ]
-  };
+    // Crear teclado con botones para marcar como entregado
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: '✅ Marcar entregado', callback_data: `delivered_${phone}` }],
+        [{ text: '❌ Descartar', callback_data: `discard_${phone}` }]
+      ]
+    };
 
-  await sendTelegramMessage(ADMIN_CHAT_ID, message, keyboard);
+    await sendTelegramMessage(ADMIN_CHAT_ID, message, keyboard);
+  }
+
   return { success: true };
 });
 
@@ -108,7 +178,7 @@ exports.createRechargeRequest = functions.https.onCall(async (data, context) => 
     throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
 
-  const { amount, userName, phone, transferProof } = data;
+  const { amount, userName, phone, transferProof, tenantId } = data;
 
   if (!amount || !userName || !phone) {
     throw new functions.https.HttpsError('invalid-argument', 'Monto, nombre y teléfono son requeridos');
@@ -121,29 +191,54 @@ exports.createRechargeRequest = functions.https.onCall(async (data, context) => 
     phone,
     amount: parseInt(amount),
     transferProof: transferProof || null,
+    tenantId: tenantId || context.auth.token.tenantId || null,
     status: 'pending', // pending, approved, rejected
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
 
-  // Notificar al admin por Telegram
-  const message = `
+  const parsedAmount = parseInt(amount);
+  const now = new Date().toLocaleString('America/Bogota', { timeZone: 'America/Bogota' });
+
+  // ========== DISCORD: Enviar notificación si el tenant tiene webhook configurado ==========
+  const effectiveTenantId = tenantId || context.auth.token.tenantId;
+  if (effectiveTenantId) {
+    const tenantData = await getTenantById(effectiveTenantId);
+    if (tenantData?.discordWebhookUrl) {
+      await sendDiscordNotification(tenantData.discordWebhookUrl, {
+        title: '💰 NUEVA SOLICITUD DE RECARGA',
+        color: 0x3498DB, // Azul
+        fields: [
+          { name: '👤 Cliente', value: userName, inline: true },
+          { name: '📱 WhatsApp', value: phone, inline: true },
+          { name: '💵 Monto', value: `$${parsedAmount.toLocaleString()} COP`, inline: true },
+          { name: '🆔 ID Recarga', value: rechargeRef.id, inline: false },
+          { name: '🕐 Fecha', value: now, inline: false }
+        ]
+      });
+    }
+  }
+
+  // ========== TELEGRAM (solo si está habilitado) ==========
+  if (ENABLE_TELEGRAM_NOTIFICATIONS) {
+    const message = `
 💰 *NUEVA RECARGA*
 ━━━━━━━━━━━━━━━━
 👤 *Nombre:* ${userName}
 📱 *WhatsApp:* ${phone}
-💵 *Monto:* $${parseInt(amount).toLocaleString()} COP
-🕐 *Fecha:* ${new Date().toLocaleString('America/Bogota', { timeZone: 'America/Bogota' })}
+💵 *Monto:* $${parsedAmount.toLocaleString()} COP
+🕐 *Fecha:* ${now}
 ━━━━━━━━━━━━━━━━
 `;
 
-  const keyboard = {
-    inline_keyboard: [
-      [{ text: '✅ Aprobar', callback_data: `approve_${rechargeRef.id}` }],
-      [{ text: '❌ Rechazar', callback_data: `reject_${rechargeRef.id}` }]
-    ]
-  };
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: '✅ Aprobar', callback_data: `approve_${rechargeRef.id}` }],
+        [{ text: '❌ Rechazar', callback_data: `reject_${rechargeRef.id}` }]
+      ]
+    };
 
-  await sendTelegramMessage(ADMIN_CHAT_ID, message, keyboard);
+    await sendTelegramMessage(ADMIN_CHAT_ID, message, keyboard);
+  }
 
   return { success: true, rechargeId: rechargeRef.id };
 });
@@ -194,9 +289,29 @@ exports.loadCustomerBalance = functions.https.onCall(async (data, context) => {
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
 
-  // Notificar por Telegram
   const customerData = customerDoc.data();
-  const message = `
+
+  // ========== DISCORD: Enviar notificación si el tenant tiene webhook configurado ==========
+  const customerTenantId = customerData.tenantId || claims.tenantId;
+  if (customerTenantId) {
+    const tenantData = await getTenantById(customerTenantId);
+    if (tenantData?.discordWebhookUrl) {
+      await sendDiscordNotification(tenantData.discordWebhookUrl, {
+        title: '💵 CARGA DE SALDO (Admin)',
+        color: 0x9B59B6, // Morado
+        fields: [
+          { name: '👤 Cliente', value: `${customerData.firstName || ''} ${customerData.lastName || ''}`.trim(), inline: true },
+          { name: '📧 Email', value: customerData.email || '', inline: true },
+          { name: '💰 Monto', value: `$${parsedAmount.toLocaleString()} COP`, inline: true },
+          { name: '👤 Cargado por', value: context.auth.token.email || 'Admin', inline: false }
+        ]
+      });
+    }
+  }
+
+  // ========== TELEGRAM (solo si está habilitado) ==========
+  if (ENABLE_TELEGRAM_NOTIFICATIONS) {
+    const message = `
 💵 *CARGA DE SALDO*
 ━━━━━━━━━━━━━━━
 👤 *Cliente:* ${customerData.firstName} ${customerData.lastName}
@@ -205,9 +320,49 @@ exports.loadCustomerBalance = functions.https.onCall(async (data, context) => {
 👤 *Cargado por:* ${context.auth.token.email}
 ━━━━━━━━━━━━━━━
   `;
-  await sendTelegramMessage(ADMIN_CHAT_ID, message);
+    await sendTelegramMessage(ADMIN_CHAT_ID, message);
+  }
 
   return { success: true, newAmount: parsedAmount };
+});
+
+// ========== TEST DISCORD WEBHOOK ==========
+// Envía un mensaje de prueba al webhook de Discord del tenant
+exports.testDiscordWebhook = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+  }
+
+  const claims = context.auth.token;
+  if (claims.role !== 'superadmin' && claims.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'No tiene permisos de admin');
+  }
+
+  const { webhookUrl } = data;
+  if (!webhookUrl) {
+    throw new functions.https.HttpsError('invalid-argument', 'webhookUrl es requerido');
+  }
+
+  try {
+    const result = await sendDiscordNotification(webhookUrl, {
+      title: '🔧 Prueba de Webhook - ¡Conexión Exitosa!',
+      color: 0xF39C12, // Naranja
+      description: 'Este es un mensaje de prueba para verificar que la integración con Discord funciona correctamente.',
+      fields: [
+        { name: '📅 Fecha de prueba', value: new Date().toLocaleString('America/Bogota', { timeZone: 'America/Bogota' }), inline: true },
+        { name: '👤 Probado por', value: context.auth.token.email || 'Admin', inline: true }
+      ]
+    });
+
+    if (result) {
+      return { success: true, message: 'Webhook de Discord configurado correctamente' };
+    } else {
+      throw new functions.https.HttpsError('internal', 'No se pudo enviar el mensaje de prueba');
+    }
+  } catch (error) {
+    console.error('Error testing Discord webhook:', error.message);
+    throw new functions.https.HttpsError('internal', 'Error al probar el webhook: ' + error.message);
+  }
 });
 
 // ========== APROBAR/RECHAZAR RECARGA (Admin) ==========
@@ -479,6 +634,7 @@ exports.createTenant = functions.https.onCall(async (data, context) => {
       whatsappNumber: whatsappNumber || '',
       contactEmail: contactEmail || '',
       isActive: true,
+      discordWebhookUrl: '',
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
