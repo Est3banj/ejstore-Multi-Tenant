@@ -5,14 +5,12 @@ service cloud.firestore {
     // ========== TENANTS ==========
     match /tenants/{tenantId} {
       allow read: if true;
-      // Solo usuarios autenticados pueden escribir su propio tenant
       allow write: if request.auth != null;
     }
 
     // ========== SERVICES ==========
     match /services/{serviceId} {
       allow read: if true;
-      // Cualquier usuario autenticado puede crear/editar (el código valida tenantId)
       allow create, update, delete: if request.auth != null;
     }
 
@@ -27,6 +25,37 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow create: if request.auth != null;
       allow update: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ========== CUSTOMERS ==========
+    match /customers/{customerId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // ========== RECHARGES ==========
+    match /recharges/{rechargeId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+    }
+
+    // ========== BALANCE TRANSACTIONS ==========
+    match /balanceTransactions/{transactionId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+    }
+
+    // ========== PRIZES ==========
+    match /prizes/{prizeId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // ========== ROULETTE CONFIG ==========
+    match /rouletteConfig/{tenantId} {
+      allow read: if true;
+      allow write: if request.auth != null;
     }
   }
 }
