@@ -58,6 +58,34 @@ const Product = () => {
     }
   }, [id, tenant?.id]);
 
+  // Aplicar colores dinámicos del tenant a los botones
+  useEffect(() => {
+    if (settings?.primaryColor) {
+      const primary = settings.primaryColor || '#E50914';
+      const primaryHex = primary;
+      
+      let styleElement = document.getElementById('product-tenant-colors');
+      if (!styleElement) {
+        styleElement = document.createElement('style');
+        styleElement.id = 'product-tenant-colors';
+        document.head.appendChild(styleElement);
+      }
+      
+      styleElement.textContent = `
+        .btn-primary {
+          background: linear-gradient(135deg, ${primaryHex}, ${primaryHex}dd) !important;
+          border-color: ${primaryHex} !important;
+        }
+        .btn-primary:hover {
+          background: linear-gradient(135deg, ${primaryHex}cc, ${primaryHex}aa) !important;
+        }
+        .shadow-primary\\/50 {
+          --tw-shadow-color: ${primaryHex}80 !important;
+        }
+      `;
+    }
+  }, [settings]);
+
   const handleBuy = () => {
     if (!acceptedTerms) {
       setShowTermsModal(true);
@@ -213,12 +241,16 @@ const Product = () => {
                   <button
                     key={method.id}
                     onClick={() => setSelectedPayment(method)}
-                    className={`p-4 rounded-lg border-2 transition-all flex items-center justify-center space-x-2 ${selectedPayment?.id === method.id
+                    className={`p-4 rounded-lg border-2 transition-all flex items-center justify-center gap-2 ${selectedPayment?.id === method.id
                       ? 'border-primary-500 bg-primary-500/10'
                       : 'border-white/20 hover:border-white/40'
                       }`}
                   >
-                    <span className="text-2xl">{method.icon}</span>
+                    {method.logo ? (
+                      <img src={method.icon} alt={method.name} className="w-8 h-8 object-contain" />
+                    ) : (
+                      <span className="text-2xl">{method.icon}</span>
+                    )}
                     <span className="text-white font-semibold">{method.name}</span>
                   </button>
                 ))}
@@ -264,7 +296,15 @@ const Product = () => {
             <button
               onClick={handleBuy}
               disabled={!acceptedTerms || !selectedPayment}
-              className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: settings?.primaryColor 
+                  ? `linear-gradient(135deg, ${settings.primaryColor}, ${settings.primaryColor}dd)`
+                  : 'linear-gradient(135deg, #E50914, #E50914dd)',
+                boxShadow: settings?.primaryColor
+                  ? `0 4px 15px -3px ${settings.primaryColor}80`
+                  : '0 4px 15px -3px rgba(229, 9, 20, 0.5)'
+              }}
             >
               Comprar Ahora
             </button>

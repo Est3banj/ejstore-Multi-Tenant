@@ -69,6 +69,7 @@ export const getServices = async (tenantId: string): Promise<Service[]> => {
         images: data.images || [],
         image: data.image || data.images?.[0] || '',
         isActive: data.active !== false,
+        isPopular: data.isPopular || false,
         createdAt: convertTimestamp(data.createdAt),
         plans: data.plans
       } as Service;
@@ -107,6 +108,7 @@ export const getAllServices = async (tenantId: string): Promise<Service[]> => {
         images: data.images || [],
         image: data.image || data.images?.[0] || '',
         isActive: data.active !== false,
+        isPopular: data.isPopular || false,
         createdAt: convertTimestamp(data.createdAt),
         plans: data.plans
       } as Service;
@@ -141,6 +143,7 @@ export const getServiceById = async (id: string, tenantId: string): Promise<Serv
           images: data.images || [],
           image: data.image || data.images?.[0] || '',
           isActive: data.active !== false,
+          isPopular: data.isPopular || false,
           createdAt: convertTimestamp(data.createdAt),
           plans: data.plans
         } as Service;
@@ -160,6 +163,7 @@ interface ServiceInput {
   category: string;
   images: string[];
   isActive: boolean;
+  isPopular?: boolean;
   plans?: Service['plans'];
 }
 
@@ -343,6 +347,9 @@ export const deleteBanner = async (id: string, _tenantId: string): Promise<void>
 interface SettingsOutput extends Settings {
   primaryColor?: string;
   secondaryColor?: string;
+  qrImage?: string;
+  brebKey?: string;
+  brebBankName?: string;
 }
 
 export const getSettings = async (tenantId: string): Promise<SettingsOutput | null> => {
@@ -359,7 +366,10 @@ export const getSettings = async (tenantId: string): Promise<SettingsOutput | nu
         contactEmail: data.contactEmail || '',
         siteName: data.name || 'Mi Tienda',
         primaryColor: data.primaryColor || '#E50914',
-        secondaryColor: data.secondaryColor || '#1A1A1A'
+        secondaryColor: data.secondaryColor || '#1A1A1A',
+        qrImage: data.qrImage || '',
+        brebKey: data.brebKey || '',
+        brebBankName: data.brebBankName || ''
       };
     }
     return null;
@@ -376,6 +386,9 @@ interface SettingsInput {
   contactEmail?: string;
   primaryColor?: string;
   secondaryColor?: string;
+  qrImage?: string;
+  brebKey?: string;
+  brebBankName?: string;
 }
 
 export const updateSettings = async (tenantId: string, settings: SettingsInput): Promise<void> => {
@@ -389,6 +402,9 @@ export const updateSettings = async (tenantId: string, settings: SettingsInput):
       contactEmail: settings.contactEmail,
       primaryColor: settings.primaryColor,
       secondaryColor: settings.secondaryColor,
+      qrImage: settings.qrImage,
+      brebKey: settings.brebKey,
+      brebBankName: settings.brebBankName,
       updatedAt: serverTimestamp()
     };
     await setDoc(docRef, firestoreData, { merge: true });
@@ -408,6 +424,124 @@ export const updateTenant = async (tenantId: string, data: Partial<Tenant>): Pro
     }, { merge: true });
   } catch (error) {
     console.error('Error updating tenant:', error);
+    throw error;
+  }
+};
+
+// === RECARGAS ===
+import type { Recharge } from '../types';
+
+export const createRechargeRequest = async (recharge: Omit<Recharge, 'id' | 'createdAt' | 'status'>): Promise<string> => {
+  try {
+    const docRef = await addDoc(collection(db, 'recharges'), {
+      ...recharge,
+      status: 'pending',
+      createdAt: serverTimestamp()
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error('Error creating recharge request:', error);
+    throw error;
+  }
+};
+
+export const getRecharges = async (tenantId: string): Promise<Recharge[]> => {
+  if (!tenantId) throw new Error('tenantId required');
+  try {
+    const q = query(
+      collection(db, 'recharges'),
+      where('tenantId', '==', tenantId)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate?.() || new Date()
+    })) as Recharge[];
+  } catch (error) {
+    console.error('Error getting recharges:', error);
+    return [];
+  }
+};
+
+export const approveRecharge = async (rechargeId: string, adminId: string): Promise<void> => {
+  try {
+    const docRef = doc(db, 'recharges', rechargeId);
+    await updateDoc(docRef, {
+      status: 'approved',
+      processedAt: serverTimestamp(),
+      processedBy: adminId
+    });
+  } catch (error) {
+    console.error('Error approving recharge:', error);
+    throw error;
+  }
+};
+
+export const rejectRecharge = async (rechargeId: string, adminId: string, reason?: string): Promise<void> => {
+  try {
+    const docRef = doc(db, 'recharges', rechargeId);
+    await updateDoc(docRef, {
+      status: 'rejected',
+      processedAt: serverTimestamp(),
+      processedBy: adminId,
+      rejectionReason: reason || 'Rechazado por el administrador'
+    });
+  } catch (error) {
+    console.error('Error rejecting recharge:', error);
+    throw error;
+  }
+};
+
+// ========== CONFIGURACIÓN DE RULETA ==========
+export interface RouletteConfigData {
+  tenantId: string;
+  isEnabled: boolean;
+  pricePerSpin: number;
+  spinsForFreeSpin: number;
+  prizes: {
+    id: string;
+    name: string;
+    probability: number;
+    cost: number;
+    isActive: boolean;
+  }[];
+  updatedAt: Date;
+}
+
+export const getRouletteConfig = async (tenantId: string): Promise<RouletteConfigData | null> => {
+  if (!tenantId) return null;
+  try {
+    const docRef = doc(db, 'rouletteConfig', tenantId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      return {
+        tenantId: data.tenantId,
+        isEnabled: data.isEnabled,
+        pricePerSpin: data.pricePerSpin,
+        spinsForFreeSpin: data.spinsForFreeSpin,
+        prizes: data.prizes,
+        updatedAt: data.updatedAt?.toDate() || new Date()
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting roulette config:', error);
+    return null;
+  }
+};
+
+export const saveRouletteConfig = async (config: Omit<RouletteConfigData, 'updatedAt'>): Promise<void> => {
+  if (!config.tenantId) throw new Error('tenantId required');
+  try {
+    const docRef = doc(db, 'rouletteConfig', config.tenantId);
+    await setDoc(docRef, {
+      ...config,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  } catch (error) {
+    console.error('Error saving roulette config:', error);
     throw error;
   }
 };

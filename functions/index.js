@@ -1,9 +1,408 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const axios = require('axios');
 
 admin.initializeApp();
 
 const db = admin.firestore();
+
+// ========== CONFIG - Secrets (env vars) ==========
+// IMPORTANTE: Configurar en Firebase Console > Functions > Environment Configuration
+// Desarrollo: Usar procesos.env
+// Producción: firebase functions:config:set telegram.bot_token="TOKEN" telegram.admin_chat_id="CHAT_ID"
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || functions.config().telegram?.bot_token;
+const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || functions.config().telegram?.admin_chat_id;
+
+// Warn en desarrollo
+if (!TELEGRAM_BOT_TOKEN || !ADMIN_CHAT_ID) {
+  console.warn('⚠️ Telegram config no encontrada. Usar: firebase functions:config:set telegram.bot_token="TOKEN" telegram.admin_chat_id="CHAT_ID"');
+}
+
+// ========== BOOTSTRAP - Crear primer superadmin ==========
+// Solo funciona si NO existe ningún superadmin en el sistema
+// Uso: /createSuperadminBootstrap?uid=XXX&tenantId=xxx&email=xxx
+exports.createSuperadminBootstrap = functions.https.onCall(async (data, context) => {
+  const { uid, tenantId, email } = data;
+
+  if (!uid || !tenantId || !email) {
+    throw new functions.https.HttpsError('invalid-argument', 'uid, tenantId y email son requeridos');
+  }
+
+  // Verificar si ya existe algún superadmin
+  const superadminSnap = await db.collection('users').where('role', '==', 'superadmin').limit(1).get();
+  if (!superadminSnap.empty) {
+    throw new functions.https.HttpsError('permission-denied', 'Ya existe un superadmin. Use setTenantClaims');
+  }
+
+  try {
+    // Setear custom claims
+    await admin.auth().setCustomUserClaims(uid, {
+      tenantId,
+      role: 'superadmin'
+    });
+
+    // Crear documento en Firestore
+    await db.collection('users').doc(uid).set({
+      tenantId,
+      role: 'superadmin',
+      email,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    return { success: true, message: 'Superadmin creado correctamente' };
+  } catch (error) {
+    console.error('Error bootstrap:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// ========== HELPER: Enviar mensaje a Telegram ==========
+async function sendTelegramMessage(chatId, text, keyboard = null) {
+  try {
+    const payload = { chat_id: chatId, text };
+    if (keyboard) {
+      payload.reply_markup = keyboard;
+    }
+    await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, payload);
+  } catch (error) {
+    console.error('Error sending Telegram message:', error.message);
+  }
+}
+
+// ========== NOTIFICAR PREMIO GANADO ==========
+exports.notifyPrizeWon = functions.https.onCall(async (data, context) => {
+  const { userName, phone, prize, prizeId } = data;
+
+  // No enviar notificación si es "nada"
+  if (prizeId === 'nothing') {
+    return { success: true, message: 'No se notifica porque no ganó nada' };
+  }
+
+  const message = `
+🎁 *NUEVO GANADOR*
+━━━━━━━━━━━━━━━━
+👤 *Nombre:* ${userName}
+📱 *WhatsApp:* ${phone}
+🎉 *Premio:* ${prize}
+🕐 *Fecha:* ${new Date().toLocaleString('America/Bogota', { timeZone: 'America/Bogota' })}
+━━━━━━━━━━━━━━━━
+`;
+
+  // Crear teclado con botones para marcar como entregado
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: '✅ Marcar entregado', callback_data: `delivered_${phone}` }],
+      [{ text: '❌ Descartar', callback_data: `discard_${phone}` }]
+    ]
+  };
+
+  await sendTelegramMessage(ADMIN_CHAT_ID, message, keyboard);
+  return { success: true };
+});
+
+// ========== CREAR SOLICITUD DE RECARGA ==========
+exports.createRechargeRequest = functions.https.onCall(async (data, context) => {
+  // Verificar que el usuario esté autenticado
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+  }
+
+  const { amount, userName, phone, transferProof } = data;
+
+  if (!amount || !userName || !phone) {
+    throw new functions.https.HttpsError('invalid-argument', 'Monto, nombre y teléfono son requeridos');
+  }
+
+  // Crear documento de recarga
+  const rechargeRef = await db.collection('recharges').add({
+    userId: context.auth.uid,
+    userName,
+    phone,
+    amount: parseInt(amount),
+    transferProof: transferProof || null,
+    status: 'pending', // pending, approved, rejected
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+
+  // Notificar al admin por Telegram
+  const message = `
+💰 *NUEVA RECARGA*
+━━━━━━━━━━━━━━━━
+👤 *Nombre:* ${userName}
+📱 *WhatsApp:* ${phone}
+💵 *Monto:* $${parseInt(amount).toLocaleString()} COP
+🕐 *Fecha:* ${new Date().toLocaleString('America/Bogota', { timeZone: 'America/Bogota' })}
+━━━━━━━━━━━━━━━━
+`;
+
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: '✅ Aprobar', callback_data: `approve_${rechargeRef.id}` }],
+      [{ text: '❌ Rechazar', callback_data: `reject_${rechargeRef.id}` }]
+    ]
+  };
+
+  await sendTelegramMessage(ADMIN_CHAT_ID, message, keyboard);
+
+  return { success: true, rechargeId: rechargeRef.id };
+});
+
+// ========== CARGAR SALDO A CLIENTE (Admin directo) ==========
+exports.loadCustomerBalance = functions.https.onCall(async (data, context) => {
+  // Verificar que sea admin
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+  }
+
+  const claims = context.auth.token;
+  if (claims.role !== 'superadmin' && claims.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'No tiene permisos de admin');
+  }
+
+  const { customerId, amount } = data;
+
+  if (!customerId || !amount) {
+    throw new functions.https.HttpsError('invalid-argument', 'customerId y amount son requeridos');
+  }
+
+  const parsedAmount = parseInt(amount);
+  if (isNaN(parsedAmount) || parsedAmount < 1000) {
+    throw new functions.https.HttpsError('invalid-argument', 'El monto mínimo es $1,000 COP');
+  }
+
+  // Verificar que el cliente existe
+  const customerRef = db.collection('customers').doc(customerId);
+  const customerDoc = await customerRef.get();
+
+  if (!customerDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Cliente no encontrado');
+  }
+
+  // Usar atomic increment para evitar race conditions
+  await customerRef.update({
+    balance: admin.firestore.FieldValue.increment(parsedAmount)
+  });
+
+  // Registrar la transacción
+  await db.collection('balanceTransactions').add({
+    customerId,
+    amount: parsedAmount,
+    type: 'admin_load',
+    processedBy: context.auth.uid,
+    adminEmail: context.auth.token.email || null,
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+
+  // Notificar por Telegram
+  const customerData = customerDoc.data();
+  const message = `
+💵 *CARGA DE SALDO*
+━━━━━━━━━━━━━━━
+👤 *Cliente:* ${customerData.firstName} ${customerData.lastName}
+📧 *Email:* ${customerData.email}
+💰 *Monto:* $${parsedAmount.toLocaleString()} COP
+👤 *Cargado por:* ${context.auth.token.email}
+━━━━━━━━━━━━━━━
+  `;
+  await sendTelegramMessage(ADMIN_CHAT_ID, message);
+
+  return { success: true, newAmount: parsedAmount };
+});
+
+// ========== APROBAR/RECHAZAR RECARGA (Admin) ==========
+exports.processRecharge = functions.https.onCall(async (data, context) => {
+  // Verificar que sea admin
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+  }
+
+  const claims = context.auth.token;
+  if (claims.role !== 'superadmin' && claims.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'No tiene permisos de admin');
+  }
+
+  const { rechargeId, action } = data; // action: 'approve' | 'reject'
+
+  if (!rechargeId || !action) {
+    throw new functions.https.HttpsError('invalid-argument', 'rechargeId y action son requeridos');
+  }
+
+  const rechargeRef = db.collection('recharges').doc(rechargeId);
+  const rechargeDoc = await rechargeRef.get();
+
+  if (!rechargeDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Recarga no encontrada');
+  }
+
+  const rechargeData = rechargeDoc.data();
+  const newStatus = action === 'approve' ? 'approved' : 'rejected';
+
+  // Actualizar estado
+  await rechargeRef.update({
+    status: newStatus,
+    processedAt: admin.firestore.FieldValue.serverTimestamp(),
+    processedBy: context.auth.uid
+  });
+
+  // Si se aprueba, actualizar saldo del usuario
+  if (action === 'approve') {
+    const customerRef = db.collection('customers').doc(rechargeData.userId);
+    await customerRef.update({
+      balance: admin.firestore.FieldValue.increment(rechargeData.amount)
+    });
+  }
+
+  // Notificar al usuario por Telegram
+  const statusText = action === 'approve' ? '✅ Aprobada' : '❌ Rechazada';
+  const userMessage = `Tu recarga de $${rechargeData.amount.toLocaleString()} COP ha sido ${statusText.toLowerCase()}.`;
+
+  if (rechargeData.phone) {
+    // Enviar mensaje al usuario (si tiene Telegram linked, si no solo guardamos en Firestore)
+    await db.collection('notifications').add({
+      userId: rechargeData.userId,
+      type: 'recharge_status',
+      message: userMessage,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+  }
+
+  return { success: true, status: newStatus };
+});
+
+// ========== TELEGRAM WEBHOOK ==========
+// Maneja callbacks (premios, recargas) y comandos de texto (approve/reject admin)
+exports.telegramWebhook = functions.https.onRequest(async (req, res) => {
+  if (req.method !== 'POST') {
+    res.status(200).send('OK');
+    return;
+  }
+
+  const update = req.body;
+
+  // ========== CALLBACKS (botones inline) ==========
+  if (update.callback_query) {
+    const callbackData = update.callback_query.data;
+    const chatId = update.callback_query.message.chat.id;
+
+    if (callbackData.startsWith('delivered_')) {
+      const phone = callbackData.replace('delivered_', '');
+      await sendTelegramMessage(chatId, `✅ Premio marcado como entregado al usuario ${phone}`);
+    } else if (callbackData.startsWith('discard_')) {
+      const phone = callbackData.replace('discard_', '');
+      await sendTelegramMessage(chatId, `❌ Premio descartado para el usuario ${phone}`);
+    } else if (callbackData.startsWith('approve_')) {
+      const rechargeId = callbackData.replace('approve_', '');
+      // Procesar recarga via Cloud Function internamente
+      const rechargeRef = db.collection('recharges').doc(rechargeId);
+      const doc = await rechargeRef.get();
+      if (doc.exists) {
+        const data = doc.data();
+        await rechargeRef.update({
+          status: 'approved',
+          processedAt: admin.firestore.FieldValue.serverTimestamp(),
+          processedBy: 'telegram'
+        });
+        const customerRef = db.collection('customers').doc(data.userId || data.customerId);
+        await customerRef.update({ balance: admin.firestore.FieldValue.increment(data.amount) });
+        await sendTelegramMessage(chatId, `✅ Recarga #${rechargeId} APROBADA\nMonto: $${data.amount.toLocaleString()}`);
+      }
+    } else if (callbackData.startsWith('reject_')) {
+      const rechargeId = callbackData.replace('reject_', '');
+      const rechargeRef = db.collection('recharges').doc(rechargeId);
+      await rechargeRef.update({
+        status: 'rejected',
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+        processedBy: 'telegram'
+      });
+      await sendTelegramMessage(chatId, `❌ Recarga #${rechargeId} RECHAZADA`);
+    }
+
+    await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+      callback_query_id: update.callback_query.id
+    });
+
+    res.status(200).send('OK');
+    return;
+  }
+
+  // ========== TEXT COMMANDS (admin approve/reject por monto) ==========
+  const message = req.body.message;
+  if (!message) {
+    res.status(200).send('OK');
+    return;
+  }
+
+  const chatId = message.chat?.id;
+  if (chatId !== ADMIN_CHAT_ID) {
+    res.status(200).send('OK');
+    return;
+  }
+
+  const text = message.text || '';
+
+  let action = null;
+  let amount = 0;
+  let reason = '';
+
+  if (text.startsWith('✅') || text.toLowerCase().startsWith('aprobar')) {
+    action = 'approve';
+    const match = text.match(/(\d+)/);
+    if (match) amount = parseInt(match[1]);
+  } else if (text.startsWith('❌') || text.toLowerCase().startsWith('rechazar')) {
+    action = 'reject';
+    reason = text.replace(/^(❌|rechazar|RECHAZAR)\s*/i, '').trim() || 'Pago no válido';
+  }
+
+  if (!action) {
+    res.status(200).send('OK');
+    return;
+  }
+
+  const pendingSnap = await db.collection('recharges')
+    .where('status', '==', 'pending')
+    .orderBy('createdAt', 'desc')
+    .limit(10)
+    .get();
+
+  let processed = false;
+
+  for (const doc of pendingSnap.docs) {
+    const recharge = doc.data();
+    const ref = doc.ref;
+
+    if (action === 'approve' && amount > 0 && Math.abs(recharge.amount - amount) < 500) {
+      await ref.update({
+        status: 'approved',
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+        processedBy: 'telegram'
+      });
+      const customerRef = db.collection('customers').doc(recharge.customerId || recharge.userId);
+      await customerRef.update({ balance: admin.firestore.FieldValue.increment(recharge.amount) });
+      await sendTelegramMessage(chatId, `✅ *RECARGA APROBADA*\n\nMonto: $${recharge.amount.toLocaleString()}\nCliente: ${recharge.customerName || recharge.userName}`);
+      processed = true;
+      break;
+    } else if (action === 'reject') {
+      await ref.update({
+        status: 'rejected',
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+        processedBy: 'telegram',
+        rejectionReason: reason
+      });
+      await sendTelegramMessage(chatId, `❌ *RECARGA RECHAZADA*\n\nMonto: $${recharge.amount.toLocaleString()}\nCliente: ${recharge.customerName || recharge.userName}\nMotivo: ${reason}`);
+      processed = true;
+      break;
+    }
+  }
+
+  if (!processed && action === 'approve' && amount > 0) {
+    await sendTelegramMessage(chatId, `⚠️ No se encontró recarga pendiente de ~$${amount.toLocaleString()}`);
+  } else if (!processed && action === 'reject') {
+    await sendTelegramMessage(chatId, `⚠️ No hay recargas pendientes para rechazar`);
+  }
+
+  res.status(200).send('OK');
+});
 
 // ========== SET CUSTOM CLAIMS ==========
 // Llamada desde el frontend para setear claims del usuario
@@ -122,58 +521,6 @@ exports.verifyTenantAccess = functions.https.onCall(async (data, context) => {
   return { valid: true };
 });
 
-// ========== CREATE SUPERADMIN BOOTSTRAP ==========
-// Crear el primer superadmin (solo funciona si no hay superadmin existente)
-exports.createSuperadminBootstrap = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe estar autenticado');
-  }
-
-  const { uid, email } = data;
-
-  if (!uid || !email) {
-    throw new functions.https.HttpsError('invalid-argument', 'uid y email son requeridos');
-  }
-
-  try {
-    // Verificar si ya existe un superadmin
-    const usersSnap = await db.collection('users')
-      .where('role', '==', 'superadmin')
-      .limit(1)
-      .get();
-
-    if (!usersSnap.empty) {
-      // Ya existe superadmin - verificar si es este usuario
-      const existingSuperadmin = usersSnap.docs[0];
-      if (existingSuperadmin.id !== uid) {
-        throw new functions.https.HttpsError(
-          'already-exists',
-          'Ya existe un superadmin registrado'
-        );
-      }
-    }
-
-    // Setear custom claims
-    await admin.auth().setCustomUserClaims(uid, {
-      role: 'superadmin',
-      tenantId: 'ej'
-    });
-
-    // Actualizar Firestore
-    await db.collection('users').doc(uid).set({
-      email,
-      role: 'superadmin',
-      tenantId: 'ej',
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-
-    return { success: true, message: 'Superadmin creado exitosamente' };
-  } catch (error) {
-    console.error('Error creating superadmin:', error);
-    throw new functions.https.HttpsError('internal', error.message);
-  }
-});
-
 // ========== MIGRATE CUSTOMERS TENANT ID ==========
 // Backfill: agrega tenantId a customers existentes que no lo tienen
 exports.migrateCustomersTenantId = functions.https.onCall(async (data, context) => {
@@ -195,11 +542,8 @@ exports.migrateCustomersTenantId = functions.https.onCall(async (data, context) 
     const batch = db.batch();
 
     customersSnap.forEach((doc) => {
-      const customer = doc.data();
-      // Determinar tenantId basado en alguna lógica existente
-      // Por defecto se asigna al tenant 'ej' en customers sin tenantId
       batch.update(doc.ref, {
-        tenantId: customer.tenantId || 'ej'
+        tenantId: 'ej'
       });
       migrated++;
     });
@@ -218,359 +562,3 @@ exports.migrateCustomersTenantId = functions.https.onCall(async (data, context) 
     throw new functions.https.HttpsError('internal', error.message);
   }
 });
-
-// ========== CREATE RECHARGE REQUEST ==========
-// Crear una solicitud de recarga de saldo (desde el panel admin)
-exports.createRechargeRequest = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe estar autenticado');
-  }
-
-  const { customerId, customerName, customerPhone, amount, tenantId } = data;
-
-  if (!customerId || !amount || !tenantId) {
-    throw new functions.https.HttpsError('invalid-argument', 'customerId, amount y tenantId son requeridos');
-  }
-
-  if (amount <= 0) {
-    throw new functions.https.HttpsError('invalid-argument', 'El monto debe ser mayor a 0');
-  }
-
-  try {
-    const rechargeRef = await db.collection('recharges').add({
-      tenantId,
-      customerId,
-      customerName: customerName || '',
-      customerPhone: customerPhone || '',
-      amount,
-      status: 'pending',
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      createdBy: context.auth.uid
-    });
-
-    return {
-      success: true,
-      rechargeId: rechargeRef.id,
-      message: 'Solicitud de recarga creada'
-    };
-  } catch (error) {
-    console.error('Error creating recharge:', error);
-    throw new functions.https.HttpsError('internal', error.message);
-  }
-});
-
-// ========== LOAD CUSTOMER BALANCE ==========
-// Obtener el saldo actual de un cliente
-exports.loadCustomerBalance = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe estar autenticado');
-  }
-
-  const { customerId } = data;
-
-  if (!customerId) {
-    throw new functions.https.HttpsError('invalid-argument', 'customerId es requerido');
-  }
-
-  try {
-    const customerDoc = await db.collection('customers').doc(customerId).get();
-
-    if (!customerDoc.exists) {
-      throw new functions.https.HttpsError('not-found', 'Cliente no encontrado');
-    }
-
-    const customer = customerDoc.data();
-
-    // Verificar acceso al tenant
-    const callerClaims = context.auth.token;
-    if (customer.tenantId !== callerClaims.tenantId && callerClaims.role !== 'superadmin') {
-      throw new functions.https.HttpsError('permission-denied', 'No tiene acceso a este cliente');
-    }
-
-    return {
-      success: true,
-      balance: customer.balance || 0,
-      customer: {
-        id: customerDoc.id,
-        firstName: customer.firstName || '',
-        lastName: customer.lastName || '',
-        email: customer.email || '',
-        phone: customer.phone || ''
-      }
-    };
-  } catch (error) {
-    console.error('Error loading balance:', error);
-    throw new functions.https.HttpsError('internal', error.message);
-  }
-});
-
-// ========== PROCESS RECHARGE ==========
-// Aprobar o rechazar una solicitud de recarga (admin)
-exports.processRecharge = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe estar autenticado');
-  }
-
-  const { rechargeId, action } = data; // action: 'approve' | 'reject'
-
-  if (!rechargeId || !action) {
-    throw new functions.https.HttpsError('invalid-argument', 'rechargeId y action son requeridos');
-  }
-
-  if (!['approve', 'reject'].includes(action)) {
-    throw new functions.https.HttpsError('invalid-argument', 'action debe ser "approve" o "reject"');
-  }
-
-  try {
-    const rechargeRef = db.collection('recharges').doc(rechargeId);
-    const rechargeDoc = await rechargeRef.get();
-
-    if (!rechargeDoc.exists) {
-      throw new functions.https.HttpsError('not-found', 'Solicitud de recarga no encontrada');
-    }
-
-    const recharge = rechargeDoc.data();
-
-    if (recharge.status !== 'pending') {
-      throw new functions.https.HttpsError('failed-precondition', 'La recarga ya fue procesada');
-    }
-
-    // Verificar acceso al tenant
-    const callerClaims = context.auth.token;
-    if (recharge.tenantId !== callerClaims.tenantId && callerClaims.role !== 'superadmin') {
-      throw new functions.https.HttpsError('permission-denied', 'No tiene acceso a esta recarga');
-    }
-
-    const now = admin.firestore.FieldValue.serverTimestamp();
-
-    if (action === 'reject') {
-      await rechargeRef.update({
-        status: 'rejected',
-        processedAt: now,
-        processedBy: context.auth.uid
-      });
-
-      return { success: true, message: 'Recarga rechazada' };
-    }
-
-    // Approve: actualizar recarga + saldo + transacción
-    const customerRef = db.collection('customers').doc(recharge.customerId);
-    const customerDoc = await customerRef.get();
-
-    if (!customerDoc.exists) {
-      throw new functions.https.HttpsError('not-found', 'Cliente no encontrado');
-    }
-
-    const customer = customerDoc.data();
-
-    // Actualizar estado de recarga
-    await rechargeRef.update({
-      status: 'approved',
-      processedAt: now,
-      processedBy: context.auth.uid,
-      adminEmail: context.auth.token.email || null
-    });
-
-    // Actualizar saldo del cliente
-    await customerRef.update({
-      balance: admin.firestore.FieldValue.increment(recharge.amount)
-    });
-
-    // Registrar transacción de balance
-    await db.collection('balanceTransactions').add({
-      customerId: recharge.customerId,
-      amount: recharge.amount,
-      type: 'recharge',
-      processedBy: context.auth.uid,
-      adminEmail: context.auth.token.email || null,
-      rechargeId: rechargeRef.id,
-      createdAt: now
-    });
-
-    return {
-      success: true,
-      message: 'Recarga aprobada exitosamente',
-      amount: recharge.amount,
-      newBalance: (customer.balance || 0) + recharge.amount
-    };
-  } catch (error) {
-    console.error('Error processing recharge:', error);
-    throw new functions.https.HttpsError('internal', error.message);
-  }
-});
-
-// ========== NOTIFY PRIZE WON ==========
-// Notificar cuando un cliente gana un premio en la ruleta
-exports.notifyPrizeWon = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe estar autenticado');
-  }
-
-  const { customerId, prize, tenantId, customerName } = data;
-
-  if (!customerId || !prize || !tenantId) {
-    throw new functions.https.HttpsError('invalid-argument', 'customerId, prize y tenantId son requeridos');
-  }
-
-  try {
-    // Registrar el premio ganado
-    const prizeRef = await db.collection('prizes').add({
-      customerId,
-      customerName: customerName || '',
-      tenantId,
-      prize,
-      claimed: false,
-      wonAt: admin.firestore.FieldValue.serverTimestamp(),
-      notifiedBy: context.auth.uid
-    });
-
-    // Si el premio es saldo, acreditarlo automáticamente
-    if (prize.type === 'balance' && prize.amount > 0) {
-      const customerRef = db.collection('customers').doc(customerId);
-      const customerDoc = await customerRef.get();
-
-      if (customerDoc.exists) {
-        await customerRef.update({
-          balance: admin.firestore.FieldValue.increment(prize.amount)
-        });
-
-        // Registrar transacción
-        await db.collection('balanceTransactions').add({
-          customerId,
-          amount: prize.amount,
-          type: 'prize',
-          processedBy: context.auth.uid,
-          prizeId: prizeRef.id,
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-
-        return {
-          success: true,
-          message: 'Premio registrado y saldo acreditado',
-          prizeId: prizeRef.id,
-          creditedAmount: prize.amount
-        };
-      }
-    }
-
-    return {
-      success: true,
-      message: 'Premio registrado exitosamente',
-      prizeId: prizeRef.id
-    };
-  } catch (error) {
-    console.error('Error notifying prize:', error);
-    throw new functions.https.HttpsError('internal', error.message);
-  }
-});
-
-// ========== TELEGRAM WEBHOOK ==========
-// Webhook para el bot de Telegram (maneja comandos y callbacks)
-exports.telegramWebhook = functions.https.onRequest(async (req, res) => {
-  try {
-    const { message, callback_query } = req.body;
-
-    // Manejar callback_query (botones inline)
-    if (callback_query) {
-      const { data, from, message: callbackMessage } = callback_query;
-      const chatId = callbackMessage?.chat?.id || from?.id;
-
-      if (!chatId) {
-        return res.status(400).send('No chat ID');
-      }
-
-      // Procesar según el callback data
-      if (data === 'start') {
-        await sendTelegramMessage(chatId,
-          '¡Bienvenido a EJStore!\n\n' +
-          'Selecciona una opción:\n' +
-          '/servicios - Ver servicios disponibles\n' +
-          '/saldo - Consultar tu saldo\n' +
-          '/ayuda - Ayuda y contacto'
-        );
-      }
-
-      return res.status(200).send('OK');
-    }
-
-    // Manejar mensajes de texto (comandos)
-    if (message?.text) {
-      const chatId = message.chat.id;
-      const text = message.text.trim().toLowerCase();
-      const firstName = message.from?.first_name || 'Usuario';
-
-      if (text === '/start') {
-        await sendTelegramMessage(chatId,
-          `¡Hola ${firstName}! Bienvenido a EJStore 🎉\n\n` +
-          'Soy tu asistente virtual. Usa los comandos:\n' +
-          '🔹 /servicios - Ver servicios\n' +
-          '🔹 /saldo - Consultar saldo\n' +
-          '🔹 /ayuda - Ayuda y contacto\n' +
-          '🔹 /recargar - Recargar saldo'
-        );
-      } else if (text === '/ayuda' || text === '/help') {
-        await sendTelegramMessage(chatId,
-          '📞 *Contacto y Ayuda*\n\n' +
-          'Si necesitas asistencia, contáctanos:\n' +
-          '• WhatsApp: +57 300 123 4567\n' +
-          '• Email: soporte@ejstore.com\n\n' +
-          'Horario: Lun-Sáb 9:00 AM - 8:00 PM'
-        );
-      } else if (text === '/servicios') {
-        await sendTelegramMessage(chatId,
-          '🛒 *Servicios Disponibles*\n\n' +
-          'Actualmente puedes consultar nuestros servicios en la tienda web.\n' +
-          'Visítanos en: https://ejstore-web.web.app'
-        );
-      } else if (text === '/saldo') {
-        await sendTelegramMessage(chatId,
-          '💰 *Consultar Saldo*\n\n' +
-          'Para consultar tu saldo, inicia sesión en la tienda web o contacta a nuestro equipo.'
-        );
-      } else if (text === '/recargar') {
-        await sendTelegramMessage(chatId,
-          '💳 *Recargar Saldo*\n\n' +
-          'Para recargar saldo, contacta a nuestro equipo por WhatsApp:\n' +
-          'wa.me/573001234567'
-        );
-      } else {
-        await sendTelegramMessage(chatId,
-          'Lo siento, no entendí ese comando. Usa /ayuda para ver los comandos disponibles.'
-        );
-      }
-
-      return res.status(200).send('OK');
-    }
-
-    // Si no hay mensaje ni callback, solo responder OK
-    return res.status(200).send('OK');
-  } catch (error) {
-    console.error('Error en telegramWebhook:', error);
-    return res.status(500).send('Error interno');
-  }
-});
-
-// Helper para enviar mensajes a Telegram
-async function sendTelegramMessage(chatId, text) {
-  const botToken = '7609492059:AAEM4lxZ5d23DhlgIXXEAdifuLgQxSGvD8I';
-  const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-        parse_mode: 'Markdown'
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Telegram API error:', errorText);
-    }
-  } catch (error) {
-    console.error('Error sending Telegram message:', error);
-  }
-}

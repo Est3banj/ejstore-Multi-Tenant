@@ -14,6 +14,8 @@ export const useApp = () => {
   const bannersQuery = useBanners();
   const settingsQuery = useSettings();
   const termsQuery = useTerms();
+  const allServicesQuery = useAllServices();
+  const allBannersQuery = useAllBanners();
   
   return {
     // Auth
@@ -34,13 +36,28 @@ export const useApp = () => {
       contactEmail: '',
       siteName: 'Mi Tienda',
       primaryColor: '#E50914',
-      secondaryColor: '#1A1A1A'
+      secondaryColor: '#1A1A1A',
+      qrImage: '',
+      brebKey: '',
+      brebBankName: ''
     },
     terms: termsQuery.data || '',
     
     // For admin: get all (including inactive)
-    allServices: useAllServices().data || [],
-    allBanners: useAllBanners().data || [],
+    allServices: allServicesQuery.data || [],
+    allBanners: allBannersQuery.data || [],
+    
+    // Refresh functions
+    refreshServices: () => {
+      servicesQuery.refetch();
+      allServicesQuery.refetch();
+    },
+    refreshBanners: () => {
+      bannersQuery.refetch();
+      allBannersQuery.refetch();
+    },
+    refreshSettings: () => settingsQuery.refetch(),
+    refreshTerms: () => termsQuery.refetch(),
   };
 };
 

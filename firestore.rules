@@ -2,60 +2,140 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ========== HELPER FUNCTIONS ==========
+    
+    function getUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    
+    function userDocExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    
+    function getUserRole() {
+      return userDocExists() ? getUserDoc().data.role : null;
+    }
+    
+    function getUserTenantId() {
+      return userDocExists() ? getUserDoc().data.tenantId : null;
+    }
+    
+    function isSuperadmin() {
+      return getUserRole() == 'superadmin';
+    }
+    
+    function isAdmin() {
+      return getUserRole() in ['admin', 'superadmin'];
+    }
+    
+    function isTenantAdminFor(resourceTenantId) {
+      return getUserTenantId() == resourceTenantId;
+    }
+
     // ========== TENANTS ==========
     match /tenants/{tenantId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow create: if false;
+      allow update: if request.auth != null && (
+        isSuperadmin() || 
+        (isAdmin() && isTenantAdminFor(tenantId))
+      );
     }
 
     // ========== SERVICES ==========
     match /services/{serviceId} {
       allow read: if true;
-      allow create, update, delete: if request.auth != null;
+      allow create: if request.auth != null && (
+        isSuperadmin() || 
+        (isAdmin() && isTenantAdminFor(request.resource.data.tenantId))
+      );
+      allow update, delete: if request.auth != null && (
+        isSuperadmin() || 
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId))
+      );
     }
 
     // ========== BANNERS ==========
     match /banners/{bannerId} {
       allow read: if true;
-      allow create, update, delete: if request.auth != null;
+      allow create: if request.auth != null && (
+        isSuperadmin() || 
+        (isAdmin() && isTenantAdminFor(request.resource.data.tenantId))
+      );
+      allow update, delete: if request.auth != null && (
+        isSuperadmin() || 
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId))
+      );
     }
 
     // ========== USERS ==========
     match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && (
+        request.auth.uid == userId || isSuperadmin()
+      );
+      allow create, update: if false;
+      allow delete: if false;
     }
 
     // ========== CUSTOMERS ==========
     match /customers/{customerId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if request.auth != null && (
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId)) ||
+        request.auth.uid == customerId
+      );
+      allow create: if request.auth != null && request.auth.uid == customerId;
+      allow update: if request.auth != null && (
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId)) ||
+        request.auth.uid == customerId
+      );
+      allow delete: if isSuperadmin();
+    }
+
+    // ========== SETTINGS ==========
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if request.auth != null && isAdmin();
+    }
+
+    // ========== TERMS ==========
+    match /terms/{termId} {
+      allow read: if true;
+      allow write: if request.auth != null && isAdmin();
     }
 
     // ========== RECHARGES ==========
     match /recharges/{rechargeId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId))
+      );
       allow create: if request.auth != null;
-      allow update: if request.auth != null;
+      allow update: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId))
+      );
+      allow delete: if isSuperadmin();
     }
 
     // ========== BALANCE TRANSACTIONS ==========
     match /balanceTransactions/{transactionId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && isAdmin();
       allow create: if request.auth != null;
     }
 
     // ========== PRIZES ==========
     match /prizes/{prizeId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && isAdmin();
       allow write: if request.auth != null;
     }
 
     // ========== ROULETTE CONFIG ==========
     match /rouletteConfig/{tenantId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(tenantId))
+      );
     }
   }
 }
