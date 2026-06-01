@@ -36,25 +36,32 @@ Cada tienda tiene:
 - 📱 Redirección a WhatsApp con mensaje personalizado
 
 ### Para Administradores
-- 🔐 Autenticación con Firebase Auth
-- 📊 Dashboard con estadísticas
+- 🔐 Autenticación con Firebase Auth (sesión aislada del cliente)
+- 📊 Dashboard con estadísticas y clientes registrados
 - 🛍️ CRUD completo de servicios
 - 🖼️ Gestión de banners
 - 📝 Editor de términos y condiciones
 - ⚙️ Configuración de tienda (colores, logo, WhatsApp)
 - 📤 Subida de imágenes a Firebase Storage
+- 👥 Gestión de administradores (superadmin)
+- 💰 Administración de recargas de saldo
+- 🎡 Configuración de ruleta de premios
+- 🏪 Gestión de tenants (superadmin)
+- 🔔 Notificaciones por Discord via Webhook
 
 ---
 
 ## 🛠️ Tecnologías
 
-- **React 18** con Vite
-- **Firebase** (Auth, Firestore, Storage)
+- **React 18** con Vite 5
+- **Firebase** (Auth, Firestore, Storage, Functions)
 - **TailwindCSS**
 - **Framer Motion**
 - **React Router**
-- **Context API**
+- **Zustand** (State Management)
+- **TanStack Query** (Data Fetching)
 - **Lucide React**
+- **Discord Webhooks** (Notificaciones por tenant)
 
 ---
 
@@ -130,13 +137,45 @@ npm run dev
 │   │   └── order: 1
 │   └── ...
 │
+├── 📂 customers/
+│   ├── 📄 uid-cliente-1
+│   │   ├── email: "cliente@email.com"
+│   │   ├── firstName, lastName, phone
+│   │   ├── balance: 1000
+│   │   └── tenantId: "micromercado"
+│   └── ...
+│
+├── 📂 recharges/
+│   ├── 📄 recharge-id
+│   │   ├── tenantId, customerId, customerName
+│   │   ├── amount: 10000
+│   │   ├── status: "pending" | "approved" | "rejected"
+│   │   └── createdAt, processedAt
+│   └── ...
+│
+├── 📂 balanceTransactions/
+│   └── 📄 tx-id
+│       ├── customerId, amount, type
+│       └── processedBy, createdAt
+│
+├── 📂 prizes/
+│   └── 📄 prize-id
+│       ├── customerId, prize, tenantId
+│       └── claimed, wonAt
+│
+├── 📂 rouletteConfig/
+│   └── 📄 tenant-id
+│       ├── isEnabled, pricePerSpin
+│       ├── spinsForFreeSpin
+│       └── prizes: [...]
+│
 └── 📂 users/
-    ├── 📄 uid-del-usuario-1
+    ├── 📄 uid-del-admin-1
     │   ├── email: "admin@micromercado.com"
-    │   ├── tenantId: "micromercado"  ← asocia admin a tienda
-    │   └── role: "admin"
+    │   ├── tenantId: "micromercado"
+    │   └── role: "admin" | "superadmin"
     │
-    └── 📄 uid-del-usuario-2
+    └── 📄 uid-del-admin-2
         ├── email: "admin@otratienda.com"
         ├── tenantId: "otratienda"
         └── role: "admin"
@@ -147,15 +186,21 @@ npm run dev
 #### Tenant (`tenants/{tenantId}`)
 ```javascript
 {
-  name: string,           // Nombre de la tienda
-  logoUrl: string,        // URL del logo
-  primaryColor: string,   // Color primario (#E50914)
-  secondaryColor: string, // Color secundario (#1A1A1A)
-  whatsappNumber: string, // Número con código de país
-  contactEmail: string,   // Email de contacto
-  isActive: boolean,      // Si la tienda está activa
-  terms: string,          // Términos y condiciones
-  subdomain: string        // (futuro) subdominio
+  name: string,              // Nombre de la tienda
+  logoUrl: string,           // URL del logo
+  primaryColor: string,      // Color primario (#E50914)
+  secondaryColor: string,    // Color secundario (#1A1A1A)
+  whatsappNumber: string,    // Número con código de país
+  contactEmail: string,      // Email de contacto
+  isActive: boolean,         // Si la tienda está activa
+  terms: string,             // Términos y condiciones
+  subdomain: string,         // (futuro) subdominio
+  qrImage: string,           // QR para recargas
+  brebKey: string,           // Clave BRE-B
+  brebBankName: string,      // Banco BRE-B
+  discordWebhookUrl: string, // Webhook Discord notificaciones
+  createdAt: timestamp,
+  updatedAt: timestamp
 }
 ```
 
@@ -202,6 +247,60 @@ npm run dev
   tenantId: string,       // IMPORTANTE: tienda que administra
   role: string,           // "admin" o "superadmin"
   createdAt: timestamp
+}
+```
+
+#### Cliente (`customers/{uid}`)
+```javascript
+{
+  email: string,
+  firstName: string,
+  lastName: string,
+  phone: string,
+  balance: number,         // Saldo actual en COP
+  tenantId: string,        // Tienda a la que pertenece
+  createdAt: timestamp
+}
+```
+
+#### Recarga (`recharges/{id}`)
+```javascript
+{
+  tenantId: string,
+  customerId: string,
+  customerName: string,
+  customerPhone: string,
+  amount: number,
+  status: "pending" | "approved" | "rejected",
+  createdAt: timestamp,
+  processedAt: timestamp,
+  processedBy: string
+}
+```
+
+#### Premio (`prizes/{id}`)
+```javascript
+{
+  customerId: string,
+  customerName: string,
+  tenantId: string,
+  prize: string,
+  claimed: boolean,
+  wonAt: timestamp,
+  notifiedBy: string
+}
+```
+
+#### Configuración Ruleta (`rouletteConfig/{tenantId}`)
+```javascript
+{
+  tenantId: string,
+  isEnabled: boolean,
+  pricePerSpin: number,      // Precio por giro en COP
+  spinsForFreeSpin: number,   // Giros pagos para 1 gratis
+  prizes: [                   // Lista de premios
+    { id: string, name: string, probability: number, cost: number, isActive: boolean }
+  ]
 }
 ```
 
@@ -294,40 +393,50 @@ service cloud.firestore {
 ```
 ejstore-web/
 ├── src/
-│   ├── components/         # Componentes reutilizables
-│   │   ├── BannerSlider.jsx
-│   │   ├── ServiceCard.jsx
-│   │   ├── Header.jsx
-│   │   ├── Footer.jsx
-│   │   ├── Modal.jsx
+│   ├── components/            # Componentes reutilizables
+│   │   ├── Roulette.tsx       # 🎡 Ruleta de premios
+│   │   ├── Header.tsx         # Header público con auth + recargas
+│   │   ├── Footer.tsx
 │   │   └── ...
 │   ├── pages/
-│   │   ├── Home.jsx        # Catálogo público
-│   │   ├── Product.jsx     # Detalle de servicio
-│   │   └── admin/          # Panel de admin
-│   │       ├── Dashboard.jsx
+│   │   ├── Home.jsx           # Catálogo público
+│   │   ├── Product.jsx        # Detalle de servicio
+│   │   └── admin/             # Panel de admin
+│   │       ├── Dashboard.jsx  # Stats + clientes + recarga
 │   │       ├── Services.jsx
 │   │       ├── Banners.jsx
 │   │       ├── Terms.jsx
-│   │       ├── Settings.jsx
+│   │       ├── Settings.jsx   # Config + Discord webhook
+│   │       ├── Admins.tsx     # 👥 Gestión admins (superadmin)
+│   │       ├── Recharges.tsx  # 💰 Recargas de saldo
+│   │       ├── RouletteSettings.tsx # 🎡 Config ruleta
+│   │       ├── Tenants.tsx    # 🏪 Gestión tenants (superadmin)
 │   │       └── Login.jsx
 │   ├── layouts/
-│   │   ├── MainLayout.jsx  # Layout público
-│   │   └── AdminLayout.jsx # Layout admin
-│   ├── context/
-│   │   ├── TenantContext.jsx  # Carga tenant desde URL
-│   │   └── AppContext.jsx     # Estado global + datos
+│   │   ├── MainLayout.tsx     # Layout público
+│   │   └── AdminLayout.tsx    # Layout admin
+│   ├── hooks/
+│   │   ├── useAuth.ts        # Hook de autenticación
+│   │   ├── useQueries.ts     # TanStack Query hooks
+│   │   └── useRoulette.ts    # Hook de ruleta
+│   ├── store/
+│   │   ├── authStore.ts      # Zustand: auth (cliente + admin)
+│   │   ├── tenantStore.ts    # Zustand: tenant actual
+│   │   └── index.ts          # StoreProvider
 │   ├── services/
-│   │   ├── firebase.js     # Config Firebase
-│   │   ├── firestore.js    # CRUD Firestore
-│   │   ├── auth.js         # Autenticación
-│   │   ├── tenant.js       # Detección de tenant
-│   │   └── storage.js      # Upload de imágenes
+│   │   ├── firebase.ts       # Config Firebase + adminAuth
+│   │   ├── firestore.js      # CRUD Firestore
+│   │   ├── auth.ts           # Autenticación (cliente + admin)
+│   │   ├── tenant.js         # Detección de tenant
+│   │   └── storage.js        # Upload de imágenes
 │   └── utils/
-│       ├── constants.js     # Constantes (categorías, métodos pago)
-│       ├── validation.js   # Utilidades de validación
-│       └── whatsapp.js     # Generador de mensajes
-├── public/
+│       ├── constants.js       # Constantes
+│       ├── validation.js      # Validación URLs
+│       ├── roulette.ts       # Utilidades ruleta
+│       └── whatsapp.js       # Generador de mensajes
+├── functions/
+│   ├── index.js              # 12 Cloud Functions
+│   └── package.json
 ├── firestore.rules
 ├── firestore.indexes.json
 ├── firebase.json
@@ -353,6 +462,64 @@ ejstore-web/
 
 ---
 
+---
+
+## 🔔 Sistema de Notificaciones Multi-Tenant
+
+### Discord Webhooks (por tenant)
+
+Cada tienda puede configurar su propio webhook de Discord para recibir notificaciones:
+
+| Evento | Embed Color | Descripción |
+|--------|-------------|-------------|
+| 💰 Recarga | `#3498DB` (Azul) | Nueva solicitud de recarga |
+| 🎁 Premio | `#2ECC71` (Verde) | Cliente ganó premio en la ruleta |
+| 💵 Carga Admin | `#9B59B6` (Morado) | Admin cargó saldo a cliente |
+
+**Configuración:** Settings → Notificaciones por Discord → Ingresar URL → Probar (guarda automático)
+
+### Telegram (feature flag deshabilitado)
+
+El código de Telegram está intacto pero deshabilitado vía:
+```bash
+firebase functions:config:set notifications.enable_telegram="true"
+firebase deploy --only functions
+```
+
+## ☁️ Cloud Functions (12 funciones)
+
+| Función | Tipo | Descripción |
+|---------|------|-------------|
+| `createSuperadminBootstrap` | callable | Crear primer superadmin |
+| `setTenantClaims` | callable | Asignar roles a usuarios |
+| `createTenant` | callable | Crear nuevo tenant |
+| `onUserCreated` | trigger | Crear documento al registrar usuario |
+| `verifyTenantAccess` | callable | Verificar acceso a tenant |
+| `migrateCustomersTenantId` | callable | Backfill tenantId en customers |
+| `createRechargeRequest` | callable | Solicitar recarga de saldo |
+| `loadCustomerBalance` | callable | Cargar saldo al cliente (admin) |
+| `processRecharge` | callable | Aprobar/rechazar recarga |
+| `notifyPrizeWon` | callable | Notificar premio de ruleta |
+| `testDiscordWebhook` | callable | Probar webhook de Discord |
+| `telegramWebhook` | onRequest | Webhook para bot de Telegram |
+
+### Despliegue de Functions
+```bash
+firebase deploy --only functions
+firebase deploy --only functions:notifyPrizeWon  # Función específica
+```
+
+## 🔐 Sesiones Aisladas (Admin vs Cliente)
+
+El sistema usa **dos instancias de Firebase Auth** para mantener sesiones independientes:
+
+- **`auth`** → Clientes (compartido entre tabs, localStorage)
+- **`adminAuth`** → Administradores (sesión aislada, storage key separado)
+
+Esto evita que al loguearte como admin se cierre la sesión del cliente en otras pestañas.
+
+---
+
 ## 🔧 Scripts
 
 ```bash
@@ -372,6 +539,14 @@ npm run preview   # Preview build
 3. **Términos y condiciones** - se guardan en el documento del tenant, campo `terms`
 
 4. **Favicon y título** - se actualizan dinámicamente según el tenant cargado
+
+5. **Sesiones aisladas** - Admin y cliente usan instancias de Firebase Auth separadas. No se afectan entre sí.
+
+6. **Discord Webhook** - Configurar en Settings → Notificaciones por Discord. El botón "Probar" guarda automáticamente.
+
+7. **Dominios personalizados** - Agregar el dominio en Firebase Console > Authentication > Settings > Authorized domains
+
+8. **Teléfono obligatorio** - Los clientes deben tener teléfono registrado para solicitar recargas
 
 ---
 
