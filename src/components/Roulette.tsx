@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../services/firebase';
 import { DEFAULT_PRIZES, DEFAULT_ROULETTE_CONFIG } from '../utils/roulette';
 import { getUserSpinData, useSpin, spinWheel, getSpinPrice, getSpinsForFreeSpin, fetchRouletteConfig } from '../hooks/useRoulette';
 import { useAuthStore } from '../store/authStore';
@@ -8,45 +10,15 @@ import { updateBalance } from '../services/auth';
 import type { RoulettePrize, UserSpinData } from '../types';
 import { Gift, X, Zap } from 'lucide-react';
 
-// Configuración de Telegram
-const TELEGRAM_BOT_TOKEN = '8597739575:AAFuw__aMizR6sSPfUx6bU9da_r4PlNjnuI';
-const ADMIN_CHAT_ID = '1666952441';
-
-// Función para enviar mensaje a Telegram
-async function sendTelegramMessage(text: string) {
-  try {
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: ADMIN_CHAT_ID,
-        text,
-        parse_mode: 'Markdown'
-      })
-    });
-  } catch (error) {
-    console.error('Error sending to Telegram:', error);
-  }
-}
-
-// Función para notificar premio ganado
-async function notifyWinner(userName: string, phone: string, prize: string, prizeId: string) {
-  // No enviar notificación si es "nada"
+// Función para notificar premio ganado via Cloud Function (Discord + Telegram)
+async function notifyWinner(userName: string, phone: string, prize: string, prizeId: string, tenantId: string) {
   if (prizeId === 'nothing') return;
-
-  const fecha = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' });
-  
-  const message = `
-🎁 *NUEVO GANADOR - RULETA*
-━━━━━━━━━━━━━━━━━━━━━━━━
-👤 *Nombre:* ${userName}
-📱 *WhatsApp:* ${phone || 'Sin teléfono'}
-🎉 *Premio:* ${prize}
-🕐 *Fecha:* ${fecha}
-━━━━━━━━━━━━━━━━━━━━━━━━
-`;
-
-  await sendTelegramMessage(message);
+  try {
+    const notify = httpsCallable(functions, 'notifyPrizeWon');
+    await notify({ userName, phone, prize, prizeId, tenantId });
+  } catch (error) {
+    console.error('Error notifying prize:', error);
+  }
 }
 
 const COLORES: Record<string, string> = {
@@ -328,7 +300,8 @@ const Roulette = () => {
         customer.firstName || customer.email || 'Usuario',
         customer.phone || '',
         result.name,
-        result.id
+        result.id,
+        tenantId
       );
     }
   }, [result, useFreeSpin, customer]);
