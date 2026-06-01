@@ -180,10 +180,10 @@ exports.createRechargeRequest = functions.https.onCall(async (data, context) => 
 
   const { amount, userName, phone, customerName, customerPhone, transferProof, tenantId } = data;
   const finalUserName = userName || customerName;
-  const finalPhone = phone || customerPhone;
+  const finalPhone = phone || customerPhone || 'Sin teléfono';
 
-  if (!amount || !finalUserName || !finalPhone) {
-    throw new functions.https.HttpsError('invalid-argument', 'Monto, nombre y teléfono son requeridos');
+  if (!amount || !finalUserName) {
+    throw new functions.https.HttpsError('invalid-argument', 'Monto y nombre son requeridos');
   }
 
   const parsedAmount = parseInt(amount);
