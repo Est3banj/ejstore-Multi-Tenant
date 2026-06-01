@@ -125,19 +125,21 @@ const Settings = () => {
       alert('Primero ingresa una URL de webhook de Discord');
       return;
     }
+    if (!tenantId) {
+      alert('Error: No se pudo identificar el tenant. Asegúrate de estar en la página de configuración correcta.');
+      return;
+    }
     setTestLoading(true);
     setTestResult(null);
     try {
       const testWebhook = httpsCallable(functions, 'testDiscordWebhook');
-      const result = await testWebhook({ webhookUrl: formData.discordWebhookUrl.trim() });
+      const result = await testWebhook({
+        webhookUrl: formData.discordWebhookUrl.trim(),
+        tenantId: tenantId
+      });
       setTestResult({ success: true, message: result.data.message });
-      // Auto-guardar la URL en Firestore después de prueba exitosa
-      const url = formData.discordWebhookUrl.trim();
-      const { updateSettings } = await import('../../services/firestore');
-      const dataToSave = { ...formData, discordWebhookUrl: url };
-      delete dataToSave.logoUrlInput;
-      await updateSettings(tenantId, dataToSave);
-      setTestResult({ success: true, message: '✅ Webhook probado y URL guardada exitosamente' });
+      // Recargar settings para reflejar el URL guardado
+      await refreshSettings();
     } catch (error) {
       setTestResult({ success: false, message: error.message || 'Error al probar el webhook' });
     } finally {

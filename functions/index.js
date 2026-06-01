@@ -26,9 +26,9 @@ const ENABLE_TELEGRAM_NOTIFICATIONS = process.env.ENABLE_TELEGRAM_NOTIFICATIONS 
 
 // ========== HELPER: Obtener datos del tenant desde Firestore ==========
 async function getTenantById(tenantId) {
-  if (!tenantId) return null;
+  if (!tenantId || typeof tenantId !== 'string' || tenantId.trim() === '') return null;
   try {
-    const doc = await db.collection('tenants').doc(tenantId).get();
+    const doc = await db.collection('tenants').doc(tenantId.trim()).get();
     if (!doc.exists) return null;
     return { id: doc.id, ...doc.data() };
   } catch (error) {
@@ -208,7 +208,7 @@ exports.createRechargeRequest = functions.https.onCall(async (data, context) => 
   const now = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' });
 
   // ========== DISCORD: Enviar notificación si el tenant tiene webhook configurado ==========
-  const effectiveTenantId = tenantId || context.auth.token.tenantId;
+  const effectiveTenantId = (tenantId && tenantId.trim()) || context.auth.token.tenantId || '';
   if (effectiveTenantId) {
     const tenantData = await getTenantById(effectiveTenantId);
     if (tenantData?.discordWebhookUrl) {
@@ -346,9 +346,15 @@ exports.testDiscordWebhook = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('permission-denied', 'No tiene permisos de admin');
   }
 
-  const { webhookUrl } = data;
+  const { webhookUrl, tenantId } = data;
   if (!webhookUrl) {
     throw new functions.https.HttpsError('invalid-argument', 'webhookUrl es requerido');
+  }
+
+  // Determinar tenantId: del parámetro, del token del usuario, o error
+  const targetTenantId = tenantId || claims.tenantId;
+  if (!targetTenantId) {
+    throw new functions.https.HttpsError('invalid-argument', 'No se pudo determinar el tenant. Asegúrate de estar en la página de configuración de un tenant.');
   }
 
   try {
@@ -358,12 +364,19 @@ exports.testDiscordWebhook = functions.https.onCall(async (data, context) => {
       description: 'Este es un mensaje de prueba para verificar que la integración con Discord funciona correctamente.',
       fields: [
         { name: '📅 Fecha de prueba', value: new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' }), inline: true },
-        { name: '👤 Probado por', value: context.auth.token.email || 'Admin', inline: true }
+        { name: '👤 Probado por', value: context.auth.token.email || 'Admin', inline: true },
+        { name: '🏪 Tenant', value: targetTenantId, inline: true }
       ]
     });
 
     if (result) {
-      return { success: true, message: 'Webhook de Discord configurado correctamente' };
+      // ✅ Auto-guardar la URL en Firestore después de prueba exitosa
+      await db.collection('tenants').doc(targetTenantId).set({
+        discordWebhookUrl: webhookUrl,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      console.log(`✅ Discord webhook guardado para tenant ${targetTenantId}`);
+      return { success: true, message: '✅ Webhook probado y URL guardada correctamente' };
     } else {
       throw new functions.https.HttpsError('internal', 'No se pudo enviar el mensaje de prueba');
     }
