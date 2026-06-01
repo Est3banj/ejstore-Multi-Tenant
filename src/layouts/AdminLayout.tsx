@@ -11,17 +11,11 @@ interface MenuItem {
 }
 
 const AdminLayout = (): JSX.Element => {
-  const { user, role, initialize: initAdminAuth } = useAdminAuthStore();
+  const { user, role } = useAdminAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
-
-  // Inicializar store de auth admin (sesión aislada del cliente)
-  useEffect(() => {
-    const unsubscribe = initAdminAuth();
-    return () => { if (unsubscribe) unsubscribe(); };
-  }, [initAdminAuth]);
 
   const handleLogout = async (): Promise<void> => {
     try {
