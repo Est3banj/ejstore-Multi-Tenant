@@ -1,7 +1,6 @@
-import { Suspense, lazy, useEffect, type ReactNode } from 'react';
+import { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { StoreProvider, useAuthStore, useTenantStore } from './store';
-import { useAdminAuthStore } from './store/authStore';
 import MainLayout from './layouts/MainLayout';
 import AdminLayout from './layouts/AdminLayout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -54,44 +53,30 @@ const PublicRoutes = () => {
   );
 };
 
-// Inicializa el store de auth admin ANTES de que ProtectedRoute lo verifique
-// Esto evita el deadlock: ProtectedRoute no puede chequear sin init,
-// y AdminLayout (que hace init) no se monta sin pasar por ProtectedRoute.
-const AdminInit = ({ children }: { children: React.ReactNode }) => {
-  const initialize = useAdminAuthStore((s) => s.initialize);
-  useEffect(() => {
-    const unsub = initialize();
-    return () => { if (unsub) unsub(); };
-  }, [initialize]);
-  return <>{children}</>;
-};
-
 const AdminRoutes = () => {
   return (
-    <AdminInit>
-      <Routes>
-        <Route path="/admin/login" element={<Login />} />
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute>
-              <AdminLayout />
-            </ProtectedRoute>
-          }
-        >
+    <Routes>
+      <Route path="/admin/login" element={<Login />} />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="services" element={<Services />} />
         <Route path="banners" element={<Banners />} />
         <Route path="terms" element={<Terms />} />
         <Route path="settings" element={<Settings />} />
         <Route path="roulette" element={<RouletteSettings />} />
-          <Route path="recargas" element={<Recharges />} />
-          <Route path="tenants" element={<Tenants />} />
-          <Route path="admins" element={<Admins />} />
+        <Route path="recargas" element={<Recharges />} />
+        <Route path="tenants" element={<Tenants />} />
+        <Route path="admins" element={<Admins />} />
         <Route index element={<Navigate to="/admin/dashboard" replace />} />
       </Route>
     </Routes>
-    </AdminInit>
   );
 };
 

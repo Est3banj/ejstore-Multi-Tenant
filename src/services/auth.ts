@@ -2,11 +2,14 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  setPersistence,
+  browserSessionPersistence,
+  browserLocalPersistence,
   createUserWithEmailAndPassword,
   User
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
-import { auth, adminAuth, db } from './firebase';
+import { auth, db } from './firebase';
 import type { User as AppUser } from '../types';
 
 export interface AuthUser extends User {
@@ -26,6 +29,8 @@ export interface CustomerUser {
 
 export const login = async (email: string, password: string): Promise<AuthUser> => {
   try {
+    // Cliente usa localStorage (persistencia entre tabs)
+    await setPersistence(auth, browserLocalPersistence);
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     
@@ -69,6 +74,8 @@ export const register = async (
   tenantId?: string
 ): Promise<AuthUser> => {
   try {
+    // Cliente usa localStorage (persistencia entre tabs)
+    await setPersistence(auth, browserLocalPersistence);
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     
@@ -114,7 +121,10 @@ export const onAuthChange = (callback: (user: User | null) => void): (() => void
 
 export const adminLogin = async (email: string, password: string): Promise<AuthUser> => {
   try {
-    const userCredential = await signInWithEmailAndPassword(adminAuth, email, password);
+    // Usar sessionStorage para aislar la sesión del admin de la del cliente
+    // El cliente usa localStorage (compartido entre tabs), admin usa sessionStorage (solo pestaña actual)
+    await setPersistence(auth, browserSessionPersistence);
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
     const userDoc = await getDoc(doc(db, 'users', user.uid));
@@ -148,12 +158,14 @@ export const adminLogin = async (email: string, password: string): Promise<AuthU
 };
 
 export const onAdminAuthChange = (callback: (user: User | null) => void): (() => void) => {
-  return onAuthStateChanged(adminAuth, callback);
+  return onAuthStateChanged(auth, callback);
 };
 
 export const adminLogout = async (): Promise<void> => {
   try {
-    await signOut(adminAuth);
+    // Restaurar persistencia a localStorage antes de cerrar sesión
+    await setPersistence(auth, browserLocalPersistence);
+    await signOut(auth);
   } catch (error) {
     console.error('Error logging out admin:', error);
     throw error;

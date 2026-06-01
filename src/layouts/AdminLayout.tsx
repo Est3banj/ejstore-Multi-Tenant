@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAdminAuthStore } from '../store/authStore';
-import { adminLogout } from '../services/auth';
+import { useAuthStore } from '../store/authStore';
+import { logout } from '../services/auth';
 import { Menu, X, LayoutDashboard, Package, Image, FileText, Settings, LogOut, LucideIcon, Gift, Wallet, Users, Store } from 'lucide-react';
 
 interface MenuItem {
@@ -11,7 +11,7 @@ interface MenuItem {
 }
 
 const AdminLayout = (): JSX.Element => {
-  const { user, role } = useAdminAuthStore();
+  const { user, role } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -19,7 +19,7 @@ const AdminLayout = (): JSX.Element => {
 
   const handleLogout = async (): Promise<void> => {
     try {
-      await adminLogout();
+      await logout();
       navigate('/admin/login');
     } catch (error) {
       console.error('Error logging out:', error);

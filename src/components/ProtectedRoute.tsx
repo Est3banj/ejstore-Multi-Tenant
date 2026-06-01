@@ -1,5 +1,5 @@
 import { Navigate } from 'react-router-dom';
-import { useAdminAuthStore } from '../store/authStore';
+import { useAuthStore } from '../store/authStore';
 import Loader from './Loader';
 import type { ReactNode } from 'react';
 
@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps): JSX.Element => {
-  const { user, isAdmin, loading, initialized } = useAdminAuthStore();
+  const { user, isAdmin, loading, initialized } = useAuthStore();
 
   if (!initialized || loading) {
     return <Loader />;
