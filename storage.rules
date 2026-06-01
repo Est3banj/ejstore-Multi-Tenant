@@ -1,0 +1,50 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ========== SERVICE IMAGES ==========
+    // Imágenes de servicios (públicas para lectura)
+    match /services/{serviceId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null 
+        && request.resource.size <= 5 * 1024 * 1024  // 5MB max
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // ========== BANNER IMAGES ==========
+    // Imágenes de banners (públicas para lectura)
+    match /banners/{bannerId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.resource.size <= 10 * 1024 * 1024  // 10MB max
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // ========== TENANT LOGOS ==========
+    // Logos de tiendas (públicos para lectura)
+    match /tenants/{tenantId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.resource.size <= 2 * 1024 * 1024  // 2MB max
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // ========== PROFILE IMAGES ==========
+    // Fotos de perfil de usuarios
+    match /profiles/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId
+        && request.resource.size <= 1 * 1024 * 1024  // 1MB max
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // ========== PROOF OF PAYMENT ==========
+    // Comprobantes de pago (privados)
+    match /payments/{tenantId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size <= 10 * 1024 * 1024  // 10MB max
+        && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

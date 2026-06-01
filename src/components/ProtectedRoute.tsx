@@ -1,5 +1,5 @@
 import { Navigate } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
+import { useAuthStore } from '../store/authStore';
 import Loader from './Loader';
 import type { ReactNode } from 'react';
 
@@ -8,13 +8,14 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps): JSX.Element => {
-  const { user, loading } = useApp();
+  const { user, isAdmin, loading, initialized } = useAuthStore();
 
-  if (loading) {
+  if (!initialized || loading) {
     return <Loader />;
   }
 
-  if (!user) {
+  // Solo permitir acceso si es admin (tiene tenantId en la colección users)
+  if (!user || !isAdmin) {
     return <Navigate to="/admin/login" replace />;
   }
 

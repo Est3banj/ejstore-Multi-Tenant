@@ -17,7 +17,10 @@ const Settings = () => {
     whatsappNumber: '',
     contactEmail: '',
     primaryColor: '#E50914',
-    secondaryColor: '#1A1A1A'
+    secondaryColor: '#1A1A1A',
+    qrImage: '',
+    brebKey: '',
+    brebBankName: ''
   });
   const [logoFile, setLogoFile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -44,8 +47,7 @@ const Settings = () => {
         contactEmail: '',
         primaryColor: '#E50914',
         secondaryColor: '#1A1A1A',
-        ...restSettings,
-        logoUrlInput: ''
+        ...restSettings
       });
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -298,6 +300,53 @@ const Settings = () => {
               placeholder="contacto@ejstore.com"
             />
           </div>
+
+          <div>
+            <label className="block text-white/70 mb-2">URL de Imagen QR (Recargas)</label>
+            <input
+              type="url"
+              value={formData.qrImage || ''}
+              onChange={(e) => setFormData({ ...formData, qrImage: e.target.value })}
+              className="input-field"
+              placeholder="https://ejemplo.com/qr-recarga.png"
+            />
+            <p className="text-white/50 text-sm mt-2">
+              Imagen QR que se mostrará en el modal de recarga. Sube la imagen a Storage y pega la URL aquí.
+            </p>
+            {formData.qrImage && (
+              <div className="mt-2">
+                <img src={formData.qrImage} alt="QR Preview" className="w-24 h-24 rounded-lg border border-white/20" />
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-white/70 mb-2">Clave BRE-B</label>
+            <input
+              type="text"
+              value={formData.brebKey || ''}
+              onChange={(e) => setFormData({ ...formData, brebKey: e.target.value })}
+              className="input-field"
+              placeholder="0035443571"
+            />
+            <p className="text-white/50 text-sm mt-2">
+              Clave BRE-B para transferencias. Se mostrará en el modal de recarga de saldo.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-white/70 mb-2">Nombre del Banco (BRE-B)</label>
+            <input
+              type="text"
+              value={formData.brebBankName || ''}
+              onChange={(e) => setFormData({ ...formData, brebBankName: e.target.value })}
+              className="input-field"
+              placeholder="GIO TECH"
+            />
+            <p className="text-white/50 text-sm mt-2">
+              Nombre que aparecerá junto a BRE-B en las transferencias.
+            </p>
+          </div>
         </div>
 
         <div className="glass p-6 rounded-xl">
@@ -311,6 +360,7 @@ const Settings = () => {
               <li>El logo se mostrará en el header principal</li>
               <li>El número de WhatsApp debe incluir el código de país</li>
               <li>El email de contacto aparecerá en el footer</li>
+              <li>La clave BRE-B se muestra en el modal de recarga de saldo</li>
             </ul>
           </div>
         </div>
