@@ -16,8 +16,16 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize services
+// Initialize services (público / clientes)
 export const auth = getAuth(app);
+
+// App secundaria para el panel admin (sesión aislada)
+// Solución: Firebase Auth solo permite un usuario por dominio/origen.
+// Con dos apps nombradas, cada una tiene su propio storage key en localStorage,
+// permitiendo sesiones independientes entre admin y cliente.
+const adminApp = initializeApp(firebaseConfig, 'admin');
+export const adminAuth = getAuth(adminApp);
+
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app);

@@ -6,7 +6,7 @@ import {
   User
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { auth, adminAuth, db } from './firebase';
 import type { User as AppUser } from '../types';
 
 export interface AuthUser extends User {
@@ -108,6 +108,56 @@ export const logout = async (): Promise<void> => {
 
 export const onAuthChange = (callback: (user: User | null) => void): (() => void) => {
   return onAuthStateChanged(auth, callback);
+};
+
+// === Funciones para el panel admin (usando adminAuth, sesión aislada) ===
+
+export const adminLogin = async (email: string, password: string): Promise<AuthUser> => {
+  try {
+    const userCredential = await signInWithEmailAndPassword(adminAuth, email, password);
+    const user = userCredential.user;
+
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      return {
+        ...user,
+        tenantId: userData.tenantId,
+        role: userData.role
+      } as AuthUser;
+    }
+
+    return user as AuthUser;
+  } catch (error: any) {
+    console.error('Error logging in admin:', error);
+
+    if (error.code === 'auth/invalid-credential') {
+      throw new Error('Correo o contraseña incorrectos');
+    } else if (error.code === 'auth/user-not-found') {
+      throw new Error('Usuario no encontrado');
+    } else if (error.code === 'auth/wrong-password') {
+      throw new Error('Contraseña incorrecta');
+    } else if (error.code === 'auth/invalid-email') {
+      throw new Error('Correo electrónico inválido');
+    } else if (error.code === 'auth/too-many-requests') {
+      throw new Error('Demasiados intentos. Intenta más tarde');
+    }
+
+    throw error;
+  }
+};
+
+export const onAdminAuthChange = (callback: (user: User | null) => void): (() => void) => {
+  return onAuthStateChanged(adminAuth, callback);
+};
+
+export const adminLogout = async (): Promise<void> => {
+  try {
+    await signOut(adminAuth);
+  } catch (error) {
+    console.error('Error logging out admin:', error);
+    throw error;
+  }
 };
 
 export const checkUserRole = async (uid: string): Promise<AppUser | null> => {
