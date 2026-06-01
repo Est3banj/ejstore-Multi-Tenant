@@ -1,31 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { getRecharges, approveRecharge, rejectRecharge } from '../../services/firestore';
-import { updateBalance } from '../../services/auth';
+import { getRecharges } from '../../services/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../../services/firebase';
 import { motion } from 'framer-motion';
 import { Check, X, Clock, CheckCircle, XCircle, Loader } from 'lucide-react';
 import type { Recharge } from '../../types';
-
-// Configuración de Telegram (misma que en Header)
-const TELEGRAM_BOT_TOKEN = '8597739575:AAFuw__aMizR6sSPfUx6bU9da_r4PlNjnuI';
-const ADMIN_CHAT_ID = '1666952441';
-
-// Función para enviar mensaje a Telegram
-async function sendTelegramMessage(text: string) {
-  try {
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: ADMIN_CHAT_ID,
-        text,
-        parse_mode: 'Markdown'
-      })
-    });
-  } catch (error) {
-    console.error('Error sending to Telegram:', error);
-  }
-}
 
 const Recharges = () => {
   const { tenant, userTenantId, user } = useApp();
@@ -63,15 +43,9 @@ const Recharges = () => {
     if (!tenantId || !user?.email) return;
     setProcessing(recharge.id);
     try {
-      // Aprobar en Firestore
-      await approveRecharge(recharge.id, user.email);
-      
-      // Agregar saldo al cliente
-      await updateBalance(recharge.customerId, recharge.amount);
-      
-      // Notificar al usuario por Telegram
-      const message = `✅ *RECARGA APROBADA*\n━━━━━━━━━━━━━━━━\n👤 ${recharge.customerName}\n💵 $${recharge.amount.toLocaleString()} COP\n━━━━━━━━━━━━━━━━\nEl saldo ha sido agregado a su cuenta.`;
-      await sendTelegramMessage(message);
+      // Usar Cloud Function que maneja Firestore + Discord + Telegram
+      const processRechargeCF = httpsCallable(functions, 'processRecharge');
+      await processRechargeCF({ rechargeId: recharge.id, action: 'approve' });
       
       // Recargar lista
       await loadRecharges();
@@ -85,16 +59,14 @@ const Recharges = () => {
 
   const handleReject = async (recharge: Recharge) => {
     if (!tenantId || !user?.email) return;
-    // Mensaje predeterminado por pago no válido
     const defaultReason = 'Pago no válido o no verificado';
     const reason = prompt('Motivo del rechazo (Enter para "Pago no válido"):', defaultReason);
+    if (reason === null) return; // Usuario canceló
     setProcessing(recharge.id);
     try {
-      await rejectRecharge(recharge.id, user.email, reason || defaultReason);
-      
-      // Notificar al usuario por Telegram
-      const message = `❌ *RECARGA RECHAZADA*\n━━━━━━━━━━━━━━━━\n👤 ${recharge.customerName}\n💵 $${recharge.amount.toLocaleString()} COP\n📝 *Motivo:* ${reason || defaultReason}\n━━━━━━━━━━━━━━━━\nPor favor contacta soporte para más información.`;
-      await sendTelegramMessage(message);
+      // Usar Cloud Function que maneja Firestore + Discord + Telegram
+      const processRechargeCF = httpsCallable(functions, 'processRecharge');
+      await processRechargeCF({ rechargeId: recharge.id, action: 'reject' });
       
       await loadRecharges();
     } catch (error) {

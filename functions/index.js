@@ -139,7 +139,7 @@ exports.notifyPrizeWon = functions.https.onCall(async (data, context) => {
           { name: '👤 Cliente', value: userName, inline: true },
           { name: '📱 WhatsApp', value: phone, inline: true },
           { name: '🎉 Premio', value: prize, inline: false },
-          { name: '🕐 Fecha', value: new Date().toLocaleString('America/Bogota', { timeZone: 'America/Bogota' }), inline: false }
+          { name: '🕐 Fecha', value: new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' }), inline: false }
         ]
       });
     }
@@ -153,7 +153,7 @@ exports.notifyPrizeWon = functions.https.onCall(async (data, context) => {
 👤 *Nombre:* ${userName}
 📱 *WhatsApp:* ${phone}
 🎉 *Premio:* ${prize}
-🕐 *Fecha:* ${new Date().toLocaleString('America/Bogota', { timeZone: 'America/Bogota' })}
+🕐 *Fecha:* ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}
 ━━━━━━━━━━━━━━━━
 `;
 
@@ -178,26 +178,34 @@ exports.createRechargeRequest = functions.https.onCall(async (data, context) => 
     throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
 
-  const { amount, userName, phone, transferProof, tenantId } = data;
+  const { amount, userName, phone, customerName, customerPhone, transferProof, tenantId } = data;
+  const finalUserName = userName || customerName;
+  const finalPhone = phone || customerPhone;
 
-  if (!amount || !userName || !phone) {
+  if (!amount || !finalUserName || !finalPhone) {
     throw new functions.https.HttpsError('invalid-argument', 'Monto, nombre y teléfono son requeridos');
+  }
+
+  const parsedAmount = parseInt(amount);
+  if (isNaN(parsedAmount) || parsedAmount <= 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Monto inválido');
   }
 
   // Crear documento de recarga
   const rechargeRef = await db.collection('recharges').add({
     userId: context.auth.uid,
-    userName,
-    phone,
-    amount: parseInt(amount),
+    userName: finalUserName,
+    phone: finalPhone,
+    customerName: finalUserName,
+    customerPhone: finalPhone,
+    amount: parsedAmount,
     transferProof: transferProof || null,
     tenantId: tenantId || context.auth.token.tenantId || null,
-    status: 'pending', // pending, approved, rejected
+    status: 'pending',
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
 
-  const parsedAmount = parseInt(amount);
-  const now = new Date().toLocaleString('America/Bogota', { timeZone: 'America/Bogota' });
+  const now = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' });
 
   // ========== DISCORD: Enviar notificación si el tenant tiene webhook configurado ==========
   const effectiveTenantId = tenantId || context.auth.token.tenantId;
@@ -208,8 +216,8 @@ exports.createRechargeRequest = functions.https.onCall(async (data, context) => 
         title: '💰 NUEVA SOLICITUD DE RECARGA',
         color: 0x3498DB, // Azul
         fields: [
-          { name: '👤 Cliente', value: userName, inline: true },
-          { name: '📱 WhatsApp', value: phone, inline: true },
+          { name: '👤 Cliente', value: finalUserName, inline: true },
+          { name: '📱 WhatsApp', value: finalPhone, inline: true },
           { name: '💵 Monto', value: `$${parsedAmount.toLocaleString()} COP`, inline: true },
           { name: '🆔 ID Recarga', value: rechargeRef.id, inline: false },
           { name: '🕐 Fecha', value: now, inline: false }
@@ -349,7 +357,7 @@ exports.testDiscordWebhook = functions.https.onCall(async (data, context) => {
       color: 0xF39C12, // Naranja
       description: 'Este es un mensaje de prueba para verificar que la integración con Discord funciona correctamente.',
       fields: [
-        { name: '📅 Fecha de prueba', value: new Date().toLocaleString('America/Bogota', { timeZone: 'America/Bogota' }), inline: true },
+        { name: '📅 Fecha de prueba', value: new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' }), inline: true },
         { name: '👤 Probado por', value: context.auth.token.email || 'Admin', inline: true }
       ]
     });

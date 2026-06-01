@@ -6,28 +6,8 @@ import { useTenantStore } from '../store';
 import { useAuth } from '../hooks/useAuth';
 import { Menu, X, User, LogOut, Wallet, Plus, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { createRechargeRequest } from '../services/firestore';
-
-// Configuración de Telegram (hardcodeada para evitar Cloud Functions)
-const TELEGRAM_BOT_TOKEN = '8597739575:AAFuw__aMizR6sSPfUx6bU9da_r4PlNjnuI';
-const ADMIN_CHAT_ID = '1666952441';
-
-// Función para enviar mensaje a Telegram
-async function sendTelegramMessage(text: string) {
-  try {
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: ADMIN_CHAT_ID,
-        text,
-        parse_mode: 'Markdown'
-      })
-    });
-  } catch (error) {
-    console.error('Error sending to Telegram:', error);
-  }
-}
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../services/firebase';
 
 const Header = (): JSX.Element => {
   const { settings } = useApp();
@@ -523,17 +503,14 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
 `;
 
     try {
-      // Guardar en Firestore
-      await createRechargeRequest({
-        tenantId: tenantId || '',
-        customerId: customer?.uid || '',
+      // Llamar a la Cloud Function que maneja Firestore + Discord + Telegram
+      const createRecharge = httpsCallable(functions, 'createRechargeRequest');
+      await createRecharge({
         customerName: fullName,
         customerPhone: customer?.phone || '',
-        amount: parseInt(amount)
+        amount: parseInt(amount),
+        tenantId: tenantId || ''
       });
-      
-      // Notificar a Telegram
-      await sendTelegramMessage(message);
       
       // Mostrar toast y cerrar automáticamente después de 2 segundos
       showToast('✅ Tu recarga ha sido registrada. Será validada y cargada en minutos.', 'success');
