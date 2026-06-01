@@ -1,5 +1,5 @@
 import { useApp } from '../../context/AppContext';
-import { useAdminAuthStore } from '../../store/authStore';
+import { useAuthStore } from '../../store/authStore';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Package, Tag, Image, Settings, Users, Wallet, Search, X, Plus } from 'lucide-react';
@@ -10,7 +10,7 @@ import { functions } from '../../services/firebase';
 
 const Dashboard = () => {
   const { services, banners, tenant, userTenantId } = useApp();
-  const { role } = useAdminAuthStore(); // Agregar acceso al role
+  const { role } = useAuthStore(); // Agregar acceso al role
   const effectiveTenantId = tenant?.id || userTenantId;
   const isSuperadmin = role === 'superadmin';
   const [allServices, setAllServices] = useState([]);

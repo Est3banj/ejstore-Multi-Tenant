@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { onAuthChange, onAdminAuthChange, checkUserRole, getCustomerData, adminLogout, logout as customerLogout } from '../services/auth';
+import { onAuthChange, checkUserRole, getCustomerData } from '../services/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
 import type { CustomerUser } from '../services/auth';
 
@@ -19,79 +19,69 @@ interface AuthState {
   refreshCustomer: () => Promise<void>;
 }
 
-// Factory: crea un store de auth con la función onAuthChange específica
-// Esto permite tener sesiones aisladas entre admin y cliente
-const createAuthStore = (onAuthChangeFn: typeof onAuthChange, logoutFn: typeof customerLogout) => {
-  return create<AuthState>((set, get) => ({
-    user: null,
-    userTenantId: null,
-    customer: null,
-    isAdmin: false,
-    role: null,
-    loading: false,
-    initialized: false,
+export const useAuthStore = create<AuthState>((set, get) => ({
+  user: null,
+  userTenantId: null,
+  customer: null,
+  isAdmin: false,
+  role: null,
+  loading: false,
+  initialized: false,
 
-    initialize: () => {
-      const unsubscribe = onAuthChangeFn(async (currentUser) => {
-        set({ user: currentUser, loading: true });
+  initialize: () => {
+    const unsubscribe = onAuthChange(async (currentUser) => {
+      set({ user: currentUser, loading: true });
 
-        if (currentUser) {
-          const userData = await checkUserRole(currentUser.uid);
-          const isAdminUser = !!userData?.tenantId;
+      if (currentUser) {
+        const userData = await checkUserRole(currentUser.uid);
+        const isAdminUser = !!userData?.tenantId;
 
-          if (isAdminUser) {
-            const userRole = userData?.role || 'admin';
-            set({
-              userTenantId: userData.tenantId,
-              isAdmin: true,
-              role: userRole,
-              customer: null
-            });
-          } else {
-            set({ userTenantId: null, isAdmin: false, role: null });
-            const customerData = await getCustomerData(currentUser.uid, currentUser.email || '');
-            set({ customer: customerData });
-          }
+        if (isAdminUser) {
+          const userRole = userData?.role || 'admin';
+          set({
+            userTenantId: userData.tenantId,
+            isAdmin: true,
+            role: userRole,
+            customer: null
+          });
         } else {
-          set({ userTenantId: null, customer: null, isAdmin: false, role: null });
+          set({ userTenantId: null, isAdmin: false, role: null });
+          const customerData = await getCustomerData(currentUser.uid, currentUser.email || '');
+          set({ customer: customerData });
         }
-
-        set({ loading: false, initialized: true });
-      });
-
-      return unsubscribe;
-    },
-
-    setUserTenantId: (tenantId) => {
-      set({ userTenantId: tenantId });
-    },
-
-    setCustomer: (customer) => {
-      set({ customer });
-    },
-
-    refreshCustomer: async () => {
-      const { user } = get();
-      if (user) {
-        const customerData = await getCustomerData(user.uid);
-        set({ customer: customerData });
+      } else {
+        set({ userTenantId: null, customer: null, isAdmin: false, role: null });
       }
-    },
 
-    logout: async () => {
-      await logoutFn();
+      set({ loading: false, initialized: true });
+    });
 
-      // Limpiar localStorage de ruleta
-      localStorage.removeItem('ejstore_roulette_data');
-      localStorage.removeItem('roulette_dont_ask');
+    return unsubscribe;
+  },
 
-      set({ user: null, userTenantId: null, customer: null, isAdmin: false, role: null });
+  setUserTenantId: (tenantId) => {
+    set({ userTenantId: tenantId });
+  },
+
+  setCustomer: (customer) => {
+    set({ customer });
+  },
+
+  refreshCustomer: async () => {
+    const { user } = get();
+    if (user) {
+      const customerData = await getCustomerData(user.uid);
+      set({ customer: customerData });
     }
-  }));
-};
+  },
 
-// Store para clientes (usa auth principal - localStorage - compartido entre tabs)
-export const useAuthStore = createAuthStore(onAuthChange, customerLogout);
+  logout: async () => {
+    const { logout: authLogout } = await import('../services/auth');
+    await authLogout();
 
-// Store para admin (usa adminAuth - sesión aislada del cliente)
-export const useAdminAuthStore = createAuthStore(onAdminAuthChange, adminLogout);
+    localStorage.removeItem('ejstore_roulette_data');
+    localStorage.removeItem('roulette_dont_ask');
+
+    set({ user: null, userTenantId: null, customer: null, isAdmin: false, role: null });
+  }
+}));
