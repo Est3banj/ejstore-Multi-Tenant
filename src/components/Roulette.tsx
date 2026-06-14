@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fetchRouletteConfig, executeServerSpin, fetchSpinData, notifyPrizeWon } from '../hooks/useRoulette';
 import { useAuthStore } from '../store/authStore';
@@ -179,6 +180,8 @@ const Roulette = () => {
     loadSpinData();
   };
 
+  const navigate = useNavigate();
+
   const handleSpinStart = useCallback(async () => {
     if (isSpinning || mustSpin) return;
 
@@ -206,7 +209,7 @@ const Roulette = () => {
       await refreshCustomer();
       await loadSpinData();
 
-      // Notificar premio (no bloqueante)
+      // Notificar premio
       if (serverResult.transactionId) {
         try {
           await notifyPrizeWon(serverResult.transactionId);
@@ -237,13 +240,14 @@ const Roulette = () => {
       if (err.code === 'failed-precondition' && (
         msg.toLowerCase().includes('saldo') || msg.toLowerCase().includes('insuficiente')
       )) {
+        // Redirigir a recarga en vez de mostrar modal overlay
         setTimeout(() => {
           setShowRoulette(false);
-          window.dispatchEvent(new CustomEvent('openRechargeModal'));
+          navigate('/?recarga=1', { replace: true });
         }, 2000);
       }
     }
-  }, [isSpinning, mustSpin, user, customer, tenantId, prizes, refreshCustomer, loadSpinData]);
+  }, [isSpinning, mustSpin, user, customer, tenantId, prizes, refreshCustomer, loadSpinData, navigate]);
 
   const handleSpinEnd = useCallback(() => {
     setIsSpinning(false);

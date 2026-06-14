@@ -78,6 +78,15 @@ const Header = (): JSX.Element => {
       setShowRechargeModal(true);
     };
     window.addEventListener('openRechargeModal', handleOpenRecharge);
+
+    // Auto-abrir si viene de redirect por saldo insuficiente
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('recarga') === '1') {
+      setShowRechargeModal(true);
+      // Limpiar query param sin recargar la página
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
     return () => window.removeEventListener('openRechargeModal', handleOpenRecharge);
   }, []);
 
