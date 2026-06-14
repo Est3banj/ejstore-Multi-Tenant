@@ -23,6 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 
+# SDD artifacts
+.atl/
+
 # Environment variables
 .env
 .env.local

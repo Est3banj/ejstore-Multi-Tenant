@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { DEFAULT_PRIZES, DEFAULT_ROULETTE_CONFIG } from '../../utils/roulette';
 import type { RoulettePrize } from '../../types';
 import { getRouletteConfig, saveRouletteConfig } from '../../services/firestore';
 import { motion } from 'framer-motion';
@@ -12,9 +11,9 @@ const RouletteSettings = () => {
   
   // Estado para la configuración
   const [isEnabled, setIsEnabled] = useState(true);
-  const [pricePerSpin, setPricePerSpin] = useState(DEFAULT_ROULETTE_CONFIG.pricePerSpin);
-  const [spinsForFreeSpin, setSpinsForFreeSpin] = useState(DEFAULT_ROULETTE_CONFIG.spinsForFreeSpin);
-  const [prizes, setPrizes] = useState<RoulettePrize[]>(DEFAULT_PRIZES);
+  const [pricePerSpin, setPricePerSpin] = useState(0);
+  const [spinsForFreeSpin, setSpinsForFreeSpin] = useState(1);
+  const [prizes, setPrizes] = useState<RoulettePrize[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -73,9 +72,9 @@ const RouletteSettings = () => {
   // Resetear a valores por defecto
   const handleReset = () => {
     setIsEnabled(true);
-    setPricePerSpin(DEFAULT_ROULETTE_CONFIG.pricePerSpin);
-    setSpinsForFreeSpin(DEFAULT_ROULETTE_CONFIG.spinsForFreeSpin);
-    setPrizes(DEFAULT_PRIZES);
+    setPricePerSpin(0);
+    setSpinsForFreeSpin(1);
+    setPrizes([]);
     setShowResetConfirm(false);
   };
 
@@ -186,13 +185,15 @@ const RouletteSettings = () => {
                 key={prize.id}
                 className={`flex items-center gap-4 p-4 rounded-lg ${
                   prize.id === 'nothing' ? 'bg-red-500/10' : 'bg-white/5'
+                } ${
+                  prize.stock !== undefined && prize.stock <= 0 && prize.id !== 'nothing' ? 'opacity-60 border border-yellow-500/30' : ''
                 }`}
               >
                 <div className="w-8 h-8 rounded-full bg-primary-500/20 flex items-center justify-center text-primary-400 font-bold">
                   {index + 1}
                 </div>
                 
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-3">
                   <div className="md:col-span-2">
                     <input
                       type="text"
@@ -224,6 +225,26 @@ const RouletteSettings = () => {
                       min="0"
                     />
                     <span className="text-white/50 text-xs">costo (COP)</span>
+                  </div>
+                  <div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={prize.stock ?? ''}
+                        onChange={(e) => updatePrize(prize.id, 'stock', e.target.value === '' ? undefined : parseInt(e.target.value) || 0)}
+                        className={`input-field ${(!prize.stock && prize.id !== 'nothing') ? 'text-yellow-400' : ''}`}
+                        placeholder="∞"
+                        min="0"
+                      />
+                      {!prize.stock && prize.id !== 'nothing' && (
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-yellow-400 text-xs font-bold">∞</span>
+                      )}
+                    </div>
+                    <span className="text-white/50 text-xs">
+                      {prize.stock !== undefined && prize.stock <= 0 && prize.id !== 'nothing' 
+                        ? <span className="text-yellow-400 font-bold">⚠️ Agotado</span>
+                        : 'stock (∞ = ilimitado)'}
+                    </span>
                   </div>
                 </div>
                 

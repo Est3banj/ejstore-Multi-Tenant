@@ -509,6 +509,7 @@ export interface RouletteConfigData {
     probability: number;
     cost: number;
     isActive: boolean;
+    stock?: number;
   }[];
   updatedAt: Date;
 }

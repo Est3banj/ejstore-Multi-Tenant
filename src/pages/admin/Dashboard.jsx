@@ -19,6 +19,7 @@ const Dashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [rechargeAmount, setRechargeAmount] = useState('');
+  const [customerError, setCustomerError] = useState(null);
   const [recharging, setRecharging] = useState(false);
   const [stats, setStats] = useState({
     totalServices: 0,
@@ -38,6 +39,7 @@ const Dashboard = () => {
         
         // Cargar clientes: superadmin ve todos, admin ve solo los de su tenant
         setLoadingCustomers(true);
+        setCustomerError(null);
         try {
           let customersQuery;
           if (isSuperadmin) {
@@ -70,6 +72,7 @@ const Dashboard = () => {
           });
         } catch (err) {
           console.error('Error loading customers:', err);
+          setCustomerError(err.message || 'Error al cargar clientes');
         } finally {
           setLoadingCustomers(false);
         }
@@ -160,6 +163,15 @@ const Dashboard = () => {
             <span className="text-gray-400 text-sm">{customers.length} total</span>
           </div>
           
+          {/* Error message */}
+          {customerError && (
+            <div className="mt-3 p-3 bg-red-500/20 border border-red-500/50 rounded-lg">
+              <p className="text-red-400 text-sm">
+                ⚠️ {customerError}
+              </p>
+            </div>
+          )}
+
           {/* Search */}
           <div className="mt-4 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
