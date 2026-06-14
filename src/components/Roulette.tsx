@@ -1,44 +1,37 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../services/firebase';
-import { DEFAULT_PRIZES, DEFAULT_ROULETTE_CONFIG } from '../utils/roulette';
-import { getUserSpinData, useSpin, spinWheel, getSpinPrice, getSpinsForFreeSpin, fetchRouletteConfig } from '../hooks/useRoulette';
+import { fetchRouletteConfig, executeServerSpin, fetchSpinData, notifyPrizeWon } from '../hooks/useRoulette';
 import { useAuthStore } from '../store/authStore';
 import { useTenantStore } from '../store/tenantStore';
-import { updateBalance } from '../services/auth';
-import type { RoulettePrize, UserSpinData } from '../types';
-import { Gift, X, Zap } from 'lucide-react';
+import type { RoulettePrize, CustomerSpinData } from '../types';
+import { Gift, X } from 'lucide-react';
 
-// Función para notificar premio ganado via Cloud Function (Discord + Telegram)
-async function notifyWinner(userName: string, phone: string, prize: string, prizeId: string, tenantId: string) {
-  if (prizeId === 'nothing') return;
-  try {
-    const notify = httpsCallable(functions, 'notifyPrizeWon');
-    await notify({ userName, phone, prize, prizeId, tenantId });
-  } catch (error) {
-    console.error('Error notifying prize:', error);
-  }
-}
-
-const COLORES: Record<string, string> = {
+const PRIZE_COLORS: Record<string, string> = {
   nothing: '#2D3748',
-  crunchyroll: '#F97316',
+  netflix: '#E50914',
+  disney: '#1E3A8A',
   hbo: '#9333EA',
   prime: '#3B82F6',
-  disney: '#1E3A8A',
-  netflix: '#E50914',
+  crunchyroll: '#F97316',
 };
 
-// Componente ruleta original
-const RouletteWheel = ({ 
-  isSpinning, 
+const PALETTE = [
+  '#E50914', '#1E3A8A', '#9333EA', '#3B82F6',
+  '#F97316', '#059669', '#DC2626', '#7C3AED',
+];
+
+function getSegmentColor(prize: RoulettePrize, index: number): string {
+  return PRIZE_COLORS[prize.id] || PALETTE[index % PALETTE.length];
+}
+
+const RouletteWheel = ({
+  isSpinning,
   prizeNumber,
   mustSpin,
   prizes,
   onSpinEnd
-}: { 
-  isSpinning: boolean; 
+}: {
+  isSpinning: boolean;
   prizeNumber: number;
   mustSpin: boolean;
   prizes: RoulettePrize[];
@@ -46,19 +39,17 @@ const RouletteWheel = ({
 }) => {
   const [rotation, setRotation] = useState(0);
   const isAnimatingRef = useRef(false);
-  
-  // Cuando debe girar, calcular y aplicar rotación
+  const segmentAngle = 360 / prizes.length;
+
   useEffect(() => {
-    if (mustSpin && !isAnimatingRef.current) {
+    if (mustSpin && !isAnimatingRef.current && prizes.length > 0) {
       isAnimatingRef.current = true;
-      
-      // Resetear a 0 primero (sin transición)
+
       setRotation(0);
-      
-      // Luego aplicar la rotación target (con transición)
+
       requestAnimationFrame(() => {
-        const inverted = (prizeNumber + 3) % 6;
-        const sectorCenter = (inverted * 60) + 30;
+        const inverted = (prizeNumber + Math.floor(prizes.length / 2)) % prizes.length;
+        const sectorCenter = (inverted * segmentAngle) + (segmentAngle / 2);
         let needed = 90 - sectorCenter;
         if (needed < 0) needed += 360;
         const target = (360 * 5) + needed + 90;
@@ -66,28 +57,26 @@ const RouletteWheel = ({
         isAnimatingRef.current = false;
       });
     }
-  }, [mustSpin, prizeNumber]);
+  }, [mustSpin, prizeNumber, prizes.length, segmentAngle]);
 
-  const gradientParts = prizes.map((prize, i) => {
-    const color = COLORES[prize.id] || '#666';
-    const start = i * 60;
-    const end = (i + 1) * 60;
+  const gradientParts = prizes.length === 0 ? '#2D3748 0deg 360deg' : prizes.map((prize, i) => {
+    const color = getSegmentColor(prize, i);
+    const start = i * segmentAngle;
+    const end = (i + 1) * segmentAngle;
     return `${color} ${start}deg ${end}deg`;
   }).join(', ');
 
   return (
     <div className="relative" style={{ width: 240, height: 240 }}>
-      {/* Flecha fija arriba */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20"
-        style={{ 
-          width: 0, height: 0, 
-          borderLeft: '16px solid transparent', 
-          borderRight: '16px solid transparent', 
+        style={{
+          width: 0, height: 0,
+          borderLeft: '16px solid transparent',
+          borderRight: '16px solid transparent',
           borderTop: '24px solid #F59E0B',
           filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.5))'
         }} />
 
-      {/* Ruleta */}
       <div className="w-full h-full rounded-full overflow-hidden"
         style={{
           transform: `rotate(${rotation}deg)`,
@@ -97,9 +86,9 @@ const RouletteWheel = ({
           border: '4px solid #1a1a1a'
         }}
         onTransitionEnd={() => isSpinning && onSpinEnd()}>
-        
+
         {prizes.map((prize, i) => {
-          const angle = i * 60 + 30;
+          const angle = i * segmentAngle + (segmentAngle / 2);
           return (
             <div key={i} className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="text-white font-bold text-[10px] uppercase tracking-wide"
@@ -114,7 +103,7 @@ const RouletteWheel = ({
             </div>
           );
         })}
-        
+
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="w-14 h-14 rounded-full bg-gradient-to-br from-gray-800 to-black border-4 border-gray-600 z-10 shadow-lg" />
         </div>
@@ -127,203 +116,148 @@ const Roulette = () => {
   const { user, customer, refreshCustomer } = useAuthStore();
   const tenant = useTenantStore((state) => state.tenant);
   const tenantId = tenant?.id || '';
-  const [userData, setUserData] = useState<UserSpinData>({ spinsPaid: 0, spinsFree: 0, todaySpins: 0, lastSpinDate: '' });
+  const [spinData, setSpinData] = useState<CustomerSpinData | null>(null);
   const [isSpinning, setIsSpinning] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [result, setResult] = useState<RoulettePrize | null>(null);
-  const [showPayment, setShowPayment] = useState(false); // Modal viejo de Nequi (ya no se usa para recargas)
   const [showRoulette, setShowRoulette] = useState(false);
-  const [phone, setPhone] = useState('');
-  const [useFreeSpin, setUseFreeSpin] = useState(false);
   const [mustSpin, setMustSpin] = useState(false);
   const [prizeNumber, setPrizeNumber] = useState(0);
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
-  const [showConfirmSpin, setShowConfirmSpin] = useState(false);
-  const [dontAskAgain, setDontAskAgain] = useState(false);
   const [rouletteConfig, setRouletteConfig] = useState<{
     pricePerSpin: number;
     spinsForFreeSpin: number;
     prizes: RoulettePrize[];
     isEnabled: boolean;
   } | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
 
-  // Cargar configuración de Firestore
   useEffect(() => {
     if (!tenantId) return;
-    
+
     const loadConfig = async () => {
       const config = await fetchRouletteConfig(tenantId);
       if (config) {
         setRouletteConfig({
-          pricePerSpin: config.pricePerSpin || DEFAULT_ROULETTE_CONFIG.pricePerSpin,
-          spinsForFreeSpin: config.spinsForFreeSpin || DEFAULT_ROULETTE_CONFIG.spinsForFreeSpin,
-          prizes: config.prizes || DEFAULT_PRIZES,
+          pricePerSpin: config.pricePerSpin || 0,
+          spinsForFreeSpin: config.spinsForFreeSpin || 1,
+          prizes: config.prizes || [],
           isEnabled: config.isEnabled !== false,
         });
       }
     };
-    
+
     loadConfig();
   }, [tenantId]);
 
-  // Obtener valores (de config o defaults)
-  const price = rouletteConfig?.pricePerSpin || getSpinPrice();
-  const prizes = rouletteConfig?.prizes || DEFAULT_PRIZES;
+  const price = rouletteConfig?.pricePerSpin || 0;
+  const prizes = rouletteConfig?.prizes || [];
 
-  // Cargar preferencia de no preguntar
-  useEffect(() => {
-    const saved = localStorage.getItem('roulette_dont_ask');
-    if (saved === 'true') {
-      setDontAskAgain(true);
-    }
-  }, []);
-
-  // Guardar preferencia
-  const handleDontAskChange = (checked: boolean) => {
-    setDontAskAgain(checked);
-    localStorage.setItem('roulette_dont_ask', String(checked));
-  };
-  const spinsForFree = rouletteConfig?.spinsForFreeSpin || getSpinsForFreeSpin();
-
-  useEffect(() => { 
+  const loadSpinData = useCallback(async () => {
     if (customer) {
-      setUserData(getUserSpinData()); 
+      const data = await fetchSpinData(customer.uid);
+      setSpinData(data);
     }
   }, [customer]);
+
+  useEffect(() => {
+    loadSpinData();
+  }, [customer, loadSpinData]);
 
   const handleOpenRoulette = () => {
     if (!user) {
       setShowAuthPrompt(true);
       return;
     }
-    // Resetear estados de animación cuando se abre el modal
     setIsSpinning(false);
     setMustSpin(false);
     setPrizeNumber(0);
     setShowResult(false);
     setResult(null);
     setShowRoulette(true);
+    setServerError(null);
+    loadSpinData();
   };
 
   const handleSpinStart = useCallback(async () => {
     if (isSpinning || mustSpin) return;
-    
-    const data = getUserSpinData();
-    const wantsFree = useFreeSpin && data.spinsFree > 0;
-    
-    // Si no está logueado, pedir que se registre/logue
+
     if (!user) {
       setShowAuthPrompt(true);
       return;
     }
-    
-    // Si está logueado pero no tiene customer (no debería pasar pero por seguridad)
+
     if (!customer) {
       setShowAuthPrompt(true);
       return;
     }
-    
-    // Si tiene saldo, puede jugar
-    if (customer.balance >= price || wantsFree) {
-      // Si no tiene spins gratis y no ha pedido no preguntar, mostrar confirmación
-      if (!wantsFree && !dontAskAgain && !useFreeSpin) {
-        setShowConfirmSpin(true);
-        return;
-      }
-      // Ejecutar el giro
-      await executeSpin(wantsFree);
-      return;
-    }
-    
-    // Si no tiene saldo, abrir el modal de recarga del Header y cerrar la ruleta
-    setShowRoulette(false);
-    window.dispatchEvent(new CustomEvent('openRechargeModal'));
-  }, [isSpinning, mustSpin, useFreeSpin, user, customer, price, prizes, refreshCustomer, dontAskAgain]);
 
-  // Función que ejecuta el giro (separada para reuse)
-  const executeSpin = useCallback(async (wantsFree: boolean) => {
-    if (customer && !wantsFree) {
-      try {
-        await updateBalance(customer.uid, -price);
-        await refreshCustomer();
-      } catch (error) {
-        console.error('Error deduciendo saldo:', error);
-        return;
-      }
-    }
+    setIsSpinning(true);
+    setServerError(null);
 
-    // 1. Resetear TODOS los estados ANOES de setear el nuevo giro
-    setIsSpinning(false);
-    setMustSpin(false);
-    setPrizeNumber(999); // Valor inválido para forzar detección de cambio
-    
-    // Generar premio
-    const prize = spinWheel();
-    if (!prize) {
-      console.error('spinWheel devolvió null!');
-      return;
-    }
-    
-    const prizeIndex = prizes.findIndex(p => p.id === prize.id);
-    
-    setResult(prize);
-    setShowResult(false);
-    
-    // 2. Pequeño delay para que todo resetee
-    setTimeout(() => {
-      setPrizeNumber(prizeIndex);
-      // 3. Otro delay para que prizeNumber se procese
+    try {
+      const serverResult = await executeServerSpin(tenantId);
+
+      const prizeIndex = prizes.findIndex(p => p.id === serverResult.prize.id);
+      const wonPrize = prizeIndex >= 0
+        ? prizes[prizeIndex]
+        : { id: serverResult.prize.id, name: serverResult.prize.name, probability: 0, cost: 0, isActive: true };
+
+      await refreshCustomer();
+      await loadSpinData();
+
+      // Notificar premio (no bloqueante)
+      if (serverResult.transactionId) {
+        try {
+          await notifyPrizeWon(serverResult.transactionId);
+        } catch (notifError) {
+          console.error('Error notificando premio:', notifError);
+        }
+      }
+
+      setIsSpinning(false);
+      setMustSpin(false);
+      setResult(wonPrize);
+      setShowResult(false);
+
+      setPrizeNumber(999);
+
       setTimeout(() => {
-        setIsSpinning(true);
-        setMustSpin(true);
+        setPrizeNumber(prizeIndex >= 0 ? prizeIndex : 0);
+        setTimeout(() => {
+          setIsSpinning(true);
+          setMustSpin(true);
+        }, 50);
       }, 50);
-    }, 50);
-  }, [customer, price, prizes, refreshCustomer]);
+    } catch (err: any) {
+      setIsSpinning(false);
+      const msg = err.message || 'Error al girar la ruleta';
+      setServerError(msg);
 
-  // Confirmación aceptada
-  const handleConfirmSpinAccepted = () => {
-    setShowConfirmSpin(false);
-    executeSpin(false);
-  };
+      if (err.code === 'failed-precondition' && (
+        msg.toLowerCase().includes('saldo') || msg.toLowerCase().includes('insuficiente')
+      )) {
+        setTimeout(() => {
+          setShowRoulette(false);
+          window.dispatchEvent(new CustomEvent('openRechargeModal'));
+        }, 2000);
+      }
+    }
+  }, [isSpinning, mustSpin, user, customer, tenantId, prizes, refreshCustomer, loadSpinData]);
 
   const handleSpinEnd = useCallback(() => {
-    const data = getUserSpinData();
-    const useFree = useFreeSpin && data.spinsFree > 0;
-    const newData = useSpin(useFree, data);
-    setUserData(newData);
     setIsSpinning(false);
     setMustSpin(false);
     setShowResult(true);
+  }, []);
 
-    if (result && result.id !== 'nothing' && customer) {
-      notifyWinner(
-        customer.firstName || customer.email || 'Usuario',
-        customer.phone || '',
-        result.name,
-        result.id,
-        tenantId
-      );
-    }
-  }, [result, useFreeSpin, customer]);
-
-  const handlePaymentConfirm = useCallback(() => {
-    if (!phone) return;
-    const prize = spinWheel();
-    const prizeIndex = prizes.findIndex(p => p.id === prize.id);
-    setResult(prize);
-    setPrizeNumber(prizeIndex);
-    setShowPayment(false);
-    setIsSpinning(true);
-    setShowResult(false);
-    setMustSpin(true);
-  }, [phone, prizes]);
+  if (prizes.length === 0 && rouletteConfig !== null) return null;
 
   return (
     <>
-      {/* Botón flotante */}
-      <motion.button 
-        initial={{ scale: 0 }} 
-        animate={{ scale: 1 }} 
+      <motion.button
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
         className="fixed bottom-6 right-6 z-40 group"
         onClick={handleOpenRoulette}
       >
@@ -332,12 +266,11 @@ const Roulette = () => {
           <div className="relative bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 p-4 rounded-full shadow-2xl hover:scale-110">
             <Gift size={28} className="text-white" />
           </div>
-          {customer && userData.spinsFree > 0 && (
+          {customer && spinData && spinData.spinsFreeToday > 0 && (
             <div className="absolute -top-1 -right-1 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-              {userData.spinsFree}
+              {spinData.spinsFreeToday}
             </div>
           )}
-          {/* Tooltip "Prueba tu suerte" - visible on mobile, hover on desktop */}
           <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-sm px-3 py-2 rounded-lg opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none md:pointer-events-auto">
             <span className="animate-pulse">🎰</span> Prueba tu suerte
             <div className="absolute left-full top-1/2 -translate-y-1/2 w-2 h-2 bg-gray-800 rotate-45 hidden md:block"></div>
@@ -345,17 +278,16 @@ const Roulette = () => {
         </div>
       </motion.button>
 
-      {/* Modal registro */}
       <AnimatePresence>
         {showAuthPrompt && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 pb-24"
             onClick={() => setShowAuthPrompt(false)}
           >
-            <motion.div 
+            <motion.div
               initial={{ y: 50, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 50, opacity: 0 }}
@@ -368,7 +300,7 @@ const Roulette = () => {
                   <p className="text-white text-sm font-medium">¡Regístrate para jugar!</p>
                   <p className="text-white/60 text-xs">Es gratis y rápido</p>
                 </div>
-                <button 
+                <button
                   onClick={() => {
                     setShowAuthPrompt(false);
                     window.dispatchEvent(new CustomEvent('openAuthModal', { detail: 'register' }));
@@ -383,7 +315,6 @@ const Roulette = () => {
         )}
       </AnimatePresence>
 
-      {/* Modal ruleta */}
       <AnimatePresence>
         {showRoulette && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -393,34 +324,27 @@ const Roulette = () => {
               <button onClick={() => setShowRoulette(false)} className="absolute top-2 right-2 text-white/50 z-20"><X size={18} /></button>
               <div className="flex flex-col items-center gap-3">
                 <h2 className="text-xl font-bold gradient-text">🎰 Ruleta</h2>
-                <div className="flex gap-3">
-                  <div className="bg-white/5 px-3 py-1.5 rounded flex items-center gap-2">
-                    <Zap size={12} className="text-yellow-400" /><span className="text-white/70 text-sm">Gratis:</span>
-                    <span className="text-yellow-400 font-bold">{userData.spinsFree}</span>
+                {spinData && (
+                  <div className="flex gap-3">
+                    <div className="bg-white/5 px-3 py-1.5 rounded">
+                      <span className="text-white/70 text-sm">Total pagados:</span>
+                      <span className="text-primary-400 font-bold ml-1">{spinData.totalSpinsPaid}</span>
+                    </div>
                   </div>
-                  <div className="bg-white/5 px-3 py-1.5 rounded">
-                    <span className="text-white/70 text-sm">Pagados:</span>
-                    <span className="text-primary-400 font-bold ml-1">{userData.spinsPaid}</span>
-                  </div>
-                </div>
-                <RouletteWheel key={userData.spinsPaid + userData.spinsFree} isSpinning={isSpinning} prizeNumber={prizeNumber} mustSpin={mustSpin} prizes={prizes} onSpinEnd={handleSpinEnd} />
-                {userData.spinsFree > 0 && (
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={useFreeSpin} onChange={e => setUseFreeSpin(e.target.checked)} className="w-4 h-4 rounded accent-yellow-400" />
-                    <span className="text-white/70 text-sm">Usar gratis</span>
-                  </label>
                 )}
-                <button onClick={handleSpinStart} disabled={isSpinning} className={`w-full btn-primary text-lg py-3 ${isSpinning ? 'opacity-50' : ''}`}>
-                  {isSpinning ? 'Girando...' : (useFreeSpin && userData.spinsFree > 0 ? 'Girar gratis' : `Girar $${price.toLocaleString()}`)}
+                <RouletteWheel key={showResult ? 1 : 0} isSpinning={isSpinning} prizeNumber={prizeNumber} mustSpin={mustSpin} prizes={prizes} onSpinEnd={handleSpinEnd} />
+                <button onClick={handleSpinStart} disabled={isSpinning || prizes.length === 0} className={`w-full btn-primary text-lg py-3 ${isSpinning ? 'opacity-50' : ''}`}>
+                  {isSpinning ? 'Girando...' : `Girar $${price.toLocaleString()}`}
                 </button>
-                <p className="text-white/40 text-sm">{userData.spinsFree > 0 ? `${userData.spinsFree} gratis` : `${spinsForFree} para gratis`}</p>
+                {serverError && (
+                  <p className="text-red-400 text-sm text-center">{serverError}</p>
+                )}
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Modal resultado */}
       <AnimatePresence>
         {showResult && result && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -436,76 +360,6 @@ const Roulette = () => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Modal confirmación de giro */}
-      <AnimatePresence>
-        {showConfirmSpin && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setShowConfirmSpin(false)}>
-            <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }} className="glass p-5 max-w-sm w-full" onClick={e => e.stopPropagation()}>
-              <div className="text-center mb-4">
-                <div className="text-4xl mb-2">🎰</div>
-                <h3 className="text-lg font-bold">¿Confirmar giro?</h3>
-              </div>
-              <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 mb-4">
-                <p className="text-red-400 text-sm font-medium text-center">
-                  ⚠️ Se descontarán <span className="font-bold text-lg">${price.toLocaleString()}</span> de tu cuenta
-                </p>
-                <p className="text-white/60 text-xs text-center mt-1">
-                  ¿Estás seguro de tu destino?
-                </p>
-              </div>
-              <label className="flex items-start gap-3 mb-4 cursor-pointer bg-white/5 p-3 rounded-lg">
-                <input 
-                  type="checkbox" 
-                  checked={dontAskAgain} 
-                  onChange={e => handleDontAskChange(e.target.checked)} 
-                  className="w-5 h-5 mt-0.5 rounded accent-yellow-400" 
-                />
-                <div>
-                  <p className="text-white text-sm">No volver a preguntar</p>
-                  <p className="text-white/50 text-xs">Recordaré tu preferencia</p>
-                </div>
-              </label>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => setShowConfirmSpin(false)} 
-                  className="btn-secondary flex-1"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  onClick={handleConfirmSpinAccepted} 
-                  className="btn-primary flex-1 !bg-red-500 hover:!bg-red-600"
-                >
-                  Girar y probar suerte
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Modal pago (deprecated - ya no se usa, las recargas van por el modal del Header) */}
-      <AnimatePresence>
-        {showPayment && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setShowPayment(false)}>
-            <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }} className="glass p-5 max-w-sm w-full" onClick={e => e.stopPropagation()}>
-              <h3 className="text-lg font-bold text-center mb-3">💳 información de pago</h3>
-              <p className="text-white/70 text-center">
-                Usa el botón "Recargar saldo" del menú para realizar recargas.
-              </p>
-              <div className="flex gap-2 mt-4">
-                <button onClick={() => setShowPayment(false)} className="btn-primary flex-1">Cerrar</button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Modal de recarga (deprecated - ahora usa el del Header via CustomEvent) */}
-      {/* Este modal ya no se renderiza - se abre via window.dispatchEvent(new CustomEvent('openRechargeModal')) */}
     </>
   );
 };

@@ -11,7 +11,8 @@ vi.mock('firebase/auth', () => ({
   getAuth: vi.fn(() => ({})),
   signInWithEmailAndPassword: vi.fn(),
   signOut: vi.fn(),
-  onAuthStateChanged: vi.fn()
+  onAuthStateChanged: vi.fn(),
+  connectAuthEmulator: vi.fn(),
 }));
 
 vi.mock('firebase/firestore', () => ({
@@ -26,7 +27,8 @@ vi.mock('firebase/firestore', () => ({
   setDoc: vi.fn(),
   query: vi.fn(),
   where: vi.fn(),
-  serverTimestamp: vi.fn(() => new Date())
+  serverTimestamp: vi.fn(() => new Date()),
+  connectFirestoreEmulator: vi.fn(),
 }));
 
 vi.mock('firebase/storage', () => ({
@@ -34,7 +36,14 @@ vi.mock('firebase/storage', () => ({
   ref: vi.fn(),
   uploadBytes: vi.fn(),
   getDownloadURL: vi.fn(() => Promise.resolve('https://test.url')),
-  deleteObject: vi.fn()
+  deleteObject: vi.fn(),
+  connectStorageEmulator: vi.fn(),
+}));
+
+vi.mock('firebase/functions', () => ({
+  getFunctions: vi.fn(() => ({})),
+  httpsCallable: vi.fn(() => vi.fn()),
+  connectFunctionsEmulator: vi.fn(),
 }));
 
 // Mock window.matchMedia

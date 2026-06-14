@@ -8,8 +8,8 @@ export interface Tenant {
   contactEmail?: string;
   secondaryColor?: string;
   isActive?: boolean;
+  discordConfigured?: boolean;
   createdAt?: Date;
-  discordWebhookUrl?: string; // URL del webhook de Discord para notificaciones
 }
 
 export interface Service {
@@ -57,7 +57,6 @@ export interface Settings {
   qrImage?: string; // URL de imagen QR para recargas
   brebKey?: string; // Clave BRE-B personalizada por tenant
   brebBankName?: string; // Nombre del banco para BRE-B
-  discordWebhookUrl?: string; // URL del webhook de Discord para notificaciones
 }
 
 export interface User {
@@ -76,6 +75,7 @@ export interface RoulettePrize {
   probability: number; // 0-100
   cost: number; // Costo real del premio
   isActive: boolean;
+  stock?: number; // Stock disponible (undefined/0 = sin límite)
 }
 
 export interface RouletteConfig {
@@ -91,10 +91,21 @@ export interface RouletteConfig {
 }
 
 export interface UserSpinData {
-  spinsPaid: number; // Total de giros pagos
-  spinsFree: number; // Giros gratis disponibles
-  todaySpins: number; // Giros de hoy (para estadísticas)
-  lastSpinDate: string; // Fecha del último giro
+  spinsPaid: number;
+  spinsFree: number;
+  todaySpins: number;
+  lastSpinDate: string;
+}
+
+export interface CustomerSpinData {
+  spinsPaidToday: number;
+  spinsFreeToday: number;
+  lastSpinDate: string;
+  totalSpinsPaid: number;
+  totalSpinsFree: number;
+  totalGastadoEnRuleta: number; // Acumulado de dinero gastado en ruleta (para pity system)
+  paidSpinsCount: number; // Contador de giros pagos consecutivos (para giro gratis)
+  updatedAt: string;
 }
 
 export const TENANT_DEFAULTS: Omit<Tenant, 'id'> = {
@@ -109,7 +120,6 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'tenantId'> = {
   whatsappNumber: '',
   contactEmail: '',
   siteName: 'EJStore',
-  discordWebhookUrl: '',
 };
 
 // Tipos para recargas
