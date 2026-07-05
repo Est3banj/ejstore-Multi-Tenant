@@ -18,22 +18,22 @@ import {
 } from '../services/firestore';
 import { useEffectiveTenantId } from '../store';
 
-// Query keys
+// Query keys — incluyen tenantId para refetch automático al cambiar de tenant
 export const queryKeys = {
-  services: ['services'] as const,
-  allServices: ['services', 'all'] as const,
-  service: (id: string) => ['services', id] as const,
-  banners: ['banners'] as const,
-  allBanners: ['banners', 'all'] as const,
-  settings: ['settings'] as const,
-  terms: ['terms'] as const,
+  services: (tenantId: string) => ['services', tenantId] as const,
+  allServices: (tenantId: string) => ['services', tenantId, 'all'] as const,
+  service: (id: string, tenantId: string) => ['services', tenantId, id] as const,
+  banners: (tenantId: string) => ['banners', tenantId] as const,
+  allBanners: (tenantId: string) => ['banners', tenantId, 'all'] as const,
+  settings: (tenantId: string) => ['settings', tenantId] as const,
+  terms: (tenantId: string) => ['terms', tenantId] as const,
 };
 
 // Services hooks
 export const useServices = () => {
   const tenantId = useEffectiveTenantId();
   return useQuery({
-    queryKey: queryKeys.services,
+    queryKey: queryKeys.services(tenantId!),
     queryFn: () => getServices(tenantId!),
     enabled: !!tenantId,
   });
@@ -42,7 +42,7 @@ export const useServices = () => {
 export const useAllServices = () => {
   const tenantId = useEffectiveTenantId();
   return useQuery({
-    queryKey: queryKeys.allServices,
+    queryKey: queryKeys.allServices(tenantId!),
     queryFn: () => getAllServices(tenantId!),
     enabled: !!tenantId,
   });
@@ -51,7 +51,7 @@ export const useAllServices = () => {
 export const useService = (id: string) => {
   const tenantId = useEffectiveTenantId();
   return useQuery({
-    queryKey: queryKeys.service(id),
+    queryKey: queryKeys.service(id, tenantId!),
     queryFn: () => getServiceById(id, tenantId!),
     enabled: !!tenantId && !!id,
   });
@@ -65,8 +65,8 @@ export const useCreateService = () => {
     mutationFn: (serviceData: Parameters<typeof createService>[0]) => 
       createService(serviceData, tenantId!),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.services });
-      queryClient.invalidateQueries({ queryKey: queryKeys.allServices });
+      queryClient.invalidateQueries({ queryKey: queryKeys.services(tenantId!) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.allServices(tenantId!) });
     },
   });
 };
@@ -79,9 +79,9 @@ export const useUpdateService = () => {
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateService>[1] }) =>
       updateService(id, data, tenantId!),
     onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.services });
-      queryClient.invalidateQueries({ queryKey: queryKeys.allServices });
-      queryClient.invalidateQueries({ queryKey: queryKeys.service(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.services(tenantId!) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.allServices(tenantId!) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.service(id, tenantId!) });
     },
   });
 };
@@ -93,8 +93,8 @@ export const useDeleteService = () => {
   return useMutation({
     mutationFn: (id: string) => deleteService(id, tenantId!),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.services });
-      queryClient.invalidateQueries({ queryKey: queryKeys.allServices });
+      queryClient.invalidateQueries({ queryKey: queryKeys.services(tenantId!) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.allServices(tenantId!) });
     },
   });
 };
@@ -103,7 +103,7 @@ export const useDeleteService = () => {
 export const useBanners = () => {
   const tenantId = useEffectiveTenantId();
   return useQuery({
-    queryKey: queryKeys.banners,
+    queryKey: queryKeys.banners(tenantId!),
     queryFn: () => getBanners(tenantId!),
     enabled: !!tenantId,
   });
@@ -112,7 +112,7 @@ export const useBanners = () => {
 export const useAllBanners = () => {
   const tenantId = useEffectiveTenantId();
   return useQuery({
-    queryKey: queryKeys.allBanners,
+    queryKey: queryKeys.allBanners(tenantId!),
     queryFn: () => getAllBanners(tenantId!),
     enabled: !!tenantId,
   });
@@ -126,8 +126,8 @@ export const useCreateBanner = () => {
     mutationFn: (bannerData: Parameters<typeof createBanner>[0]) =>
       createBanner(bannerData, tenantId!),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.banners });
-      queryClient.invalidateQueries({ queryKey: queryKeys.allBanners });
+      queryClient.invalidateQueries({ queryKey: queryKeys.banners(tenantId!) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.allBanners(tenantId!) });
     },
   });
 };
@@ -140,8 +140,8 @@ export const useUpdateBanner = () => {
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateBanner>[1] }) =>
       updateBanner(id, data, tenantId!),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.banners });
-      queryClient.invalidateQueries({ queryKey: queryKeys.allBanners });
+      queryClient.invalidateQueries({ queryKey: queryKeys.banners(tenantId!) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.allBanners(tenantId!) });
     },
   });
 };
@@ -153,8 +153,8 @@ export const useDeleteBanner = () => {
   return useMutation({
     mutationFn: (id: string) => deleteBanner(id, tenantId!),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.banners });
-      queryClient.invalidateQueries({ queryKey: queryKeys.allBanners });
+      queryClient.invalidateQueries({ queryKey: queryKeys.banners(tenantId!) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.allBanners(tenantId!) });
     },
   });
 };
@@ -163,7 +163,7 @@ export const useDeleteBanner = () => {
 export const useSettings = () => {
   const tenantId = useEffectiveTenantId();
   return useQuery({
-    queryKey: queryKeys.settings,
+    queryKey: queryKeys.settings(tenantId!),
     queryFn: () => getSettings(tenantId!),
     enabled: !!tenantId,
   });
@@ -177,7 +177,7 @@ export const useUpdateSettings = () => {
     mutationFn: (settings: Parameters<typeof updateSettings>[1]) =>
       updateSettings(tenantId!, settings),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.settings });
+      queryClient.invalidateQueries({ queryKey: queryKeys.settings(tenantId!) });
     },
   });
 };
@@ -186,7 +186,7 @@ export const useUpdateSettings = () => {
 export const useTerms = () => {
   const tenantId = useEffectiveTenantId();
   return useQuery({
-    queryKey: queryKeys.terms,
+    queryKey: queryKeys.terms(tenantId!),
     queryFn: () => getTerms(tenantId!),
     enabled: !!tenantId,
   });
@@ -199,7 +199,7 @@ export const useUpdateTerms = () => {
   return useMutation({
     mutationFn: (content: string) => updateTerms(tenantId!, content),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.terms });
+      queryClient.invalidateQueries({ queryKey: queryKeys.terms(tenantId!) });
     },
   });
 };

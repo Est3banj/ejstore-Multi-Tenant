@@ -127,7 +127,11 @@ service cloud.firestore {
         request.auth.uid == resource.data.customerId ||
         (isAdmin() && isTenantAdminFor(resource.data.tenantId))
       );
-      allow list: if request.auth != null;
+      allow list: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && resource.data.tenantId == getUserTenantId()) ||
+        request.auth.uid == resource.data.customerId
+      );
       allow create, update, delete: if false;
     }
 
