@@ -1148,13 +1148,14 @@ exports.setDiscordWebhook = functions.https.onCall(async (data, context) => {
 
 // ========== TEST DISCORD WEBHOOK ==========
 // Envía un mensaje de prueba al webhook configurado para verificar que funciona
+// Acepta webhookUrl opcional para probar URLs antes de guardarlas
 exports.testDiscordWebhook = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
 
   const claims = context.auth.token;
-  const { tenantId } = data;
+  const { tenantId, webhookUrl } = data;
 
   if (!tenantId) {
     throw new functions.https.HttpsError('invalid-argument', 'tenantId es requerido');
@@ -1165,19 +1166,31 @@ exports.testDiscordWebhook = functions.https.onCall(async (data, context) => {
   }
 
   try {
-    // Leer webhook URL desde secrets
-    const webhookSnap = await db
-      .collection('tenants')
-      .doc(tenantId)
-      .collection('secrets')
-      .doc('webhook')
-      .get();
+    let discordUrl;
 
-    if (!webhookSnap.exists || !webhookSnap.data().discordUrl) {
-      return { success: false, error: 'No hay webhook configurado' };
+    if (webhookUrl && webhookUrl.trim() !== '') {
+      // Usar URL proporcionada por el frontend (antes de guardar)
+      discordUrl = webhookUrl.trim();
+    } else {
+      // Leer webhook URL desde secrets (ya configurada)
+      const webhookSnap = await db
+        .collection('tenants')
+        .doc(tenantId)
+        .collection('secrets')
+        .doc('webhook')
+        .get();
+
+      if (!webhookSnap.exists || !webhookSnap.data().discordUrl) {
+        return { success: false, error: 'No hay webhook configurado. Ingresa una URL primero.' };
+      }
+
+      discordUrl = webhookSnap.data().discordUrl;
     }
 
-    const { discordUrl } = webhookSnap.data();
+    // Validar formato básico de URL de Discord
+    if (!discordUrl.startsWith('https://discord.com/api/webhooks/')) {
+      return { success: false, error: 'La URL no parece ser un webhook de Discord válido. Debe comenzar con https://discord.com/api/webhooks/' };
+    }
 
     // Enviar mensaje de prueba
     await axios.post(discordUrl, {
@@ -1190,7 +1203,7 @@ exports.testDiscordWebhook = functions.https.onCall(async (data, context) => {
       }]
     });
 
-    return { success: true };
+    return { success: true, message: webhookUrl ? 'Webhook probado correctamente. No olvides guardar los cambios.' : '✅ Conexión exitosa' };
   } catch (error) {
     console.error('Error testing Discord webhook:', error.message);
     return { success: false, error: error.message };
@@ -1204,9 +1217,14 @@ exports.debugDiscordWebhook = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
 
+  const claims = context.auth.token;
   const { tenantId } = data;
   if (!tenantId) {
     throw new functions.https.HttpsError('invalid-argument', 'tenantId es requerido');
+  }
+
+  if (claims.role !== 'superadmin' && (claims.role !== 'admin' || claims.tenantId !== tenantId)) {
+    throw new functions.https.HttpsError('permission-denied', 'No tiene permisos para este tenant');
   }
 
   console.log(`🔍 Debug Discord webhook for tenant: ${tenantId}`);
