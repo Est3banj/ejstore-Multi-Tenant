@@ -298,7 +298,7 @@ exports.createRechargeRequest = functions.https.onCall(async (data, context) => 
     throw new functions.https.HttpsError('invalid-argument', 'Monto, nombre y teléfono son requeridos');
   }
 
-  // Obtener tenantId del customer que hace la recarga
+  // Leer datos del customer (UNA SOLA VEZ para tenantId + Discord)
   let rechargeTenantId = null;
   try {
     const customerDoc = await db.collection('customers').doc(context.auth.uid).get();
@@ -342,10 +342,7 @@ exports.createRechargeRequest = functions.https.onCall(async (data, context) => 
   // [DEPRECATED] Telegram notification removed — replaced by Discord sendDiscordWebhook()
   // await sendTelegramMessage(ADMIN_CHAT_ID, message, keyboard);
 
-  // Notificar a Discord (no bloqueante)
-  // Los clientes NO tienen tenantId en auth claims, lo obtenemos del documento
-  const customerDoc = await db.collection('customers').doc(context.auth.uid).get();
-  const rechargeTenantId = customerDoc.exists ? customerDoc.data().tenantId : null;
+  // Notificar a Discord (no bloqueante) — rechargeTenantId ya se obtuvo arriba
   if (rechargeTenantId) {
     await sendDiscordWebhook(rechargeTenantId, {
       title: '💰 NUEVA SOLICITUD DE RECARGA',
