@@ -313,7 +313,7 @@ exports.createRechargeRequest = functions.https.onCall(async (data, context) => 
   const rechargeRef = await db.collection('recharges').add({
     userId: context.auth.uid,
     customerName,
-    phone: customerPhone,
+    customerPhone,
     amount: parseInt(amount),
     tenantId: rechargeTenantId,
     transferProof: transferProof || null,
@@ -351,8 +351,8 @@ exports.createRechargeRequest = functions.https.onCall(async (data, context) => 
       title: '💰 NUEVA SOLICITUD DE RECARGA',
       color: 0x00ff00,
       fields: [
-        { name: '👤 Cliente', value: userName, inline: true },
-        { name: '📱 WhatsApp', value: phone, inline: true },
+        { name: '👤 Cliente', value: customerName, inline: true },
+        { name: '📱 WhatsApp', value: customerPhone, inline: true },
         { name: '💵 Monto', value: `$${parseInt(amount).toLocaleString()} COP`, inline: true },
         { name: '🆔 ID Recarga', value: rechargeRef.id, inline: false },
         { name: '🕐 Fecha', value: new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' }) }
@@ -539,7 +539,8 @@ exports.processRecharge = functions.https.onCall(async (data, context) => {
   const statusText = action === 'approve' ? '✅ Aprobada' : '❌ Rechazada';
   const userMessage = `Tu recarga de $${rechargeData.amount.toLocaleString()} COP ha sido ${statusText.toLowerCase()}.`;
 
-  if (rechargeData.phone) {
+  const notifPhone = rechargeData.customerPhone || rechargeData.phone;
+  if (notifPhone) {
     // Enviar mensaje al usuario (si tiene Telegram linked, si no solo guardamos en Firestore)
     await db.collection('notifications').add({
       userId: rechargeData.userId,
@@ -555,7 +556,7 @@ exports.processRecharge = functions.https.onCall(async (data, context) => {
     title: newStatus === 'approved' ? '✅ Recarga Aprobada' : '❌ Recarga Rechazada',
     color: newStatus === 'approved' ? 0x00ff00 : 0xff0000,
     fields: [
-      { name: 'Usuario', value: rechargeData.userName || 'N/A', inline: true },
+      { name: 'Usuario', value: rechargeData.customerName || 'N/A', inline: true },
       { name: 'Monto', value: `$${(rechargeData.amount || 0).toLocaleString()} COP`, inline: true },
       { name: 'Estado', value: newStatus === 'approved' ? '✅ Aprobada' : '❌ Rechazada', inline: true },
       { name: 'Procesado por', value: context.auth.token.email || 'Admin', inline: true },
