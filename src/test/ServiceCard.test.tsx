@@ -1,6 +1,7 @@
 import { render, screen, RenderOptions } from '@testing-library/react';
 import { BrowserRouter, ReactElement } from 'react-router-dom';
-import { describe, it, expect, ReactNode } from 'vitest';
+import { describe, it, expect } from 'vitest';
+import type { ReactNode } from 'react';
 import ServiceCard from '../components/ServiceCard';
 
 const mockService = {

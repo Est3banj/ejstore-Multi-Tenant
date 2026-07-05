@@ -292,18 +292,30 @@ exports.createRechargeRequest = functions.https.onCall(async (data, context) => 
 
   // TODO: Add tenantId validation once tenantId is stored on recharge documents
 
-  const { amount, userName, phone, transferProof } = data;
+  const { amount, customerName, customerPhone, transferProof } = data;
 
-  if (!amount || !userName || !phone) {
+  if (!amount || !customerName || !customerPhone) {
     throw new functions.https.HttpsError('invalid-argument', 'Monto, nombre y teléfono son requeridos');
+  }
+
+  // Obtener tenantId del customer que hace la recarga
+  let rechargeTenantId = null;
+  try {
+    const customerDoc = await db.collection('customers').doc(context.auth.uid).get();
+    if (customerDoc.exists) {
+      rechargeTenantId = customerDoc.data().tenantId || null;
+    }
+  } catch (_) {
+    // Si falla la lectura, continuamos sin tenantId (no blocker)
   }
 
   // Crear documento de recarga
   const rechargeRef = await db.collection('recharges').add({
     userId: context.auth.uid,
-    userName,
-    phone,
+    customerName,
+    phone: customerPhone,
     amount: parseInt(amount),
+    tenantId: rechargeTenantId,
     transferProof: transferProof || null,
     status: 'pending', // pending, approved, rejected
     createdAt: admin.firestore.FieldValue.serverTimestamp()
@@ -313,8 +325,8 @@ exports.createRechargeRequest = functions.https.onCall(async (data, context) => 
   const message = `
 💰 *NUEVA RECARGA*
 ━━━━━━━━━━━━━━━━
-👤 *Nombre:* ${userName}
-📱 *WhatsApp:* ${phone}
+👤 *Nombre:* ${customerName}
+📱 *WhatsApp:* ${customerPhone}
 💵 *Monto:* $${parseInt(amount).toLocaleString()} COP
 🕐 *Fecha:* ${new Date().toLocaleString('America/Bogota', { timeZone: 'America/Bogota' })}
 ━━━━━━━━━━━━━━━━
@@ -707,8 +719,8 @@ exports.setTenantClaims = functions.https.onCall(async (data, context) => {
 
   // Solo superadmins pueden setear claims de otros usuarios
   const callerClaims = context.auth.token;
-  if (callerClaims.role !== 'superadmin' && callerClaims.uid !== uid) {
-    throw new functions.https.HttpsError('permission-denied', 'No tiene permisos');
+  if (callerClaims.role !== 'superadmin') {
+    throw new functions.https.HttpsError('permission-denied', 'Solo superadmins pueden asignar permisos');
   }
 
   try {
