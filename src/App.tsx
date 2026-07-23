@@ -91,7 +91,6 @@ const PublicRoutes = () => {
 const AdminRoutes = () => {
   return (
     <Routes>
-      <Route path="/admin/login" element={<Login />} />
       <Route
         path="/admin"
         element={
@@ -130,9 +129,14 @@ const AppRoutes = () => {
     return <VerCuenta />;
   }
   
-  // /admin/login es accesible para TODOS (admin, reseller, sin auth)
+  // /login es la ruta única de login — accesible para TODOS sin importar el role
+  if (location.pathname === '/login') {
+    return <Login />;
+  }
+  
+  // /admin/login redirige a /login
   if (location.pathname === '/admin/login') {
-    return <AdminRoutes />;
+    return <Navigate to="/login" replace />;
   }
   
   // Reseller routes take priority over admin/public

@@ -20,7 +20,7 @@ const AdminLayout = (): JSX.Element => {
   const handleLogout = async (): Promise<void> => {
     try {
       await logout();
-      navigate('/admin/login');
+      navigate('/login');
     } catch (error) {
       console.error('Error logging out:', error);
     }
