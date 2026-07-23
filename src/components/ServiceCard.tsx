@@ -43,6 +43,11 @@ const ServiceCard = ({ service, index }: ServiceCardProps): JSX.Element => {
               PROMO
             </div>
           )}
+          {service.hasCodeExtraction && (
+            <div className="absolute top-2 left-2 bg-blue-500/90 text-white px-3 py-1 rounded-full text-sm font-semibold">
+              📡 Extracción de Código
+            </div>
+          )}
         </div>
         <div className="p-5">
           <h3 className="text-xl font-bold mb-2 text-white">{service.name}</h3>

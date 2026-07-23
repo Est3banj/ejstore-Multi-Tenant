@@ -64,4 +64,38 @@ describe('ServiceCard', () => {
     const link = screen.getByRole('link');
     expect(link).toHaveAttribute('href', '/servicio/1');
   });
+
+  it('renders code extraction badge when hasCodeExtraction is true', () => {
+    const serviceWithExtraction = {
+      ...mockService,
+      hasCodeExtraction: true,
+    };
+    renderWithProviders(<ServiceCard service={serviceWithExtraction} index={0} />);
+    expect(screen.getByText('Extracción de Código')).toBeInTheDocument();
+  });
+
+  it('hides code extraction badge when hasCodeExtraction is false', () => {
+    const serviceWithoutExtraction = {
+      ...mockService,
+      hasCodeExtraction: false,
+    };
+    renderWithProviders(<ServiceCard service={serviceWithoutExtraction} index={0} />);
+    expect(screen.queryByText('Extracción de Código')).not.toBeInTheDocument();
+  });
+
+  it('hides code extraction badge when hasCodeExtraction is undefined', () => {
+    const serviceWithoutField = { ...mockService };
+    renderWithProviders(<ServiceCard service={serviceWithoutField} index={0} />);
+    expect(screen.queryByText('Extracción de Código')).not.toBeInTheDocument();
+  });
+
+  it('renders both promo and code extraction badges without overlapping when both are present', () => {
+    const serviceWithBoth = {
+      ...mockService,
+      hasCodeExtraction: true,
+    };
+    renderWithProviders(<ServiceCard service={serviceWithBoth} index={0} />);
+    expect(screen.getByText('PROMO')).toBeInTheDocument();
+    expect(screen.getByText('Extracción de Código')).toBeInTheDocument();
+  });
 });

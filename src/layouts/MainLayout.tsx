@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuthStore } from '../store/authStore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Gift } from 'lucide-react';
+import { X } from 'lucide-react';
 
 interface HSL {
   h: number;
@@ -100,7 +100,6 @@ const MainLayout = (): JSX.Element => {
       // Generar clases dinámicas basadas en los colores del tenant
       // Colores base del tenant
       const primaryHex = primary;
-      const secondaryHex = secondary;
       
       // Para el rojo que está hardcodeado, usamos el color primario
       styleElement.textContent = `

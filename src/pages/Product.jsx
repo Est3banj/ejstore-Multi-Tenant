@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useAuthStore } from '../store/authStore';
 import { getServiceById } from '../services/firestore';
+import { processPurchase } from '../services/marketplace';
 import { PAYMENT_METHODS, PLANS } from '../utils/constants';
 import { generateWhatsAppMessage } from '../utils/whatsapp';
 import Modal from '../components/Modal';
+import PurchaseConfirmModal from '../components/PurchaseConfirmModal';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Check } from 'lucide-react';
 
@@ -18,6 +21,10 @@ const Product = () => {
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [purchaseLoading, setPurchaseLoading] = useState(false);
+  const [purchaseError, setPurchaseError] = useState(null);
+  const customer = useAuthStore((state) => state.customer);
 
   useEffect(() => {
     const loadService = async () => {
@@ -106,6 +113,31 @@ const Product = () => {
     );
 
     window.open(whatsappUrl, '_blank');
+  };
+
+  const handleDirectPurchase = async () => {
+    setPurchaseLoading(true);
+    setPurchaseError(null);
+    try {
+      const result = await processPurchase({
+        serviceId: id,
+        tenantId: tenant.id
+      });
+
+      navigate('/compra-exitosa/' + result.purchaseId, {
+        state: {
+          credential: result.account.credential,
+          serviceName: result.account.serviceName,
+          newBalance: result.newBalance,
+          linkToken: result.linkToken || null,
+          hasCodeExtraction: result.hasCodeExtraction || false,
+        }
+      });
+    } catch (error) {
+      setPurchaseError(error.message || 'Error al procesar la compra');
+    } finally {
+      setPurchaseLoading(false);
+    }
   };
 
   if (loading) {
@@ -308,6 +340,24 @@ const Product = () => {
             >
               Comprar Ahora
             </button>
+
+            {customer && (
+              <button
+                onClick={() => setShowPurchaseModal(true)}
+                disabled={!acceptedTerms}
+                className="w-full text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed mt-3"
+                style={{
+                  background: settings?.primaryColor 
+                    ? `linear-gradient(135deg, ${settings.primaryColor}, ${settings.primaryColor}dd)`
+                    : 'linear-gradient(135deg, #E50914, #E50914dd)',
+                  boxShadow: settings?.primaryColor
+                    ? `0 4px 15px -3px ${settings.primaryColor}80`
+                    : '0 4px 15px -3px rgba(229, 9, 20, 0.5)'
+                }}
+              >
+                Comprar con saldo {customer?.balance ? `($${customer.balance.toLocaleString()})` : ''}
+              </button>
+            )}
           </motion.div>
         </div>
       </div>
@@ -336,6 +386,20 @@ const Product = () => {
           </button>
         </div>
       </Modal>
+
+      <PurchaseConfirmModal
+        isOpen={showPurchaseModal}
+        onClose={() => {
+          setShowPurchaseModal(false);
+          setPurchaseError(null);
+        }}
+        onConfirm={handleDirectPurchase}
+        serviceName={service?.name || ''}
+        price={planPrice}
+        currentBalance={customer?.balance || 0}
+        loading={purchaseLoading}
+        error={purchaseError}
+      />
     </div>
   );
 };

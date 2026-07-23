@@ -4,7 +4,7 @@ import { useTenantStore } from '../store/tenantStore';
 import { detectTenantFromUrl } from '../services/tenant';
 
 export const useAuth = () => {
-  const { setCustomer, refreshCustomer } = useAuthStore();
+  const { refreshCustomer } = useAuthStore();
   // Obtener el tenant actual desde el store
   const tenant = useTenantStore((state) => state.tenant);
 

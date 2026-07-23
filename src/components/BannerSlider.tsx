@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import type { Banner } from '../types';
 
 const BannerSlider = (): JSX.Element | null => {
   const { banners } = useApp();

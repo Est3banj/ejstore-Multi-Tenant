@@ -48,8 +48,14 @@ const Login = () => {
     setLoading(true);
 
     try {
-      await adminLogin(email, password);
-      navigate('/admin/dashboard');
+      const authUser = await adminLogin(email, password);
+      
+      // Navegar según el role que ya trae adminLogin
+      if (authUser?.role === 'reseller') {
+        navigate('/r/dashboard', { replace: true });
+      } else {
+        navigate('/admin/dashboard', { replace: true });
+      }
     } catch (err) {
       setError('Credenciales incorrectas. Por favor intenta de nuevo.');
       console.error('Login error:', err);

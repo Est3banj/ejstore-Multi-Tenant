@@ -181,7 +181,7 @@ export const checkUserRole = async (uid: string): Promise<AppUser | null> => {
         uid: uid,
         email: data.email || '',
         tenantId: data.tenantId,
-        role: data.role as 'admin' | 'superadmin'
+        role: data.role as AppUser['role']
       } as AppUser;
     }
     return null;

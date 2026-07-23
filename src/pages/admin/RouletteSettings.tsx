@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import type { RoulettePrize } from '../../types';
 import { getRouletteConfig, saveRouletteConfig } from '../../services/firestore';
 import { motion } from 'framer-motion';
-import { Save, RotateCcw, Loader } from 'lucide-react';
+import { Save, RotateCcw } from 'lucide-react';
 
 const RouletteSettings = () => {
   const { tenant, userTenantId } = useApp();
@@ -15,7 +15,6 @@ const RouletteSettings = () => {
   const [spinsForFreeSpin, setSpinsForFreeSpin] = useState(1);
   const [prizes, setPrizes] = useState<RoulettePrize[]>([]);
   const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // Cargar configuración desde Firestore
@@ -23,7 +22,6 @@ const RouletteSettings = () => {
     if (!tenantId) return;
     
     const loadConfig = async () => {
-      setLoading(true);
       try {
         const config = await getRouletteConfig(tenantId);
         if (config) {
@@ -34,8 +32,6 @@ const RouletteSettings = () => {
         }
       } catch (error) {
         console.error('Error loading roulette config:', error);
-      } finally {
-        setLoading(false);
       }
     };
     

@@ -1,5 +1,4 @@
-import { create } from 'zustand';
-import { createContext, useContext, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { useAuthStore } from './authStore';
 import { useTenantStore } from './tenantStore';
 import { useEffect, type ReactElement } from 'react';
@@ -35,3 +34,4 @@ export const StoreProvider = ({ children }: StoreProviderProps): ReactElement =>
 
 // Re-export hooks for convenience
 export { useAuthStore, useTenantStore };
+export { useMarketplaceStore } from './marketplaceStore';
