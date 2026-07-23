@@ -61,6 +61,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             role: role as 'admin' | 'superadmin',
             customer: null
           });
+          // Cargar tenant desde auth si no hay tenant en URL
+          if (tenantId) {
+            const { useTenantStore } = await import('./tenantStore');
+            useTenantStore.getState().loadTenantFromAuth(tenantId);
+          }
         } else if (role === 'reseller') {
           set({
             userTenantId: tenantId,
@@ -68,6 +73,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             role: 'reseller',
             customer: null,
           });
+          // Cargar tenant desde auth si no hay tenant en URL
+          if (tenantId) {
+            const { useTenantStore } = await import('./tenantStore');
+            useTenantStore.getState().loadTenantFromAuth(tenantId);
+          }
         } else {
           set({ userTenantId: null, isAdmin: false, role: null });
           const customerData = await getCustomerData(currentUser.uid, currentUser.email || '');
