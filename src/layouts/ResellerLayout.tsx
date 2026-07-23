@@ -14,6 +14,7 @@ import {
   LucideIcon,
   Wallet,
   Flag,
+  Search,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -65,6 +66,7 @@ const ResellerLayout = (): JSX.Element => {
     { path: '/r/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/r/catalogo', label: 'Catálogo', icon: Package },
     { path: '/r/clientes', label: 'Mis Clientes', icon: ShoppingBag },
+    { path: '/r/consultar-codigo', label: 'Consultar Códigos', icon: Search },
     { path: '/r/reportar', label: 'Reportar', icon: Flag },
     { path: '/r/perfil', label: 'Perfil', icon: Settings },
   ];

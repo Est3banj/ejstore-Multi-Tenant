@@ -70,6 +70,7 @@ export interface Ticket {
   subject: string;
   description: string;
   imageUrl?: string;
+  customerEmail?: string;
   status: 'open' | 'resolved' | 'closed';
   adminNotes?: string;
   createdAt: Date;

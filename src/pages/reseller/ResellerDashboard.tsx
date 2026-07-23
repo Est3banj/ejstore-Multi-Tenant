@@ -4,7 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { getResellerById } from '../../services/marketplace';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Wallet, DollarSign, Percent, ShoppingCart } from 'lucide-react';
+import { Wallet, ShoppingCart } from 'lucide-react';
 
 interface Purchase {
   id: string;
@@ -21,7 +21,6 @@ const ResellerDashboard = (): JSX.Element => {
   const uid = user?.uid || '';
   const [balance, setBalance] = useState(0);
   const [resellerName, setResellerName] = useState('');
-  const [commission, setCommission] = useState(0);
   const [recentPurchases, setRecentPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,7 +33,6 @@ const ResellerDashboard = (): JSX.Element => {
         if (resellerData) {
           setBalance(resellerData.balance || 0);
           setResellerName(resellerData.name || '');
-          setCommission(resellerData.commissionPercent || 0);
         }
 
         const q = query(
@@ -68,7 +66,6 @@ const ResellerDashboard = (): JSX.Element => {
   }, [uid]);
 
   const totalCuentas = recentPurchases.reduce((sum, p) => sum + p.quantity, 0);
-  const totalInvertido = recentPurchases.reduce((sum, p) => sum + p.total, 0);
 
   const stats = [
     {
@@ -82,18 +79,6 @@ const ResellerDashboard = (): JSX.Element => {
       value: totalCuentas,
       icon: ShoppingCart,
       color: 'from-blue-500 to-indigo-600',
-    },
-    {
-      title: 'Total Invertido',
-      value: `$${totalInvertido.toLocaleString()}`,
-      icon: DollarSign,
-      color: 'from-green-500 to-emerald-600',
-    },
-    {
-      title: 'Comisión Configurada',
-      value: `${commission}%`,
-      icon: Percent,
-      color: 'from-purple-500 to-pink-600',
     },
   ];
 
@@ -110,7 +95,7 @@ const ResellerDashboard = (): JSX.Element => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {stats.map((stat, index) => {
           const Icon = stat.icon;
           return (
