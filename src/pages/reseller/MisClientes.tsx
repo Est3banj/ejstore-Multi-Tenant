@@ -16,8 +16,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import {
-  Link2, Plus, Copy, ExternalLink, ShoppingBag,
-  ChevronDown, ChevronRight, Clock, CheckCircle2, XCircle,
+  Plus, Copy, ShoppingBag,
+  ChevronDown, ChevronRight, CheckCircle2,
   Mail, Loader2,
 } from 'lucide-react';
 
@@ -250,11 +250,6 @@ const MisClientes = (): JSX.Element => {
       .join(' | ');
   };
 
-  const isExpired = (link: PublicLink): boolean => {
-    if (link.status === 'expired') return true;
-    return new Date() > link.expiresAt;
-  };
-
   if (loading) {
     return (
       <div className="p-6 text-center text-gray-400">Cargando...</div>
@@ -270,124 +265,7 @@ const MisClientes = (): JSX.Element => {
         )}
       </div>
 
-      {/* ===== LINKS PÚBLICOS EXISTENTES ===== */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden"
-      >
-        <div className="p-5 border-b border-gray-700">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <Link2 className="w-5 h-5 text-blue-400" />
-            Links de Acceso
-          </h2>
-          <p className="text-gray-400 text-sm mt-1">
-            Compartí estos links con tus clientes finales para que vean las
-            credenciales y extraigan códigos de verificación
-          </p>
-        </div>
-
-        {publicLinks.length === 0 ? (
-          <div className="text-center text-gray-400 py-8">
-            No generaste ningún link aún. Expandí una compra y creá links
-            para cada cuenta.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-900/50">
-                <tr>
-                  <th className="px-5 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                    Servicio
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                    Link
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                    Credencial
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                    Vence
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                    Estado
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                    Acción
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-700">
-                {publicLinks.map((link) => {
-                  const expired = isExpired(link);
-                  return (
-                    <tr key={link.id} className="hover:bg-gray-700/30">
-                      <td className="px-5 py-4 text-white font-medium">
-                        {link.serviceName}
-                      </td>
-                      <td className="px-5 py-4">
-                        <code className="text-primary-400 text-sm break-all">
-                          ?token={link.token}
-                        </code>
-                      </td>
-                      <td className="px-5 py-4 text-gray-300 text-xs max-w-[200px] truncate">
-                        {formatCredential(link.accountInfo)}
-                      </td>
-                      <td className="px-5 py-4 text-gray-300 text-sm">
-                        <span className="flex items-center gap-1">
-                          <Clock size={14} className="text-gray-500" />
-                          {link.expiresAt.toLocaleDateString()}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        {expired ? (
-                          <span className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-400 w-fit">
-                            <XCircle size={12} /> Expirado
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400 w-fit">
-                            <CheckCircle2 size={12} /> Activo
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleCopyLink(link.token)}
-                            className="flex items-center gap-1 text-primary-400 hover:text-primary-300 text-sm font-medium"
-                          >
-                            {copyFeedback === link.token ? (
-                              'Copiado!'
-                            ) : (
-                              <>
-                                <Copy size={14} />
-                                Copiar
-                              </>
-                            )}
-                          </button>
-                          {!expired && (
-                            <a
-                              href={`/?token=${link.token}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm font-medium"
-                            >
-                              <ExternalLink size={14} />
-                              Abrir
-                            </a>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </motion.div>
-
-      {/* ===== COMPRAS (para generar nuevos links) ===== */}
+      {/* ===== COMPRAS (con links por cuenta) ===== */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -397,11 +275,10 @@ const MisClientes = (): JSX.Element => {
         <div className="p-5 border-b border-gray-700">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <ShoppingBag className="w-5 h-5 text-green-400" />
-            Mis Compras
+            Compras
           </h2>
           <p className="text-gray-400 text-sm mt-1">
-            Expandí una compra para ver las cuentas y generar links públicos
-            para tus clientes
+            Expandí una compra para ver las cuentas, copiar credenciales o generar links de acceso
           </p>
         </div>
 

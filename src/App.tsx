@@ -29,6 +29,7 @@ const AdminTickets = lazy(() => import('./pages/admin/AdminTickets'));
 const ResellerDashboard = lazy(() => import('./pages/reseller/ResellerDashboard'));
 const CatalogoMayorista = lazy(() => import('./pages/reseller/CatalogoMayorista'));
 const MisClientes = lazy(() => import('./pages/reseller/MisClientes'));
+const ConsultarCodigo = lazy(() => import('./pages/reseller/ConsultarCodigo'));
 const Perfil = lazy(() => import('./pages/reseller/Perfil'));
 const ResellerReportar = lazy(() => import('./pages/reseller/ResellerReportar'));
 const VerCuenta = lazy(() => import('./pages/public/VerCuenta'));
@@ -68,6 +69,7 @@ const PublicRoutes = () => {
             <Route path="dashboard" element={<ResellerDashboard />} />
             <Route path="catalogo" element={<CatalogoMayorista />} />
             <Route path="clientes" element={<MisClientes />} />
+            <Route path="consultar-codigo" element={<ConsultarCodigo />} />
             <Route path="perfil" element={<Perfil />} />
             <Route path="reportar" element={<ResellerReportar />} />
           </Route>
