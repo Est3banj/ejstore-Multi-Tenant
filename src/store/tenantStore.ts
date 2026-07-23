@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { detectTenantFromUrl, getTenantById } from '../services/tenant';
 import { TENANT_DEFAULTS, type Tenant } from '../types';
-import { useAuthStore } from './authStore';
 
 interface TenantState {
   tenant: Tenant | null;
@@ -11,6 +10,7 @@ interface TenantState {
   // Actions
   initialize: () => void;
   loadTenant: (tenantId: string) => Promise<void>;
+  loadTenantFromAuth: (tenantId: string) => void;
   clearTenant: () => void;
 }
 
@@ -21,18 +21,18 @@ export const useTenantStore = create<TenantState>((set, get) => ({
 
   initialize: () => {
     // 1. Intentar desde la URL (?v= o ?tenant= o subdominio)
-    let tenantId = detectTenantFromUrl();
-    
-    // 2. Fallback: usar tenantId del usuario autenticado (admin/reseller)
-    if (!tenantId) {
-      const authState = useAuthStore.getState();
-      tenantId = authState.userTenantId;
-    }
-
+    const tenantId = detectTenantFromUrl();
     if (tenantId) {
       get().loadTenant(tenantId);
     } else {
       set({ error: 'No tenant especificado en la URL', loading: false });
+    }
+  },
+
+  // Cargar tenant desde auth (admin/reseller autenticados)
+  loadTenantFromAuth: (tenantId: string) => {
+    if (tenantId && !detectTenantFromUrl()) {
+      get().loadTenant(tenantId);
     }
   },
 
