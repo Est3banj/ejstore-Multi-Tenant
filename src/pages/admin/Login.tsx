@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../services/firebase';
@@ -16,6 +16,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const loginAttempted = useRef(false); // Solo redirigir si el usuario hizo login explícito
 
   // Aplicar colores dinámicos del tenant
   useEffect(() => {
@@ -45,9 +46,10 @@ const Login = () => {
     }
   }, [settings]);
 
-  // Redirigir cuando el store detecte el role después del login
+  // Redirigir SOLO después de un intento de login explícito
   useEffect(() => {
-    if (!loading && storeInitialized && storeRole) {
+    if (loginAttempted.current && !loading && storeInitialized && storeRole) {
+      loginAttempted.current = false;
       if (storeRole === 'reseller') {
         navigate('/r/dashboard', { replace: true });
       } else if (storeRole === 'admin' || storeRole === 'superadmin') {
@@ -60,6 +62,7 @@ const Login = () => {
     e.preventDefault();
     setError('');
     setLoading(true);
+    loginAttempted.current = true;
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
