@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { adminLogin } from '../../services/auth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../services/firebase';
 import { useAuthStore, useTenantStore } from '../../store';
 import { motion } from 'framer-motion';
 import { Lock, Mail, Eye, EyeOff } from 'lucide-react';
@@ -61,12 +62,20 @@ const Login = () => {
     setLoading(true);
 
     try {
-      await adminLogin(email, password);
+      await signInWithEmailAndPassword(auth, email, password);
       // No navegamos acá — el useEffect de arriba lo hace
       // cuando el authStore termine de inicializar con el role
-    } catch (err) {
-      setError('Credenciales incorrectas. Por favor intenta de nuevo.');
+    } catch (err: any) {
       console.error('Login error:', err);
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        setError('Correo o contraseña incorrectos');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Demasiados intentos. Intenta más tarde');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Correo electrónico inválido');
+      } else {
+        setError('Error al iniciar sesión. Verifica tu conexión.');
+      }
     } finally {
       setLoading(false);
     }
