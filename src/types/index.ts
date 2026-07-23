@@ -24,6 +24,7 @@ export interface Service {
   image?: string; // Legacy single image field
   isActive: boolean;
   isPopular?: boolean; // Destacados en Home
+  hasCodeExtraction?: boolean;
   createdAt?: Date;
   plans?: ServicePlan[];
 }
@@ -63,7 +64,7 @@ export interface User {
   uid: string;
   email: string;
   tenantId: string;
-  role: 'admin' | 'superadmin';
+  role: 'admin' | 'superadmin' | 'reseller';
   createdAt?: Date;
 }
 
@@ -136,3 +137,19 @@ export interface Recharge {
   processedBy?: string;
   rejectionReason?: string;
 }
+
+export type {
+  ServiceAccount,
+  AccountCredentials,
+  Purchase,
+  Reseller,
+  Ticket,
+  Notification,
+  PurchaseRequest,
+  PurchaseResponse,
+  ExtraerCodigoRequest,
+  ExtraerCodigoResponse,
+  GetPublicAccountRequest,
+  GetPublicAccountResponse,
+  PublicAccountData,
+} from './marketplace';
