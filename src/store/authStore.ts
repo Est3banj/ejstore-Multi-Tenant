@@ -33,20 +33,35 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ user: currentUser, loading: true });
 
       if (currentUser) {
+        // 1. Intentar con Firestore (users/{uid})
         const userData = await checkUserRole(currentUser.uid);
-        const isAdminUser = userData?.role === 'admin' || userData?.role === 'superadmin';
+
+        // 2. Fallback: leer custom claims del token (más confiable)
+        let role = userData?.role as string | null;
+        let tenantId = userData?.tenantId as string | null;
+
+        if (!role) {
+          try {
+            const idTokenResult = await currentUser.getIdTokenResult();
+            role = idTokenResult.claims.role as string || null;
+            tenantId = idTokenResult.claims.tenantId as string || null;
+          } catch (e) {
+            console.warn('Error reading custom claims:', e);
+          }
+        }
+
+        const isAdminUser = role === 'admin' || role === 'superadmin';
 
         if (isAdminUser) {
-          const userRole = userData?.role || 'admin';
           set({
-            userTenantId: userData.tenantId,
+            userTenantId: tenantId,
             isAdmin: true,
-            role: userRole,
+            role: role as 'admin' | 'superadmin',
             customer: null
           });
-        } else if (userData?.role === 'reseller') {
+        } else if (role === 'reseller') {
           set({
-            userTenantId: userData.tenantId,
+            userTenantId: tenantId,
             isAdmin: false,
             role: 'reseller',
             customer: null,
