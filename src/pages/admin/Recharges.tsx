@@ -4,7 +4,7 @@ import { getRecharges } from '../../services/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../services/firebase';
 import { motion } from 'framer-motion';
-import { Check, X, Clock, CheckCircle, XCircle, Loader } from 'lucide-react';
+import { Check, X, CheckCircle, XCircle, Loader } from 'lucide-react';
 import type { Recharge } from '../../types';
 
 const Recharges = () => {

@@ -11,14 +11,12 @@ import { functions } from '../services/firebase';
 
 const Header = (): JSX.Element => {
   const { settings } = useApp();
-  const { user, customer, logout } = useAuthStore();
+  const { user, customer, role, logout } = useAuthStore();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [toast, setToast] = useState<{message: string; type: 'error' | 'success'} | null>(null);
   const [showRechargeModal, setShowRechargeModal] = useState(false);
-  const showRechargeToast = (msg: string, type: 'error'|'success') => showToast(msg, type);
 
   // Función para obtener estilos dinámicos del botón según el color del tenant
   const getBtnStyle = () => {
@@ -49,12 +47,6 @@ const Header = (): JSX.Element => {
 
   const handleLogout = async () => {
     await logout();
-  };
-
-  // Toast helper
-  const showToast = (message: string, type: 'error' | 'success' = 'error') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
   };
 
   // Escuchar eventos para abrir modal de auth desde otros componentes
@@ -136,6 +128,30 @@ const Header = (): JSX.Element => {
               >
                 Servicios
               </Link>
+              {customer && (
+                <Link
+                  to="/mis-servicios"
+                  className={`px-4 py-2 rounded-lg transition-all ${
+                    isActive('/mis-servicios')
+                      ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/30'
+                      : 'text-white/80 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  Mis Servicios
+                </Link>
+              )}
+              {role === 'reseller' && (
+                <Link
+                  to="/r/dashboard"
+                  className={`px-4 py-2 rounded-lg transition-all ${
+                    location.pathname.startsWith('/r/')
+                      ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/30'
+                      : 'text-white/80 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  Panel Subdistribuidor
+                </Link>
+              )}
             </div>
 
             {/* Auth Section - Desktop */}
@@ -212,6 +228,32 @@ const Header = (): JSX.Element => {
               >
                 Servicios
               </Link>
+              {customer && (
+                <Link
+                  to="/mis-servicios"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-4 py-2 rounded-lg ${
+                    isActive('/mis-servicios')
+                      ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/30'
+                      : 'text-white/80 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  Mis Servicios
+                </Link>
+              )}
+              {role === 'reseller' && (
+                <Link
+                  to="/r/dashboard"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-4 py-2 rounded-lg ${
+                    location.pathname.startsWith('/r/')
+                      ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/30'
+                      : 'text-white/80 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  Panel Subdistribuidor
+                </Link>
+              )}
               
               {/* Mobile Auth */}
               {user && customer ? (
@@ -442,7 +484,7 @@ const AuthModal = ({ mode, onModeChange, onClose }: {
 
 // Modal para recargar saldo
 const RechargeModal = ({ onClose }: { onClose: () => void }) => {
-  const { customer, refreshCustomer } = useAuthStore();
+  const { customer } = useAuthStore();
   const { settings } = useApp();
   const tenantId = useTenantStore((state: any) => state.tenant?.id || state.userTenantId);
   const [step, setStep] = useState<'select' | 'transfer' | 'confirm'>('select');
@@ -491,25 +533,6 @@ const RechargeModal = ({ onClose }: { onClose: () => void }) => {
     }
 
     setLoading(true);
-    
-    const now = new Date();
-    const fechaHora = now.toLocaleString('es-CO', { 
-      timeZone: 'America/Bogota',
-      dateStyle: 'full',
-      timeStyle: 'short'
-    });
-    
-    const message = `
-💰 *NUEVA SOLICITUD DE RECARGA*
-━━━━━━━━━━━━
-👤 *Nombre:* ${fullName}
-📱 *WhatsApp:* ${customer?.phone || 'No registrado'}
-💵 *Monto:* $${parseInt(amount).toLocaleString()} COP
-🕐 *Fecha:* ${fechaHora}
-━━━━━━━━━━━━
-*Para APROBAR:* responder con: ✅ +monto
-*Para RECHAZAR:* responder con: ❌ +motivo
-`;
 
     try {
       // Llamar a la Cloud Function que maneja Firestore + Discord + Telegram

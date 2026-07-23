@@ -26,12 +26,14 @@ const Services = () => {
     description: '',
     price: '',
     promotionalPrice: '',
+    wholesalePrice: '',
     category: 'pantallas',
     image: null,
     imageUrl: '',
     imageUrlInput: '',
     active: true,
     isPopular: false,
+    hasCodeExtraction: false,
     benefits: [],
     pricing: []
   });
@@ -66,12 +68,14 @@ const Services = () => {
         description: service.description || '',
         price: service.price || '',
         promotionalPrice: service.promotionalPrice || '',
+        wholesalePrice: service.wholesalePrice || '',
         category: service.category || 'pantallas',
         image: null,
         imageUrl: service.image || '',
         imageUrlInput: '',
         active: service.active !== undefined ? service.active : true,
         isPopular: service.isPopular || false,
+        hasCodeExtraction: service.hasCodeExtraction || false,
         benefits: service.benefits || [],
         pricing: service.pricing || []
       });
@@ -82,12 +86,14 @@ const Services = () => {
         description: '',
         price: '',
         promotionalPrice: '',
+        wholesalePrice: '',
         category: 'pantallas',
         image: null,
         imageUrl: '',
         imageUrlInput: '',
         active: true,
         isPopular: false,
+        hasCodeExtraction: false,
         benefits: [],
         pricing: []
       });
@@ -182,10 +188,12 @@ const Services = () => {
         description: formData.description,
         price: parseFloat(formData.price),
         promotionalPrice: formData.promotionalPrice ? parseFloat(formData.promotionalPrice) : null,
+        wholesalePrice: formData.wholesalePrice ? parseFloat(formData.wholesalePrice) : null,
         category: formData.category,
         image: imageUrl,
         active: formData.active,
         isPopular: formData.isPopular,
+        hasCodeExtraction: formData.hasCodeExtraction,
         benefits: formData.benefits,
         pricing: formData.pricing
       };
@@ -336,7 +344,7 @@ const Services = () => {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-white/70 mb-2">Precio</label>
               <input
@@ -358,6 +366,18 @@ const Services = () => {
                 className="input-field"
                 min="0"
                 step="0.01"
+              />
+            </div>
+            <div>
+              <label className="block text-white/70 mb-2">Precio Mayorista (para subdistribuidores)</label>
+              <input
+                type="number"
+                value={formData.wholesalePrice}
+                onChange={(e) => setFormData({ ...formData, wholesalePrice: e.target.value })}
+                className="input-field"
+                min="0"
+                step="0.01"
+                placeholder="Ej: 15999"
               />
             </div>
           </div>
@@ -559,6 +579,17 @@ const Services = () => {
               className="w-5 h-5 rounded"
             />
             <label htmlFor="isPopular" className="text-white/70">Mostrar en "Servicios Populares"</label>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="hasCodeExtraction"
+              checked={formData.hasCodeExtraction}
+              onChange={(e) => setFormData({ ...formData, hasCodeExtraction: e.target.checked })}
+              className="w-5 h-5 rounded"
+            />
+            <label htmlFor="hasCodeExtraction" className="text-white/70">Extracción de Código (Gmail)</label>
           </div>
 
           <div className="flex justify-end space-x-4">

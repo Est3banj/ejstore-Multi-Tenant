@@ -8,7 +8,7 @@ interface AuthState {
   userTenantId: string | null;
   customer: CustomerUser | null;
   isAdmin: boolean;
-  role: 'admin' | 'superadmin' | null;
+  role: 'admin' | 'superadmin' | 'reseller' | null;
   loading: boolean;
   initialized: boolean;
 
@@ -34,7 +34,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (currentUser) {
         const userData = await checkUserRole(currentUser.uid);
-        const isAdminUser = !!userData?.tenantId;
+        const isAdminUser = userData?.role === 'admin' || userData?.role === 'superadmin';
 
         if (isAdminUser) {
           const userRole = userData?.role || 'admin';
@@ -43,6 +43,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             isAdmin: true,
             role: userRole,
             customer: null
+          });
+        } else if (userData?.role === 'reseller') {
+          set({
+            userTenantId: userData.tenantId,
+            isAdmin: false,
+            role: 'reseller',
+            customer: null,
           });
         } else {
           set({ userTenantId: null, isAdmin: false, role: null });
