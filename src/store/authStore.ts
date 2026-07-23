@@ -50,6 +50,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           }
         }
 
+        console.log('🔍 AuthStore: uid=', currentUser.uid, 'email=', currentUser.email, 'firestoreRole=', userData?.role, 'customRole=', role);
+
         const isAdminUser = role === 'admin' || role === 'superadmin';
 
         if (isAdminUser) {
