@@ -15,7 +15,10 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 3000,
-      open: true
+      open: true,
+      hmr: {
+        host: 'localhost'
+      }
     },
     build: {
       // Produciton config
