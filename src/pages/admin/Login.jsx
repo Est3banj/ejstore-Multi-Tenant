@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminLogin } from '../../services/auth';
-import { useTenantStore } from '../../store';
+import { useAuthStore, useTenantStore } from '../../store';
 import { motion } from 'framer-motion';
 import { Lock, Mail, Eye, EyeOff } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
   const { settings } = useTenantStore();
+  const storeRole = useAuthStore((s) => s.role);
+  const storeInitialized = useAuthStore((s) => s.initialized);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -42,20 +44,26 @@ const Login = () => {
     }
   }, [settings]);
 
+  // Redirigir cuando el store detecte el role después del login
+  useEffect(() => {
+    if (!loading && storeInitialized && storeRole) {
+      if (storeRole === 'reseller') {
+        navigate('/r/dashboard', { replace: true });
+      } else if (storeRole === 'admin' || storeRole === 'superadmin') {
+        navigate('/admin/dashboard', { replace: true });
+      }
+    }
+  }, [storeRole, storeInitialized, loading, navigate]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      const authUser = await adminLogin(email, password);
-      
-      // Navegar según el role que ya trae adminLogin
-      if (authUser?.role === 'reseller') {
-        navigate('/r/dashboard', { replace: true });
-      } else {
-        navigate('/admin/dashboard', { replace: true });
-      }
+      await adminLogin(email, password);
+      // No navegamos acá — el useEffect de arriba lo hace
+      // cuando el authStore termine de inicializar con el role
     } catch (err) {
       setError('Credenciales incorrectas. Por favor intenta de nuevo.');
       console.error('Login error:', err);
