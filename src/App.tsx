@@ -130,6 +130,11 @@ const AppRoutes = () => {
     return <VerCuenta />;
   }
   
+  // /admin/login es accesible para TODOS (admin, reseller, sin auth)
+  if (location.pathname === '/admin/login') {
+    return <AdminRoutes />;
+  }
+  
   // Reseller routes take priority over admin/public
   if (initialized && role === 'reseller') {
     return <PublicRoutes />;
