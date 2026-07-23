@@ -92,7 +92,7 @@ const Login = () => {
         className="glass-dark p-8 rounded-2xl w-full max-w-md"
       >
         <h1 className="text-3xl font-bold text-center mb-8 gradient-text">
-          Panel de Administración
+          Iniciar Sesión
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-6">

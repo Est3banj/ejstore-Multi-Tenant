@@ -15,7 +15,7 @@ const ResellerProtectedRoute = ({ children }: ResellerProtectedRouteProps): JSX.
   }
 
   if (!user || role !== 'reseller') {
-    return <Navigate to="/admin/login" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   return <>{children}</>;

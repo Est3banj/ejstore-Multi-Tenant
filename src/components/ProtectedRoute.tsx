@@ -16,7 +16,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps): JSX.Element => {
 
   // Solo permitir acceso si es admin (tiene tenantId en la colección users)
   if (!user || !isAdmin) {
-    return <Navigate to="/admin/login" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   return <>{children}</>;
