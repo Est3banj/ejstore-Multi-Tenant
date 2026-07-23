@@ -10,18 +10,10 @@ import {
   query,
   where,
   serverTimestamp,
-  DocumentData,
-  QueryDocumentSnapshot,
   Timestamp
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { Service, Banner, Settings, Tenant } from '../types';
-
-// Tipo para documentos de Firestore con timestamps convertidos
-interface FirestoreDoc {
-  id: string;
-  [key: string]: unknown;
-}
 
 // Helper para convertir timestamp de Firestore a Date
 const convertTimestamp = (timestamp: unknown): Date | undefined => {
@@ -32,20 +24,6 @@ const convertTimestamp = (timestamp: unknown): Date | undefined => {
     return new Date((timestamp as { seconds: number }).seconds * 1000);
   }
   return undefined;
-};
-
-// Helper para mapear documento de Firestore
-const mapDoc = <T extends DocumentData>(docSnap: QueryDocumentSnapshot<T>): FirestoreDoc => {
-  const data = docSnap.data();
-  return {
-    id: docSnap.id,
-    ...Object.fromEntries(
-      Object.entries(data).map(([key, value]) => [
-        key,
-        value instanceof Timestamp ? convertTimestamp(value) : value
-      ])
-    )
-  };
 };
 
 export const getServices = async (tenantId: string): Promise<Service[]> => {
