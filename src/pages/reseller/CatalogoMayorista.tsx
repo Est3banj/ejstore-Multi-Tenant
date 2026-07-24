@@ -68,8 +68,8 @@ const CatalogoMayorista = (): JSX.Element => {
             try {
               const result = await getServiceStock(svc.id);
               stock = result.available;
-            } catch {
-              // stock query may fail
+            } catch (e) {
+              console.error(`Stock error for ${svc.id}:`, e);
             }
 
             let wholesalePrice: number;

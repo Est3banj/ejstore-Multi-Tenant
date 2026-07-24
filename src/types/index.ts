@@ -19,6 +19,7 @@ export interface Service {
   description: string;
   price: number;
   promotionalPrice?: number;
+  wholesalePrice?: number;
   category: string;
   images: string[];
   image?: string; // Legacy single image field

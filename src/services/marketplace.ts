@@ -6,6 +6,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  writeBatch,
   query,
   where,
   serverTimestamp,
@@ -71,19 +72,58 @@ interface CreateAccountInput {
   extras?: string[];
   notes?: string;
   batchNumber?: string;
+  profiles?: Array<{ name: string; pin: string }>;
 }
 
 export const createAccount = async (serviceId: string, data: CreateAccountInput): Promise<string> => {
   if (!serviceId) throw new Error('serviceId required');
   try {
-    const docRef = await addDoc(collection(db, 'services', serviceId, 'accounts'), {
-      ...data,
-      serviceId,
-      status: 'available',
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    return docRef.id;
+    const profiles = data.profiles || [];
+    const totalProfiles = profiles.length;
+
+    if (totalProfiles > 0) {
+      // Use batch write: create account + profile subdocs
+      const accountsRef = collection(db, 'services', serviceId, 'accounts');
+      const accountDocRef = doc(accountsRef);
+
+      const batch = writeBatch(db);
+      batch.set(accountDocRef, {
+        serviceId,
+        label: data.label,
+        credential: data.credential,
+        extras: data.extras || [],
+        notes: data.notes || '',
+        batchNumber: data.batchNumber || '',
+        status: 'available',
+        totalProfiles,
+        availableProfiles: totalProfiles,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      for (const profile of profiles) {
+        const profileRef = doc(collection(db, 'services', serviceId, 'accounts', accountDocRef.id, 'profiles'));
+        batch.set(profileRef, {
+          name: profile.name,
+          pin: profile.pin || '',
+          status: 'available',
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+      return accountDocRef.id;
+    } else {
+      // Legacy: no profiles, create account only (backward compat)
+      const docRef = await addDoc(collection(db, 'services', serviceId, 'accounts'), {
+        ...data,
+        serviceId,
+        status: 'available',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      return docRef.id;
+    }
   } catch (error) {
     console.error('Error creating account:', error);
     throw error;
