@@ -141,6 +141,7 @@ export interface Recharge {
 export type {
   ServiceAccount,
   AccountCredentials,
+  Profile,
   Purchase,
   Reseller,
   Ticket,
@@ -152,4 +153,6 @@ export type {
   GetPublicAccountRequest,
   GetPublicAccountResponse,
   PublicAccountData,
+  CreateAccountWithProfilesInput,
+  CreateAccountWithProfilesResponse,
 } from './marketplace';

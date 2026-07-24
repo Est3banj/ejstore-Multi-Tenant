@@ -9,6 +9,8 @@ interface LocationState {
   newBalance?: number;
   linkToken?: string | null;
   hasCodeExtraction?: boolean;
+  profileName?: string;
+  profilePin?: string;
 }
 
 const PurchaseResult = () => {
@@ -24,6 +26,8 @@ const PurchaseResult = () => {
   const serviceName = state?.serviceName || 'Servicio';
   const linkToken = state?.linkToken || null;
   const hasCodeExtraction = state?.hasCodeExtraction || false;
+  const profileName = state?.profileName;
+  const profilePin = state?.profilePin;
 
   if (!credential) {
     return (
@@ -44,11 +48,16 @@ const PurchaseResult = () => {
     );
   }
 
+  const profileLines = [
+    profileName ? `*Perfil:* ${profileName}` : '',
+    profilePin ? `*PIN:* ${profilePin}` : '',
+  ].filter(Boolean).join('\n');
+
   const template = `🎎 SERVICIO DE ${serviceName}
 *Correo:* ${credential.email}
 *Clave:* ${credential.password}
 ${credential.extra ? Object.entries(credential.extra).map(([k, v]) => `*${k}:* ${v}`).join('\n') : ''}
-*Fecha Entrega:* ${new Date().toLocaleDateString('es-CO')}`;
+${profileLines}${profileLines ? '\n' : ''}*Fecha Entrega:* ${new Date().toLocaleDateString('es-CO')}`;
 
   const handleCopy = async () => {
     try {

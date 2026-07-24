@@ -343,23 +343,65 @@ const VerCuenta = (): JSX.Element => {
                     <Key size={14} className="text-yellow-400" />
                     Credenciales de la cuenta
                   </div>
-                  <div className="divide-y divide-gray-700/50">
-                    {Object.entries(result.account.credential).map(([k, v]) => (
-                      <div key={k} className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-800/50 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm text-gray-400 capitalize min-w-[72px]">{k}:</span>
-                          <code className="text-sm text-white font-mono">{v}</code>
-                        </div>
-                        <button
-                          onClick={() => handleCopy(v, k)}
-                          className="text-primary-400 hover:text-primary-300 transition-colors"
-                          title={`Copiar ${k}`}
-                        >
-                          <Copy size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                  {(() => {
+                    const cred = result.account.credential;
+                    const pn = cred['profileName'];
+                    const pp = cred['profilePin'];
+                    const entries = Object.entries(cred).filter(([k]) => k !== 'profileName' && k !== 'profilePin');
+                    return (
+                      <>
+                        {pn && (
+                          <div className="flex items-center justify-between px-4 py-2.5 bg-primary-500/10 border-b border-gray-700/50">
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm text-primary-400 font-medium min-w-[72px]">Perfil:</span>
+                              <code className="text-sm text-white font-mono">{pn}</code>
+                            </div>
+                            <button
+                              onClick={() => handleCopy(pn, 'Perfil')}
+                              className="text-primary-400 hover:text-primary-300 transition-colors"
+                              title="Copiar perfil"
+                            >
+                              <Copy size={14} />
+                            </button>
+                          </div>
+                        )}
+                        {pp && (
+                          <div className="flex items-center justify-between px-4 py-2.5 bg-primary-500/5 border-b border-gray-700/50">
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm text-gray-400 font-medium min-w-[72px]">PIN:</span>
+                              <code className="text-sm text-white font-mono">{pp}</code>
+                            </div>
+                            <button
+                              onClick={() => handleCopy(pp, 'PIN')}
+                              className="text-primary-400 hover:text-primary-300 transition-colors"
+                              title="Copiar PIN"
+                            >
+                              <Copy size={14} />
+                            </button>
+                          </div>
+                        )}
+                        {entries.length > 0 && (
+                          <div className="divide-y divide-gray-700/50">
+                            {entries.map(([k, v]) => (
+                              <div key={k} className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-800/50 transition-colors">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-sm text-gray-400 capitalize min-w-[72px]">{k}:</span>
+                                  <code className="text-sm text-white font-mono">{v}</code>
+                                </div>
+                                <button
+                                  onClick={() => handleCopy(v, k)}
+                                  className="text-primary-400 hover:text-primary-300 transition-colors"
+                                  title={`Copiar ${k}`}
+                                >
+                                  <Copy size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               )}
 

@@ -173,6 +173,19 @@ service cloud.firestore {
         );
         allow write: if false; // Only through Cloud Functions
       }
+
+      // Profiles subcollection
+      match /profiles/{profileId} {
+        allow read: if request.auth != null && (
+          isAdmin() ||
+          resource.data.soldTo == request.auth.uid
+        );
+        allow create: if request.auth != null && isAdmin();
+        allow update: if request.auth != null && (
+          resource.data.status == 'sold' ? resource.data.soldTo == request.auth.uid : isAdmin()
+        );
+        allow delete: if request.auth != null && isAdmin();
+      }
     }
 
     // ========== PURCHASES (Marketplace) ==========

@@ -3,9 +3,7 @@ import { motion } from 'framer-motion';
 import { useAuthStore } from '../../store/authStore';
 import { useEffectiveTenantId } from '../../store';
 import { getServices } from '../../services/firestore';
-import { getResellerById, processBulkPurchase } from '../../services/marketplace';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../../services/firebase';
+import { getServiceStock, getResellerById, processBulkPurchase } from '../../services/marketplace';
 import ResellerPurchaseSuccessModal from './ResellerPurchaseSuccessModal';
 import { CATEGORIES } from '../../utils/constants';
 import { Wallet, Minus, Plus, ShoppingCart, AlertCircle, Monitor, User, Music, Tv, Gift, Package } from 'lucide-react';
@@ -68,14 +66,10 @@ const CatalogoMayorista = (): JSX.Element => {
           svcs.map(async (svc) => {
             let stock = 0;
             try {
-              const q = query(
-                collection(db, 'services', svc.id, 'accounts'),
-                where('status', '==', 'available')
-              );
-              const snapshot = await getDocs(q);
-              stock = snapshot.size;
+              const result = await getServiceStock(svc.id);
+              stock = result.available;
             } catch {
-              // index may not exist yet
+              // stock query may fail
             }
 
             let wholesalePrice: number;
