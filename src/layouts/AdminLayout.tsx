@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { logout } from '../services/auth';
-import { Menu, X, LayoutDashboard, Package, Image, FileText, Settings, LogOut, LucideIcon, Gift, Wallet, Users, Store } from 'lucide-react';
+import { Menu, X, LayoutDashboard, Package, Image, FileText, Settings, LogOut, LucideIcon, Gift, Wallet, Users, Store, Database, Ticket, Mail } from 'lucide-react';
 
 interface MenuItem {
   path: string;
@@ -20,7 +20,7 @@ const AdminLayout = (): JSX.Element => {
   const handleLogout = async (): Promise<void> => {
     try {
       await logout();
-      navigate('/admin/login');
+      navigate('/login');
     } catch (error) {
       console.error('Error logging out:', error);
     }
@@ -37,6 +37,9 @@ const AdminLayout = (): JSX.Element => {
     { path: '/admin/banners', label: 'Banners', icon: Image },
     { path: '/admin/roulette', label: 'Ruleta', icon: Gift },
     { path: '/admin/recargas', label: 'Recargas', icon: Wallet },
+    { path: '/admin/tickets', label: 'Tickets', icon: Ticket },
+    { path: '/admin/resellers', label: 'Subdistribuidores', icon: Users },
+    { path: '/admin/email-config', label: 'Correo Madre', icon: Mail },
     { path: '/admin/terms', label: 'Términos', icon: FileText },
     { path: '/admin/settings', label: 'Configuración', icon: Settings }
   ];

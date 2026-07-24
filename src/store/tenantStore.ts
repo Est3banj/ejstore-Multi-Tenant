@@ -10,6 +10,7 @@ interface TenantState {
   // Actions
   initialize: () => void;
   loadTenant: (tenantId: string) => Promise<void>;
+  loadTenantFromAuth: (tenantId: string) => void;
   clearTenant: () => void;
 }
 
@@ -19,11 +20,19 @@ export const useTenantStore = create<TenantState>((set, get) => ({
   error: null,
 
   initialize: () => {
+    // 1. Intentar desde la URL (?v= o ?tenant= o subdominio)
     const tenantId = detectTenantFromUrl();
     if (tenantId) {
       get().loadTenant(tenantId);
     } else {
       set({ error: 'No tenant especificado en la URL', loading: false });
+    }
+  },
+
+  // Cargar tenant desde auth (admin/reseller autenticados)
+  loadTenantFromAuth: (tenantId: string) => {
+    if (tenantId && !detectTenantFromUrl()) {
+      get().loadTenant(tenantId);
     }
   },
 
@@ -39,6 +48,7 @@ export const useTenantStore = create<TenantState>((set, get) => ({
       const tenantData = await getTenantById(tenantId);
       
       if (tenantData) {
+        sessionStorage.setItem('ejstore_tenant_id', tenantId);
         set({ tenant: { ...TENANT_DEFAULTS, ...tenantData }, loading: false });
       } else {
         set({ error: 'Tenant no encontrado', loading: false });

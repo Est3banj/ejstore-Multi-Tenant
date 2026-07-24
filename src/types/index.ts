@@ -19,11 +19,15 @@ export interface Service {
   description: string;
   price: number;
   promotionalPrice?: number;
+  wholesalePrice?: number;
   category: string;
   images: string[];
   image?: string; // Legacy single image field
   isActive: boolean;
   isPopular?: boolean; // Destacados en Home
+  hasCodeExtraction?: boolean;
+  terms?: string;
+  durationDays?: number; // Días de servicio (ej: 30 = mensual)
   createdAt?: Date;
   plans?: ServicePlan[];
 }
@@ -63,7 +67,7 @@ export interface User {
   uid: string;
   email: string;
   tenantId: string;
-  role: 'admin' | 'superadmin';
+  role: 'admin' | 'superadmin' | 'reseller';
   createdAt?: Date;
 }
 
@@ -136,3 +140,22 @@ export interface Recharge {
   processedBy?: string;
   rejectionReason?: string;
 }
+
+export type {
+  ServiceAccount,
+  AccountCredentials,
+  Profile,
+  Purchase,
+  Reseller,
+  Ticket,
+  Notification,
+  PurchaseRequest,
+  PurchaseResponse,
+  ExtraerCodigoRequest,
+  ExtraerCodigoResponse,
+  GetPublicAccountRequest,
+  GetPublicAccountResponse,
+  PublicAccountData,
+  CreateAccountWithProfilesInput,
+  CreateAccountWithProfilesResponse,
+} from './marketplace';

@@ -10,18 +10,10 @@ import {
   query,
   where,
   serverTimestamp,
-  DocumentData,
-  QueryDocumentSnapshot,
   Timestamp
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { Service, Banner, Settings, Tenant } from '../types';
-
-// Tipo para documentos de Firestore con timestamps convertidos
-interface FirestoreDoc {
-  id: string;
-  [key: string]: unknown;
-}
 
 // Helper para convertir timestamp de Firestore a Date
 const convertTimestamp = (timestamp: unknown): Date | undefined => {
@@ -32,20 +24,6 @@ const convertTimestamp = (timestamp: unknown): Date | undefined => {
     return new Date((timestamp as { seconds: number }).seconds * 1000);
   }
   return undefined;
-};
-
-// Helper para mapear documento de Firestore
-const mapDoc = <T extends DocumentData>(docSnap: QueryDocumentSnapshot<T>): FirestoreDoc => {
-  const data = docSnap.data();
-  return {
-    id: docSnap.id,
-    ...Object.fromEntries(
-      Object.entries(data).map(([key, value]) => [
-        key,
-        value instanceof Timestamp ? convertTimestamp(value) : value
-      ])
-    )
-  };
 };
 
 export const getServices = async (tenantId: string): Promise<Service[]> => {
@@ -65,11 +43,13 @@ export const getServices = async (tenantId: string): Promise<Service[]> => {
         description: data.description,
         price: data.price,
         promotionalPrice: data.promotionalPrice,
+        wholesalePrice: data.wholesalePrice,
         category: data.category,
         images: data.images || [],
         image: data.image || data.images?.[0] || '',
         isActive: data.active !== false,
         isPopular: data.isPopular || false,
+        terms: data.terms,
         createdAt: convertTimestamp(data.createdAt),
         plans: data.plans
       } as Service;
@@ -104,11 +84,13 @@ export const getAllServices = async (tenantId: string): Promise<Service[]> => {
         description: data.description,
         price: data.price,
         promotionalPrice: data.promotionalPrice,
+        wholesalePrice: data.wholesalePrice,
         category: data.category,
         images: data.images || [],
         image: data.image || data.images?.[0] || '',
         isActive: data.active !== false,
         isPopular: data.isPopular || false,
+        terms: data.terms,
         createdAt: convertTimestamp(data.createdAt),
         plans: data.plans
       } as Service;
@@ -137,13 +119,15 @@ export const getServiceById = async (id: string, tenantId: string): Promise<Serv
           tenantId: data.tenantId,
           name: data.name,
           description: data.description,
-          price: data.price,
-          promotionalPrice: data.promotionalPrice,
-          category: data.category,
+        price: data.price,
+        promotionalPrice: data.promotionalPrice,
+        wholesalePrice: data.wholesalePrice,
+        category: data.category,
           images: data.images || [],
           image: data.image || data.images?.[0] || '',
           isActive: data.active !== false,
           isPopular: data.isPopular || false,
+          terms: data.terms,
           createdAt: convertTimestamp(data.createdAt),
           plans: data.plans
         } as Service;
@@ -164,6 +148,7 @@ interface ServiceInput {
   images: string[];
   isActive: boolean;
   isPopular?: boolean;
+  terms?: string;
   plans?: Service['plans'];
 }
 

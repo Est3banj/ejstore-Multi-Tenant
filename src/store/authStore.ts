@@ -8,7 +8,7 @@ interface AuthState {
   userTenantId: string | null;
   customer: CustomerUser | null;
   isAdmin: boolean;
-  role: 'admin' | 'superadmin' | null;
+  role: 'admin' | 'superadmin' | 'reseller' | null;
   loading: boolean;
   initialized: boolean;
 
@@ -33,17 +33,51 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ user: currentUser, loading: true });
 
       if (currentUser) {
+        // 1. Intentar con Firestore (users/{uid})
         const userData = await checkUserRole(currentUser.uid);
-        const isAdminUser = !!userData?.tenantId;
+
+        // 2. Fallback: leer custom claims del token (más confiable)
+        let role = userData?.role as string | null;
+        let tenantId = userData?.tenantId as string | null;
+
+        if (!role) {
+          try {
+            const idTokenResult = await currentUser.getIdTokenResult();
+            role = idTokenResult.claims.role as string || null;
+            tenantId = idTokenResult.claims.tenantId as string || null;
+          } catch (e) {
+            console.warn('Error reading custom claims:', e);
+          }
+        }
+
+        console.log('🔍 AuthStore: uid=', currentUser.uid, 'email=', currentUser.email, 'firestoreRole=', userData?.role, 'customRole=', role);
+
+        const isAdminUser = role === 'admin' || role === 'superadmin';
 
         if (isAdminUser) {
-          const userRole = userData?.role || 'admin';
           set({
-            userTenantId: userData.tenantId,
+            userTenantId: tenantId,
             isAdmin: true,
-            role: userRole,
+            role: role as 'admin' | 'superadmin',
             customer: null
           });
+          // Cargar tenant desde auth si no hay tenant en URL
+          if (tenantId) {
+            const { useTenantStore } = await import('./tenantStore');
+            useTenantStore.getState().loadTenantFromAuth(tenantId);
+          }
+        } else if (role === 'reseller') {
+          set({
+            userTenantId: tenantId,
+            isAdmin: false,
+            role: 'reseller',
+            customer: null,
+          });
+          // Cargar tenant desde auth si no hay tenant en URL
+          if (tenantId) {
+            const { useTenantStore } = await import('./tenantStore');
+            useTenantStore.getState().loadTenantFromAuth(tenantId);
+          }
         } else {
           set({ userTenantId: null, isAdmin: false, role: null });
           const customerData = await getCustomerData(currentUser.uid, currentUser.email || '');
