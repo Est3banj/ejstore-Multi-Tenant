@@ -37,7 +37,6 @@ const AdminLayout = (): JSX.Element => {
     { path: '/admin/banners', label: 'Banners', icon: Image },
     { path: '/admin/roulette', label: 'Ruleta', icon: Gift },
     { path: '/admin/recargas', label: 'Recargas', icon: Wallet },
-    { path: '/admin/accounts', label: 'Cuentas', icon: Database },
     { path: '/admin/tickets', label: 'Tickets', icon: Ticket },
     { path: '/admin/resellers', label: 'Subdistribuidores', icon: Users },
     { path: '/admin/terms', label: 'Términos', icon: FileText },

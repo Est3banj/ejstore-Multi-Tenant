@@ -299,12 +299,22 @@ export const getServiceStock = async (serviceId: string): Promise<{
   if (!serviceId) throw new Error('serviceId required');
   try {
     const accounts = await getAccounts(serviceId);
-    return {
-      total: accounts.length,
-      available: accounts.filter((a) => a.status === 'available').length,
-      sold: accounts.filter((a) => a.status === 'sold').length,
-      expired: accounts.filter((a) => a.status === 'expired').length,
-    };
+    let total = 0, available = 0, sold = 0, expired = 0;
+
+    for (const account of accounts) {
+      if (account.availableProfiles !== undefined) {
+        total += account.totalProfiles || 0;
+        available += account.availableProfiles;
+        sold += (account.totalProfiles || 0) - account.availableProfiles;
+      } else {
+        total += 1;
+        if (account.status === 'available') available += 1;
+        else if (account.status === 'sold') sold += 1;
+        else if (account.status === 'expired') expired += 1;
+      }
+    }
+
+    return { total, available, sold, expired };
   } catch (error) {
     console.error('Error getting stock:', error);
     throw error;

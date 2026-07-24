@@ -21,7 +21,6 @@ const RouletteSettings = lazy(() => import('./pages/admin/RouletteSettings'));
 const Recharges = lazy(() => import('./pages/admin/Recharges'));
 const PurchaseResult = lazy(() => import('./pages/customer/PurchaseResult'));
 const MisServicios = lazy(() => import('./pages/customer/MisServicios'));
-const Accounts = lazy(() => import('./pages/admin/Accounts'));
 const Tenants = lazy(() => import('./pages/admin/Tenants'));
 const Admins = lazy(() => import('./pages/admin/Admins'));
 const AdminResellers = lazy(() => import('./pages/admin/AdminResellers'));
@@ -108,7 +107,6 @@ const AdminRoutes = () => {
         <Route path="settings" element={<Settings />} />
         <Route path="roulette" element={<RouletteSettings />} />
         <Route path="recargas" element={<Recharges />} />
-        <Route path="accounts" element={<Accounts />} />
         <Route path="tenants" element={<Tenants />} />
         <Route path="admins" element={<Admins />} />
         <Route path="resellers" element={<AdminResellers />} />

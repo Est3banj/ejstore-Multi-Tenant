@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import Modal from '../Modal';
 import type { ServiceAccount } from '../../types';
-import { Loader } from 'lucide-react';
+import { Loader, Plus, Trash2 } from 'lucide-react';
+import { collection, getDocs, query } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 
 interface AccountFormModalProps {
   isOpen: boolean;
@@ -21,7 +23,7 @@ interface FormData {
   status: ServiceAccount['status'];
 }
 
-const AccountFormModal = ({ isOpen, onClose, onSave, account }: AccountFormModalProps) => {
+const AccountFormModal = ({ isOpen, onClose, onSave, serviceId, account }: AccountFormModalProps) => {
   const [formData, setFormData] = useState<FormData>({
     label: '',
     email: '',
@@ -31,6 +33,9 @@ const AccountFormModal = ({ isOpen, onClose, onSave, account }: AccountFormModal
     status: 'available',
   });
   const [saving, setSaving] = useState(false);
+  const [profiles, setProfiles] = useState<Array<{ name: string; pin: string; _id?: string; status?: string }>>([
+    { name: 'Perfil 1', pin: '' }
+  ]);
 
   useEffect(() => {
     if (isOpen) {
@@ -45,11 +50,42 @@ const AccountFormModal = ({ isOpen, onClose, onSave, account }: AccountFormModal
           notes: notesStr,
           status: account.status,
         });
+        const loadProfiles = async () => {
+          try {
+            const profilesRef = collection(db, 'services', serviceId, 'accounts', account.id, 'profiles');
+            const snapshot = await getDocs(query(profilesRef));
+            const existingProfiles = snapshot.docs.map(d => ({
+              _id: d.id,
+              name: (d.data() as any).name || '',
+              pin: (d.data() as any).pin || '',
+              status: (d.data() as any).status,
+            }));
+            if (existingProfiles.length > 0) {
+              setProfiles(existingProfiles);
+            }
+          } catch (error) {
+            console.error('Error loading profiles:', error);
+          }
+        };
+        loadProfiles();
       } else {
         setFormData({ label: '', email: '', password: '', extras: '', notes: '', status: 'available' });
+        setProfiles([{ name: 'Perfil 1', pin: '' }]);
       }
     }
-  }, [account, isOpen]);
+  }, [account, isOpen, serviceId]);
+
+  const updateProfile = (index: number, field: 'name' | 'pin', value: string) => {
+    setProfiles(prev => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)));
+  };
+
+  const addProfile = () => {
+    setProfiles(prev => [...prev, { name: '', pin: '' }]);
+  };
+
+  const removeProfile = (index: number) => {
+    setProfiles(prev => prev.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +105,15 @@ const AccountFormModal = ({ isOpen, onClose, onSave, account }: AccountFormModal
         ...(formData.notes ? { notes: formData.notes } : {}),
         ...(account ? { status: formData.status } : {}),
       };
+
+      const validProfiles = profiles
+        .filter(p => p.name.trim())
+        .filter(p => !(p._id && p.status === 'sold'))
+        .map(p => ({ name: p.name.trim(), ...(p.pin ? { pin: p.pin.trim() } : {}), ...(p._id ? { _id: p._id } : {}) }));
+
+      if (validProfiles.length > 0) {
+        data.profiles = validProfiles;
+      }
 
       await onSave(data);
       onClose();
@@ -144,6 +189,53 @@ const AccountFormModal = ({ isOpen, onClose, onSave, account }: AccountFormModal
             className="w-full bg-white/10 border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-primary-500 resize-none"
             placeholder="Notas internas (opcional)"
           />
+        </div>
+
+        <div>
+          <label className="block text-sm text-white/60 mb-1">
+            Perfiles <span className="text-white/40 text-xs font-normal">({profiles.length} {profiles.length === 1 ? 'perfil' : 'perfiles'})</span>
+          </label>
+          <div className="space-y-2">
+            {profiles.map((p, index) => (
+              <div key={index} className="flex gap-2 items-start">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={p.name}
+                    onChange={(e) => updateProfile(index, 'name', e.target.value)}
+                    className="w-full bg-white/10 border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-primary-500"
+                    placeholder="Nombre del perfil"
+                  />
+                </div>
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={p.pin}
+                    onChange={(e) => updateProfile(index, 'pin', e.target.value)}
+                    className="w-full bg-white/10 border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-primary-500"
+                    placeholder="PIN (opcional)"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeProfile(index)}
+                  disabled={!!(p._id && p.status === 'sold')}
+                  className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors disabled:opacity-30"
+                  title={p._id && p.status === 'sold' ? 'No se puede eliminar un perfil vendido' : 'Eliminar perfil'}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={addProfile}
+            className="mt-2 px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors text-sm flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Agregar Perfil
+          </button>
         </div>
 
         {isEditing && (

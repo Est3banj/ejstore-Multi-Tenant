@@ -1302,37 +1302,71 @@ exports.processPurchase = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('invalid-argument', 'serviceId y tenantId son requeridos');
   }
 
-  // Step 1: Find an available account (outside transaction — queries can't be in transactions)
-  const accountsSnapshot = await db
-    .collection('services')
-    .doc(serviceId)
-    .collection('accounts')
-    .where('status', '==', 'available')
-    .limit(10)
-    .get();
+  // Step 1: Find available accounts (outside transaction — queries can't be in transactions)
+  const [newAccountsSnap, legacyAccountsSnap] = await Promise.all([
+    db.collection('services').doc(serviceId).collection('accounts')
+      .where('availableProfiles', '>', 0).limit(20).get(),
+    db.collection('services').doc(serviceId).collection('accounts')
+      .where('status', '==', 'available').limit(20).get(),
+  ]);
 
-  if (accountsSnapshot.empty) {
+  // Merge and deduplicate — new accounts (with availableProfiles) take priority
+  const accountMap = new Map();
+  newAccountsSnap.docs.forEach(doc => accountMap.set(doc.ref.path, { ref: doc.ref, id: doc.id, data: doc.data() }));
+  legacyAccountsSnap.docs.forEach(doc => {
+    if (!accountMap.has(doc.ref.path) && doc.data().availableProfiles === undefined) {
+      accountMap.set(doc.ref.path, { ref: doc.ref, id: doc.id, data: doc.data() });
+    }
+  });
+
+  const candidateAccounts = Array.from(accountMap.values());
+  if (candidateAccounts.length === 0) {
     throw new functions.https.HttpsError('failed-precondition',
       'Servicio agotado, contacta al administrador'
     );
   }
 
-  // Get account references for the transaction
-  const availableAccounts = accountsSnapshot.docs.map(doc => ({
-    ref: doc.ref,
-    id: doc.id,
-    data: doc.data()
-  }));
+  // Pre-fetch profiles for accounts that have them, build flat candidate list
+  const profileCandidates = [];
+  for (const acct of candidateAccounts) {
+    const acctData = acct.data;
+    const availCount = acctData.availableProfiles ?? (acctData.status === 'available' ? 1 : 0);
+    if (availCount <= 0) continue;
+
+    if (acctData.availableProfiles !== undefined) {
+      const profilesSnap = await acct.ref.collection('profiles')
+        .where('status', '==', 'available').limit(5).get();
+      profilesSnap.docs.forEach(profDoc => {
+        profileCandidates.push({
+          accountRef: acct.ref,
+          accountData: acctData,
+          profileRef: profDoc.ref,
+          profileData: profDoc.data(),
+        });
+      });
+    } else {
+      profileCandidates.push({
+        accountRef: acct.ref,
+        accountData: acctData,
+        profileRef: null,
+        profileData: { name: 'Perfil 1', pin: null, status: 'available' },
+      });
+    }
+  }
+
+  if (profileCandidates.length === 0) {
+    throw new functions.https.HttpsError('failed-precondition',
+      'Servicio agotado, contacta al administrador'
+    );
+  }
 
   // Step 2: Execute transaction to atomically process the purchase
   try {
-    // Leer servicio fuera de la transacción para saber si aplica URL
     const serviceRef = db.collection('services').doc(serviceId);
     const serviceDocPre = await serviceRef.get();
     const hasCodeExtraction = serviceDocPre.exists && serviceDocPre.data().hasCodeExtraction === true;
 
     const result = await db.runTransaction(async (transaction) => {
-      // Verify customer exists and has balance
       const customerRef = db.collection('customers').doc(context.auth.uid);
       const customerDoc = await transaction.get(customerRef);
 
@@ -1346,7 +1380,6 @@ exports.processPurchase = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('permission-denied', 'No tiene acceso a este servicio');
       }
 
-      // Get service info (dentro de la transacción por consistencia)
       const serviceDoc = await transaction.get(serviceRef);
 
       if (!serviceDoc.exists) {
@@ -1363,63 +1396,100 @@ exports.processPurchase = functions.https.onCall(async (data, context) => {
         );
       }
 
-      // Try each account until we find one that's still available
-      let selectedAccount = null;
-      for (const acct of availableAccounts) {
-        const acctDoc = await transaction.get(acct.ref);
-        if (acctDoc.exists && acctDoc.data().status === 'available') {
-          selectedAccount = acct;
-          break;
+      // Iterate profile candidates until we find one still available
+      let selected = null;
+      for (const candidate of profileCandidates) {
+        if (candidate.profileRef) {
+          const [acctDoc, profDoc] = await Promise.all([
+            transaction.get(candidate.accountRef),
+            transaction.get(candidate.profileRef),
+          ]);
+          if (!acctDoc.exists || !profDoc.exists) continue;
+          const acctData = acctDoc.data();
+          const profData = profDoc.data();
+          if ((acctData.availableProfiles || 0) > 0 && profData.status === 'available') {
+            selected = {
+              accountRef: candidate.accountRef,
+              profileRef: candidate.profileRef,
+              profileName: profData.name,
+              profilePin: profData.pin || null,
+              credential: acctData.credential,
+            };
+            break;
+          }
+        } else {
+          const acctDoc = await transaction.get(candidate.accountRef);
+          if (!acctDoc.exists) continue;
+          const acctData = acctDoc.data();
+          if (acctData.status === 'available' && (acctData.availableProfiles === undefined || acctData.availableProfiles > 0)) {
+            selected = {
+              accountRef: candidate.accountRef,
+              profileRef: null,
+              profileName: 'Perfil 1',
+              profilePin: null,
+              credential: acctData.credential,
+            };
+            break;
+          }
         }
       }
 
-      if (!selectedAccount) {
+      if (!selected) {
         throw new functions.https.HttpsError('failed-precondition',
           'Servicio agotado, contacta al administrador'
         );
       }
 
-      // --- All checks passed, execute the purchase ---
-
-      // Deduct balance — usamos el valor ya leído dentro de la transacción
-      transaction.update(customerRef, {
-        balance: currentBalance - price
-      });
-
-      // Mark account as sold
       const now = new Date().toISOString();
-      transaction.update(selectedAccount.ref, {
-        status: 'sold',
-        soldTo: context.auth.uid,
-        updatedAt: now
+      const purchaseRef = db.collection('purchases').doc();
+
+      if (selected.profileRef) {
+        transaction.update(selected.profileRef, {
+          status: 'sold',
+          soldTo: context.auth.uid,
+          purchaseId: purchaseRef.id,
+          assignedAt: now,
+        });
+        transaction.update(selected.accountRef, {
+          availableProfiles: admin.firestore.FieldValue.increment(-1),
+        });
+      } else {
+        transaction.update(selected.accountRef, {
+          status: 'sold',
+          soldTo: context.auth.uid,
+          updatedAt: now,
+          purchaseId: purchaseRef.id,
+        });
+      }
+
+      transaction.update(customerRef, {
+        balance: currentBalance - price,
       });
 
-      // Create purchase document
-      const purchaseRef = db.collection('purchases').doc();
       transaction.set(purchaseRef, {
         customerId: context.auth.uid,
         customerEmail: context.auth.token.email || '',
         serviceId,
         serviceName: serviceData.name,
-        accountId: selectedAccount.id,
+        accountId: selected.accountRef.id,
+        profileId: selected.profileRef ? selected.profileRef.id : null,
+        profileName: selected.profileName,
+        profilePin: selected.profilePin,
         price,
         status: 'active',
         tenantId,
-        createdAt: now
-      });
-
-      // Link purchase to account
-      transaction.update(selectedAccount.ref, {
-        purchaseId: purchaseRef.id
+        createdAt: now,
       });
 
       return {
         purchaseId: purchaseRef.id,
-        accountId: selectedAccount.id,
-        credential: selectedAccount.data.credential,
+        accountId: selected.accountRef.id,
+        credential: selected.credential,
         serviceName: serviceData.name,
+        profileName: selected.profileName,
+        profilePin: selected.profilePin,
         price,
-        newBalance: currentBalance - price
+        newBalance: currentBalance - price,
       };
     });
 
@@ -1480,7 +1550,9 @@ exports.processPurchase = functions.https.onCall(async (data, context) => {
       purchaseId: result.purchaseId,
       account: {
         credential: result.credential,
-        serviceName: result.serviceName
+        serviceName: result.serviceName,
+        profileName: result.profileName,
+        profilePin: result.profilePin,
       },
       newBalance: result.newBalance,
       hasCodeExtraction,
@@ -1680,15 +1752,60 @@ exports.processBulkPurchase = functions.https.onCall(async (data, context) => {
       );
     }
 
-    const accountsSnapshot = await db
-      .collection('services').doc(serviceId).collection('accounts')
-      .where('status', '==', 'available')
-      .limit(qty)
-      .get();
+    // Query accounts — both new (with availableProfiles) and legacy
+    const limitMultiplier = Math.min(qty * 2, 50);
+    const [newBulkSnap, legacyBulkSnap] = await Promise.all([
+      db.collection('services').doc(serviceId).collection('accounts')
+        .where('availableProfiles', '>', 0).limit(limitMultiplier).get(),
+      db.collection('services').doc(serviceId).collection('accounts')
+        .where('status', '==', 'available').limit(limitMultiplier).get(),
+    ]);
 
-    if (accountsSnapshot.size < qty) {
+    const bulkAccountMap = new Map();
+    newBulkSnap.docs.forEach(doc => bulkAccountMap.set(doc.ref.path, { ref: doc.ref, id: doc.id, data: doc.data() }));
+    legacyBulkSnap.docs.forEach(doc => {
+      if (!bulkAccountMap.has(doc.ref.path) && doc.data().availableProfiles === undefined) {
+        bulkAccountMap.set(doc.ref.path, { ref: doc.ref, id: doc.id, data: doc.data() });
+      }
+    });
+
+    const bulkAccounts = Array.from(bulkAccountMap.values());
+
+    // Pre-fetch profiles across accounts until we have qty candidates
+    const bulkCandidates = [];
+    for (const acct of bulkAccounts) {
+      if (bulkCandidates.length >= qty) break;
+      const acctData = acct.data;
+      const availCount = acctData.availableProfiles ?? (acctData.status === 'available' ? 1 : 0);
+      if (availCount <= 0) continue;
+
+      if (acctData.availableProfiles !== undefined) {
+        const need = qty - bulkCandidates.length;
+        const profilesSnap = await acct.ref.collection('profiles')
+          .where('status', '==', 'available').limit(need).get();
+        profilesSnap.docs.forEach(profDoc => {
+          if (bulkCandidates.length < qty) {
+            bulkCandidates.push({
+              accountRef: acct.ref,
+              accountData: acctData,
+              profileRef: profDoc.ref,
+              profileData: profDoc.data(),
+            });
+          }
+        });
+      } else {
+        bulkCandidates.push({
+          accountRef: acct.ref,
+          accountData: acctData,
+          profileRef: null,
+          profileData: { name: 'Perfil 1', pin: null, status: 'available' },
+        });
+      }
+    }
+
+    if (bulkCandidates.length < qty) {
       throw new functions.https.HttpsError('failed-precondition',
-        `Stock insuficiente. Hay ${accountsSnapshot.size} cuenta(s) disponible(s), pediste ${qty}`
+        `Stock insuficiente. Hay ${bulkCandidates.length} perfil(es) disponible(s), pediste ${qty}`
       );
     }
 
@@ -1706,19 +1823,101 @@ exports.processBulkPurchase = functions.https.onCall(async (data, context) => {
 
       const now = new Date().toISOString();
       const purchaseRef = db.collection('purchases').doc();
-      const assignedCredentials = [];
+      const soldProfiles = [];
+      const soldAccountRefs = new Map(); // refPath -> { ref, count }
 
-      accountsSnapshot.docs.forEach((acctDoc, index) => {
-        const acctRef = db.collection('services').doc(serviceId).collection('accounts').doc(acctDoc.id);
-        
-        transaction.update(acctRef, {
-          status: 'sold',
-          soldTo: context.auth.uid,
-          purchaseId: `${purchaseRef.id}_${index}`,
-          updatedAt: now,
+      for (let i = 0; i < bulkCandidates.length && soldProfiles.length < qty; i++) {
+        const candidate = bulkCandidates[i];
+
+        if (candidate.profileRef) {
+          const [acctDoc, profDoc] = await Promise.all([
+            transaction.get(candidate.accountRef),
+            transaction.get(candidate.profileRef),
+          ]);
+          if (!acctDoc.exists || !profDoc.exists) continue;
+          const acctData = acctDoc.data();
+          const profData = profDoc.data();
+          if ((acctData.availableProfiles || 0) <= 0 || profData.status !== 'available') continue;
+
+          transaction.update(candidate.profileRef, {
+            status: 'sold',
+            soldTo: context.auth.uid,
+            purchaseId: `${purchaseRef.id}_${i}`,
+            assignedAt: now,
+          });
+
+          const key = candidate.accountRef.path;
+          if (soldAccountRefs.has(key)) {
+            soldAccountRefs.get(key).count++;
+          } else {
+            soldAccountRefs.set(key, { ref: candidate.accountRef, count: 1 });
+          }
+
+          soldProfiles.push({
+            profileRef: candidate.profileRef,
+            profileName: profData.name,
+            profilePin: profData.pin || null,
+            credential: acctData.credential,
+            accountRef: candidate.accountRef,
+          });
+        } else {
+          const acctDoc = await transaction.get(candidate.accountRef);
+          if (!acctDoc.exists) continue;
+          const acctData = acctDoc.data();
+          if (acctData.status !== 'available') continue;
+
+          transaction.update(candidate.accountRef, {
+            status: 'sold',
+            soldTo: context.auth.uid,
+            updatedAt: now,
+          });
+
+          const key = candidate.accountRef.path;
+          if (soldAccountRefs.has(key)) {
+            soldAccountRefs.get(key).count++;
+          } else {
+            soldAccountRefs.set(key, { ref: candidate.accountRef, count: 1 });
+          }
+
+          soldProfiles.push({
+            profileRef: null,
+            profileName: 'Perfil 1',
+            profilePin: null,
+            credential: acctData.credential,
+            accountRef: candidate.accountRef,
+          });
+        }
+      }
+
+      if (soldProfiles.length < qty) {
+        throw new functions.https.HttpsError('failed-precondition',
+          `Stock insuficiente. Solo hay ${soldProfiles.length} perfil(es) disponible(s), pediste ${qty}`
+        );
+      }
+
+      // Apply per-account decrements
+      for (const [, { ref, count }] of soldAccountRefs) {
+        transaction.update(ref, {
+          availableProfiles: admin.firestore.FieldValue.increment(-count),
         });
+      }
 
-        assignedCredentials.push(acctDoc.data().credential || {});
+      // Build profiles array for the purchase doc
+      const profilesData = soldProfiles.map(p => ({
+        profileId: p.profileRef ? p.profileRef.id : null,
+        profileName: p.profileName,
+        profilePin: p.profilePin,
+        credential: p.credential,
+      }));
+
+      // Unique credentials for backward compatibility
+      const uniqueCredentials = [...new Map(
+        soldProfiles.map(p => [p.credential.email || JSON.stringify(p.credential), p.credential])
+      ).values()];
+
+      const accountIds = [...soldAccountRefs.keys()].map(path => {
+        const parts = path.split('/');
+        return parts[parts.length - 1];
       });
 
       transaction.set(purchaseRef, {
@@ -1727,8 +1926,9 @@ exports.processBulkPurchase = functions.https.onCall(async (data, context) => {
         customerEmail: claims.email || '',
         serviceId,
         serviceName: serviceData.name,
-        accountIds: accountsSnapshot.docs.map(d => d.id),
-        credentials: assignedCredentials,
+        accountIds,
+        credentials: uniqueCredentials,
+        profiles: profilesData,
         price: totalPrice,
         quantity: qty,
         unitPrice: wholesalePrice,
@@ -1740,7 +1940,8 @@ exports.processBulkPurchase = functions.https.onCall(async (data, context) => {
 
       return {
         purchaseId: purchaseRef.id,
-        credentials: assignedCredentials,
+        credentials: uniqueCredentials,
+        profiles: profilesData,
         serviceName: serviceData.name,
         quantity: qty,
         newBalance: freshBalance - totalPrice,
@@ -1752,22 +1953,25 @@ exports.processBulkPurchase = functions.https.onCall(async (data, context) => {
     if (hasCodeExtraction) {
       const now = new Date();
       const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-      const accountsArray = accountsSnapshot.docs;
+      const uniqueAccounts = [...new Map(
+        result.profiles.map(p => [p.credential.email || JSON.stringify(p.credential), p])
+      ).values()];
 
-      for (let i = 0; i < accountsArray.length; i++) {
+      for (let i = 0; i < uniqueAccounts.length; i++) {
         const token = generateToken();
-        const acctDoc = accountsArray[i];
-        const credential = acctDoc.data().credential || {};
+        const profile = uniqueAccounts[i];
 
         await db.collection('public_links').doc(token).set({
           token,
           resellerId: context.auth.uid,
-          accountId: acctDoc.id,
+          accountId: profile.profileId || '',
           serviceId,
           serviceName: serviceData.name,
           purchaseId: result.purchaseId,
           accountIndex: i,
-          credential,
+          credential: profile.credential,
+          profileName: profile.profileName || null,
+          profilePin: profile.profilePin || null,
           createdAt: now,
           expiresAt,
           status: 'active',
@@ -1775,7 +1979,6 @@ exports.processBulkPurchase = functions.https.onCall(async (data, context) => {
         linkTokens.push(token);
       }
 
-      // Guardar tokens en el purchase doc para que el frontend los lea
       await db.collection('purchases').doc(result.purchaseId).update({ linkTokens });
     }
 
@@ -1810,6 +2013,7 @@ exports.processBulkPurchase = functions.https.onCall(async (data, context) => {
       success: true,
       purchaseId: result.purchaseId,
       credentials: result.credentials,
+      profiles: result.profiles,
       serviceName: result.serviceName,
       quantity: result.quantity,
       newBalance: result.newBalance,
@@ -2121,4 +2325,97 @@ exports.getPublicAccount = functions.https.onCall(async (data, context) => {
     console.error('Error en getPublicAccount:', error);
     throw new functions.https.HttpsError('internal', 'Error al obtener la cuenta');
   }
+});
+
+// ========== CREAR CUENTAS CON PERFILES (Admin/Batch Import) ==========
+exports.createAccountWithProfiles = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+  }
+
+  const claims = context.auth.token;
+  if (claims.role !== 'superadmin' && claims.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'No tiene permisos de admin');
+  }
+
+  const { serviceId, tenantId, accounts } = data;
+
+  if (!serviceId || !tenantId || !accounts || !Array.isArray(accounts) || accounts.length === 0) {
+    throw new functions.https.HttpsError('invalid-argument',
+      'serviceId, tenantId y accounts (array no vacío) son requeridos'
+    );
+  }
+
+  // Verify tenant access
+  if (claims.role !== 'superadmin' && claims.tenantId !== tenantId) {
+    throw new functions.https.HttpsError('permission-denied', 'No tiene acceso a este tenant');
+  }
+
+  let accountsCreated = 0;
+  let profilesCreated = 0;
+  const failed = [];
+
+  for (let lineIdx = 0; lineIdx < accounts.length; lineIdx++) {
+    const accountInput = accounts[lineIdx];
+
+    if (!accountInput.email || !accountInput.password) {
+      failed.push({ line: lineIdx + 1, error: 'email y password requeridos' });
+      continue;
+    }
+
+    if (!accountInput.profiles || !Array.isArray(accountInput.profiles) || accountInput.profiles.length === 0) {
+      failed.push({ line: lineIdx + 1, error: 'Debe tener al menos 1 perfil' });
+      continue;
+    }
+
+    const hasInvalidProfile = accountInput.profiles.some(p => !p.name || p.name.trim() === '');
+    if (hasInvalidProfile) {
+      failed.push({ line: lineIdx + 1, error: 'Todos los perfiles deben tener nombre' });
+      continue;
+    }
+
+    try {
+      const batch = db.batch();
+      const accountRef = db.collection('services').doc(serviceId).collection('accounts').doc();
+      const profileCount = accountInput.profiles.length;
+
+      batch.set(accountRef, {
+        serviceId,
+        tenantId,
+        email: accountInput.email,
+        credential: {
+          email: accountInput.email,
+          password: accountInput.password,
+        },
+        label: accountInput.label || '',
+        status: 'available',
+        totalProfiles: profileCount,
+        availableProfiles: profileCount,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      for (const profile of accountInput.profiles) {
+        const profileRef = accountRef.collection('profiles').doc();
+        batch.set(profileRef, {
+          name: profile.name.trim(),
+          pin: profile.pin || null,
+          status: 'available',
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        profilesCreated++;
+      }
+
+      await batch.commit();
+      accountsCreated++;
+    } catch (error) {
+      console.error(`Error creating account at line ${lineIdx + 1}:`, error.message);
+      failed.push({ line: lineIdx + 1, error: error.message });
+    }
+  }
+
+  return {
+    accountsCreated,
+    profilesCreated,
+    failed,
+  };
 });

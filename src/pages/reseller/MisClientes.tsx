@@ -36,6 +36,13 @@ interface PurchaseAccount {
   credential: Record<string, string>;
 }
 
+interface PurchasedProfile {
+  profileId: string;
+  profileName: string;
+  profilePin?: string;
+  credential: Record<string, string>;
+}
+
 interface Purchase {
   id: string;
   customerEmail: string;
@@ -48,6 +55,9 @@ interface Purchase {
   credentials: Record<string, string>[];
   status: string;
   linkTokens?: string[];
+  profileName?: string;
+  profilePin?: string;
+  profiles?: PurchasedProfile[];
 }
 
 const generateToken = (): string => {
@@ -245,9 +255,10 @@ const MisClientes = (): JSX.Element => {
   };
 
   const formatCredential = (cred: Record<string, string>): string => {
-    return Object.entries(cred)
-      .map(([k, v]) => `${k}: ${v}`)
-      .join(' | ');
+    // Filter out profileName/profilePin from credential display (shown separately)
+    const entries = Object.entries(cred).filter(([k]) => k !== 'profileName' && k !== 'profilePin');
+    if (entries.length === 0) return Object.entries(cred).map(([k, v]) => `${k}: ${v}`).join(' | ');
+    return entries.map(([k, v]) => `${k}: ${v}`).join(' | ');
   };
 
   if (loading) {
@@ -290,10 +301,34 @@ const MisClientes = (): JSX.Element => {
           <div className="divide-y divide-gray-700">
             {purchases.map((purchase) => {
               const isExpanded = expandedPurchase === purchase.id;
-              const accounts: PurchaseAccount[] = purchase.accountIds.map((id, i) => ({
-                accountId: id,
-                credential: purchase.credentials[i] || {},
-              }));
+
+              // Build account list from profiles (new format) or legacy credentials
+              let accounts: PurchaseAccount[];
+              if (purchase.profiles && purchase.profiles.length > 0) {
+                accounts = purchase.profiles.map((p, i) => ({
+                  accountId: p.profileId || purchase.accountIds[i] || '',
+                  credential: {
+                    ...p.credential,
+                    profileName: p.profileName,
+                    ...(p.profilePin ? { profilePin: p.profilePin } : {}),
+                  },
+                }));
+              } else if (purchase.profileName) {
+                accounts = purchase.accountIds.map((id, i) => ({
+                  accountId: id,
+                  credential: {
+                    ...(purchase.credentials[i] || {}),
+                    profileName: purchase.profileName || '',
+                    ...(purchase.profilePin ? { profilePin: purchase.profilePin } : {}),
+                  },
+                }));
+              } else {
+                // Legacy: no profiles
+                accounts = purchase.accountIds.map((id, i) => ({
+                  accountId: id,
+                  credential: purchase.credentials[i] || {},
+                }));
+              }
 
               return (
                 <div key={purchase.id}>
@@ -363,13 +398,23 @@ const MisClientes = (): JSX.Element => {
                               <div key={acct.accountId}>
                                 {/* Account row */}
                                 <div className="flex items-center justify-between px-5 py-3 hover:bg-gray-700/20">
-                                  <div className="flex items-center gap-4">
-                                    <span className="text-gray-500 text-sm w-6">
+                                  <div className="flex items-center gap-4 min-w-0">
+                                    <span className="text-gray-500 text-sm w-6 shrink-0">
                                       #{idx + 1}
                                     </span>
-                                    <span className="text-gray-300 text-sm font-mono">
-                                      {formatCredential(acct.credential)}
-                                    </span>
+                                    <div className="flex flex-col min-w-0">
+                                      {acct.credential.profileName && (
+                                        <span className="text-primary-300 text-xs font-medium mb-0.5">
+                                          Perfil: {acct.credential.profileName}
+                                          {acct.credential.profilePin && (
+                                            <> · PIN: {acct.credential.profilePin}</>
+                                          )}
+                                        </span>
+                                      )}
+                                      <span className="text-gray-300 text-sm font-mono truncate">
+                                        {formatCredential(acct.credential)}
+                                      </span>
+                                    </div>
                                   </div>
                                   <div className="flex items-center gap-2">
                                     {/* Extraer código */}

@@ -118,8 +118,12 @@ const MisServicios = () => {
     setActiveTab('reportar');
   };
 
-  const formatCredential = (c: { email: string; password: string; extra?: Record<string, string> }) => {
+  const formatCredential = (c: { email: string; password: string; extra?: Record<string, string> }, profileName?: string, profilePin?: string) => {
     let text = `Correo: ${c.email}\nClave: ${c.password}`;
+    if (profileName) {
+      text += `\nPerfil: ${profileName}`;
+      if (profilePin) text += `\nPIN: ${profilePin}`;
+    }
     if (c.extra) {
       Object.entries(c.extra).forEach(([k, v]) => { text += `\n${k}: ${v}`; });
     }
@@ -203,10 +207,20 @@ const MisServicios = () => {
                         </span>
                       </div>
 
-                      {purchase.credential && (
+                      {purchase.profiles && purchase.profiles.length > 0 ? (
+                        <div className="space-y-2 mt-2">
+                          {purchase.profiles.map((p, i) => (
+                            <div key={p.profileId || i} className="glass-dark p-3 rounded-lg">
+                              <pre className="text-white/70 text-xs whitespace-pre-wrap font-mono">
+                                {formatCredential(p.credential, p.profileName, p.profilePin)}
+                              </pre>
+                            </div>
+                          ))}
+                        </div>
+                      ) : purchase.credential && (
                         <div className="glass-dark p-3 rounded-lg mt-2">
                           <pre className="text-white/70 text-xs whitespace-pre-wrap font-mono">
-                            {formatCredential(purchase.credential)}
+                            {formatCredential(purchase.credential, purchase.profileName, purchase.profilePin)}
                           </pre>
                         </div>
                       )}
@@ -230,7 +244,7 @@ const MisServicios = () => {
                         </div>
                       )}
 
-                      {!purchase.linkTokens && purchase.credential && (
+                      {!purchase.linkTokens && (purchase.credential || (purchase.profiles && purchase.profiles.length > 0)) && (
                         <div className="mt-2 text-xs text-gray-600 italic">URL: no aplica</div>
                       )}
 
@@ -244,9 +258,16 @@ const MisServicios = () => {
                     </div>
 
                     <div className="flex flex-col gap-2 shrink-0">
-                      {purchase.credential && (
+                      {(purchase.credential || (purchase.profiles && purchase.profiles.length > 0)) && (
                         <button
-                          onClick={() => handleCopy(purchase.id, formatCredential(purchase.credential!))}
+                          onClick={() => {
+                            if (purchase.profiles && purchase.profiles.length > 0) {
+                              const all = purchase.profiles.map(p => formatCredential(p.credential, p.profileName, p.profilePin)).join('\n\n');
+                              handleCopy(purchase.id, all);
+                            } else if (purchase.credential) {
+                              handleCopy(purchase.id, formatCredential(purchase.credential, purchase.profileName, purchase.profilePin));
+                            }
+                          }}
                           className="p-2 rounded-lg bg-white/10 text-white/60 hover:text-white hover:bg-white/20 transition-all"
                           title="Copiar credenciales"
                         >
