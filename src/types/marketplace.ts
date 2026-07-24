@@ -92,7 +92,11 @@ export interface Ticket {
   subject: string;
   description: string;
   imageUrl?: string;
-  customerEmail?: string;
+  customerEmail: string;
+  purchaseId?: string;
+  purchaseDocId?: string;
+  accountIndex?: number;
+  newCredentials?: { email?: string; password?: string; profileName?: string; profilePin?: string };
   status: 'open' | 'resolved' | 'closed';
   adminNotes?: string;
   createdAt: Date;

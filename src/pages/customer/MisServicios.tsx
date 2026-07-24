@@ -1,42 +1,81 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Server, Copy, RefreshCw, AlertTriangle, Loader,
-  Check, X, ClipboardCheck, History, ShoppingBag, Ticket,
-  Sparkles
+  Server, Copy, Loader, MoreVertical, Ticket, Flag, X, Search,
+  ShoppingBag, Clock, MessageSquare,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
-import { useApp } from '../../context/AppContext';
-import {
-  getPurchases,
-  processPurchase,
-  extraerCodigo,
-} from '../../services/marketplace';
-import type { Purchase, ExtraerCodigoResponse } from '../../types/marketplace';
+import { getPurchases } from '../../services/marketplace';
+import type { Purchase } from '../../types/marketplace';
 import Movimientos from './Movimientos';
 import Reportar from './Reportar';
+import Codigos from './Codigos';
+import MisReportesCliente from './MisReportesCliente';
 
-interface PurchaseItem extends Purchase {
-  credential?: {
-    email: string;
-    password: string;
-    extra?: Record<string, string>;
-  };
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface AccountRow {
+  rowId: string;
+  purchaseId: string;
+  idx: number;
+  nombre: string;
+  plataforma: string;
+  correo: string;
+  contrasena: string;
+  perfil: string;
+  pinPerfil: string;
+  fechaEntrega: Date;
+  diasServicio: number;
+  fechaVencimiento: Date;
+  diasRestantes: number;
+  credential: Record<string, string>;
+  linkToken?: string;
+  purchase: Purchase;
 }
 
-const MisServicios = () => {
-  const { customer, refreshCustomer } = useAuthStore();
-  const { tenant, userTenantId } = useApp();
-  const tenantId = tenant?.id || userTenantId;
+const buildTicketId = (purchaseId: string, idx: number): string => {
+  const shortId = purchaseId.slice(0, 6).toUpperCase();
+  return `TKT-${shortId}-${idx + 1}`;
+};
 
-  const [purchases, setPurchases] = useState<PurchaseItem[]>([]);
+const TEMPLATE_RULES = `⚠ REGLAS ⚠
+✅ NO EDITAR SOBRE EL MISMO PERFIL // NO CAMBIAR CONTRASEÑA, DE LO CONTRARIO NO SE DARÁ GARANTÍA
+USAR EN UN SOLO DISPOSITIVO.
+✅ SI LLEGA A PRESENTAR ALGUNA FALLA TU CUENTA, POR FAVOR ENVIAR EN ORDEN: CORREO, CONTRASEÑA Y EVIDENCIA DEL PROBLEMA`;
+
+const buildTemplate = (serviceName: string, row: AccountRow): string => {
+  const ticketId = buildTicketId(row.purchaseId, row.idx);
+  const lines = [
+    `⭕️📺 SERVICIO DE ${serviceName} 📽️`,
+    '',
+    `*Ticket:* ${ticketId}`,
+    `*Correo:* ${row.correo}`,
+    `*Clave:* ${row.contrasena}`,
+    `*Perfil:* ${row.perfil}`,
+    `*Pin:* ${row.pinPerfil}`,
+    '',
+    `*Vence:* ${row.fechaVencimiento.toLocaleDateString()}`,
+    '',
+    TEMPLATE_RULES,
+  ];
+  return lines.join('\n');
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+const MisServicios = (): JSX.Element => {
+  const { customer } = useAuthStore();
+  const uid = customer?.uid || '';
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'servicios' | 'movimientos' | 'reportar'>('servicios');
-  const [processing, setProcessing] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [codeResult, setCodeResult] = useState<{ purchaseId: string; data: ExtraerCodigoResponse } | null>(null);
-  const [toast, setToast] = useState<{ msg: string; type: 'error' | 'success' } | null>(null);
+  const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'servicios' | 'movimientos' | 'codigos' | 'reportar' | 'mis-reportes'>('servicios');
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [modalRow, setModalRow] = useState<AccountRow | null>(null);
   const [reportServiceId, setReportServiceId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; type: 'error' | 'success' } | null>(null);
+  const [copiedTemplate, setCopiedTemplate] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const showToast = (msg: string, type: 'error' | 'success' = 'error') => {
     setToast({ msg, type });
@@ -44,114 +83,195 @@ const MisServicios = () => {
   };
 
   useEffect(() => {
-    if (customer?.uid) loadPurchases();
+    if (uid) loadPurchases();
     else setLoading(false);
-  }, [customer?.uid]);
+  }, [uid]);
 
-  const loadPurchases = async () => {
-    if (!customer?.uid) return;
+  // Cerrar menú al hacer clic fuera
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenu(null);
+      }
+    };
+    if (openMenu) {
+      document.addEventListener('mousedown', handleClick);
+      return () => document.removeEventListener('mousedown', handleClick);
+    }
+  }, [openMenu]);
+
+  const loadData = async () => {
+    if (!uid) return;
     setLoading(true);
     try {
-      const data = await getPurchases(customer.uid);
-      data.sort((a, b) => {
-        if (a.status === 'active' && b.status !== 'active') return -1;
-        if (b.status === 'active' && a.status !== 'active') return 1;
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
-      setPurchases(data as PurchaseItem[]);
-    } catch (error) {
-      console.error('Error loading purchases:', error);
+      const data = await getPurchases(uid);
+      data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setPurchases(data);
+    } catch (err) {
+      console.error('Error loading purchases:', err);
       showToast('Error al cargar servicios', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCopy = async (id: string, text: string) => {
+  const loadPurchases = loadData;
+
+  // ─── Construir filas ──────────────────────────────────────────────────
+  const rows = useMemo<AccountRow[]>(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const allRows: AccountRow[] = [];
+
+    for (const purchase of purchases) {
+      const durationDays = (purchase as any).durationDays || 30;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const entrega = new Date(purchase.createdAt);
+      const vencimiento = new Date(entrega.getTime() + durationDays * 24 * 60 * 60 * 1000);
+      const diffTime = vencimiento.getTime() - today.getTime();
+      const diasRestantes = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+
+      let accounts: { accountId: string; credential: Record<string, string> }[];
+      if (purchase.profiles && purchase.profiles.length > 0) {
+        accounts = purchase.profiles.map((p, i) => ({
+          accountId: p.profileId || `row-${i}`,
+          credential: {
+            email: p.credential?.email || '',
+            password: p.credential?.password || '',
+            profileName: p.profileName,
+            ...(p.profilePin ? { profilePin: p.profilePin } : {}),
+          },
+        }));
+      } else {
+        // Single account per purchase
+        accounts = [{
+          accountId: purchase.accountId || purchase.id,
+          credential: {
+            email: (purchase as any).credential?.email || '',
+            password: (purchase as any).credential?.password || '',
+            profileName: purchase.profileName || '',
+            ...(purchase.profilePin ? { profilePin: purchase.profilePin } : {}),
+          },
+        }];
+      }
+
+      accounts.forEach((acct, idx) => {
+        const cred = acct.credential;
+        const rowId = `${purchase.id}_${idx}`;
+        allRows.push({
+          rowId,
+          purchaseId: purchase.id,
+          idx,
+          nombre: customer?.email || '-',
+          plataforma: purchase.serviceName || '-',
+          correo: cred.email || cred.correo || cred.usuario || '-',
+          contrasena: cred.password || cred.clave || cred.pass || '-',
+          perfil: cred.profileName || '-',
+          pinPerfil: cred.profilePin || '-',
+          fechaEntrega: entrega,
+          diasServicio: durationDays,
+          fechaVencimiento: vencimiento,
+          diasRestantes,
+          credential: cred,
+          linkToken: purchase.linkTokens?.[idx],
+          purchase,
+        });
+      });
+    }
+    return allRows;
+  }, [purchases, customer]);
+
+  // ─── Filtro de búsqueda ───────────────────────────────────────────────
+  const filteredRows = useMemo(() => {
+    if (!search.trim()) return rows;
+    const q = search.toLowerCase().trim();
+    return rows.filter(
+      (r) =>
+        r.plataforma.toLowerCase().includes(q) ||
+        r.correo.toLowerCase().includes(q) ||
+        r.perfil.toLowerCase().includes(q) ||
+        buildTicketId(r.purchaseId, r.idx).toLowerCase().includes(q),
+    );
+  }, [rows, search]);
+
+  // ─── Copiar credenciales ──────────────────────────────────────────────
+  const handleCopyCredentials = async (row: AccountRow) => {
+    const text = [
+      `Plataforma: ${row.plataforma}`,
+      `Correo: ${row.correo}`,
+      `Contraseña: ${row.contrasena}`,
+      row.perfil !== '-' ? `Perfil: ${row.perfil}` : '',
+      row.pinPerfil !== '-' ? `PIN: ${row.pinPerfil}` : '',
+    ].filter(Boolean).join('\n');
+
     try {
       await navigator.clipboard.writeText(text);
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
+      showToast('Credenciales copiadas', 'success');
     } catch {
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      document.body.appendChild(textarea);
-      textarea.select();
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
       document.execCommand('copy');
-      document.body.removeChild(textarea);
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
+      document.body.removeChild(ta);
+      showToast('Credenciales copiadas', 'success');
     }
   };
 
-  const handleExtraerCodigo = async (purchaseId: string) => {
-    setProcessing(purchaseId);
+  // ─── Copiar template ──────────────────────────────────────────────────
+  const handleCopyTemplate = async (row: AccountRow) => {
+    const template = buildTemplate(row.plataforma, row);
     try {
-      const result = await extraerCodigo({ purchaseId });
-      setCodeResult({ purchaseId, data: result });
-    } catch (error) {
-      console.error('Error extracting code:', error);
-      showToast('Error al extraer código', 'error');
-    } finally {
-      setProcessing(null);
+      await navigator.clipboard.writeText(template);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = template;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
     }
+    setCopiedTemplate(true);
+    setTimeout(() => setCopiedTemplate(false), 2000);
   };
 
-  const handleRenovar = async (serviceId: string, purchaseId: string) => {
-    if (!tenantId) return;
-    setProcessing(purchaseId);
-    try {
-      await processPurchase({ serviceId, tenantId });
-      await loadPurchases();
-      await refreshCustomer();
-      showToast('¡Servicio renovado exitosamente!', 'success');
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : 'Error al renovar';
-      showToast(msg, 'error');
-    } finally {
-      setProcessing(null);
-    }
-  };
-
-  const handleReportar = (serviceId: string) => {
-    setReportServiceId(serviceId);
-    setActiveTab('reportar');
-  };
-
-  const formatCredential = (c: { email: string; password: string; extra?: Record<string, string> }, profileName?: string, profilePin?: string) => {
-    let text = `Correo: ${c.email}\nClave: ${c.password}`;
-    if (profileName) {
-      text += `\nPerfil: ${profileName}`;
-      if (profilePin) text += `\nPIN: ${profilePin}`;
-    }
-    if (c.extra) {
-      Object.entries(c.extra).forEach(([k, v]) => { text += `\n${k}: ${v}`; });
-    }
-    return text;
-  };
-
+  // ─── Tabs config ──────────────────────────────────────────────────────
   const tabs = [
     { key: 'servicios' as const, label: 'Mis Servicios', icon: Server },
-    { key: 'movimientos' as const, label: 'Movimientos', icon: History },
-    { key: 'reportar' as const, label: 'Reportar', icon: Ticket },
+    { key: 'movimientos' as const, label: 'Movimientos', icon: Clock },
+    { key: 'codigos' as const, label: 'Códigos', icon: Search },
+    { key: 'reportar' as const, label: 'Reportar', icon: Flag },
+    { key: 'mis-reportes' as const, label: 'Mis Reportes', icon: MessageSquare },
   ];
 
+  // ─── Render ───────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="p-6 text-center text-gray-400">
+        <Loader size={24} className="animate-spin inline-block" />
+        <p className="mt-2">Cargando servicios...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-4 md:p-6">
-      <div className="mb-6">
+    <div className="p-4 md:p-6 space-y-6">
+      {/* Header */}
+      <div>
         <h1 className="text-xl md:text-2xl font-bold text-white">Mis Servicios</h1>
-        <p className="text-white/60 text-sm">Gestioná tus servicios comprados</p>
+        <p className="text-gray-400 text-sm mt-1">Gestioná tus servicios comprados</p>
       </div>
 
-      <div className="flex gap-2 mb-6 overflow-x-auto">
+      {/* Tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
         {tabs.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-all text-sm ${
               activeTab === key
                 ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/30'
-                : 'bg-white/10 text-white/60 hover:text-white'
+                : 'bg-gray-800 text-gray-400 hover:text-white'
             }`}
           >
             <Icon size={16} />
@@ -160,214 +280,257 @@ const MisServicios = () => {
         ))}
       </div>
 
+      {/* ─── TAB: SERVICIOS (igual que MisClientes) ─────────────────────── */}
       {activeTab === 'servicios' && (
         <>
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader className="w-8 h-8 animate-spin text-primary-400" />
-            </div>
-          ) : purchases.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="glass p-12 text-center"
-            >
-              <ShoppingBag size={48} className="mx-auto text-white/20 mb-4" />
-              <p className="text-white/50">Todavía no tenés servicios comprados.</p>
-              <p className="text-white/30 text-sm mt-1">Visitá la tienda para adquirir servicios.</p>
-            </motion.div>
-          ) : (
-            <div className="space-y-4">
-              {purchases.map((purchase, idx) => (
-                <motion.div
-                  key={purchase.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.03 }}
-                  className={`glass p-4 rounded-xl border ${
-                    purchase.status === 'active'
-                      ? 'border-green-500/30'
-                      : purchase.status === 'expired'
-                      ? 'border-yellow-500/30'
-                      : 'border-red-500/30'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="text-white font-semibold truncate">{purchase.serviceName}</h3>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          purchase.status === 'active'
-                            ? 'bg-green-500/20 text-green-400'
-                            : purchase.status === 'expired'
-                            ? 'bg-yellow-500/20 text-yellow-400'
-                            : 'bg-red-500/20 text-red-400'
-                        }`}>
-                          {purchase.status === 'active' ? 'Activo' : purchase.status === 'expired' ? 'Vencido' : purchase.status}
-                        </span>
-                      </div>
+          {/* Buscador */}
+          <div className="relative max-w-md">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por plataforma, correo, perfil, ticket..."
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-9 pr-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary-500 transition-colors"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">
+                <X size={14} />
+              </button>
+            )}
+          </div>
 
-                      {purchase.profiles && purchase.profiles.length > 0 ? (
-                        <div className="space-y-2 mt-2">
-                          {purchase.profiles.map((p, i) => (
-                            <div key={p.profileId || i} className="glass-dark p-3 rounded-lg">
-                              <pre className="text-white/70 text-xs whitespace-pre-wrap font-mono">
-                                {formatCredential(p.credential, p.profileName, p.profilePin)}
-                              </pre>
+          {/* Tabla */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden"
+          >
+            <div className="p-5 border-b border-gray-700">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Server className="w-5 h-5 text-primary-400" />
+                Servicios
+                {search && (
+                  <span className="text-sm font-normal text-gray-400 ml-2">
+                    ({filteredRows.length} resultado{filteredRows.length !== 1 ? 's' : ''})
+                  </span>
+                )}
+              </h2>
+            </div>
+
+            {rows.length === 0 ? (
+              <div className="text-center text-gray-400 py-8">
+                <ShoppingBag size={32} className="mx-auto mb-2 text-gray-600" />
+                <p>Todavía no tenés servicios comprados.</p>
+                <p className="text-sm mt-1">Visitá la tienda para adquirir servicios.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-700 bg-gray-800/80">
+                      <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">#</th>
+                      <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">Plataforma</th>
+                      <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">Correo</th>
+                      <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">Contraseña</th>
+                      <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">Perfil</th>
+                      <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">PIN Perfil</th>
+                      <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">Fecha Entrega</th>
+                      <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">Días Svc.</th>
+                      <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">Fecha Venc.</th>
+                      <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">Días Rest.</th>
+                      <th className="px-3 py-3 text-center text-gray-400 font-medium text-xs uppercase tracking-wider">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-700/50">
+                    {filteredRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={11} className="px-3 py-8 text-center text-gray-500">
+                          No hay resultados para "{search}"
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredRows.map((row) => (
+                        <tr key={row.rowId} className="hover:bg-gray-700/20 transition-colors">
+                          <td className="px-3 py-2.5">
+                            <div className="text-gray-500 font-mono text-xs">{row.idx + 1}</div>
+                            <div className="text-primary-400 font-mono text-[10px] leading-tight mt-0.5">
+                              {buildTicketId(row.purchaseId, row.idx)}
                             </div>
-                          ))}
-                        </div>
-                      ) : purchase.credential && (
-                        <div className="glass-dark p-3 rounded-lg mt-2">
-                          <pre className="text-white/70 text-xs whitespace-pre-wrap font-mono">
-                            {formatCredential(purchase.credential, purchase.profileName, purchase.profilePin)}
-                          </pre>
-                        </div>
-                      )}
+                          </td>
+                          <td className="px-3 py-2.5 text-gray-300">{row.plataforma}</td>
+                          <td className="px-3 py-2.5">
+                            <span className="text-gray-200 font-mono text-xs">{row.correo}</span>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className="text-gray-200 font-mono text-xs">{row.contrasena}</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-gray-300">{row.perfil}</td>
+                          <td className="px-3 py-2.5 text-gray-300">{row.pinPerfil}</td>
+                          <td className="px-3 py-2.5 text-gray-400 text-xs whitespace-nowrap">
+                            {row.fechaEntrega.toLocaleDateString()}
+                          </td>
+                          <td className="px-3 py-2.5 text-gray-400 text-xs">{row.diasServicio}</td>
+                          <td className="px-3 py-2.5 text-xs whitespace-nowrap">
+                            <span className={row.diasRestantes <= 0 ? 'text-red-400' : 'text-gray-200'}>
+                              {row.fechaVencimiento.toLocaleDateString()}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5 text-xs">
+                            <span className={
+                              row.diasRestantes <= 0
+                                ? 'text-red-400 font-medium'
+                                : row.diasRestantes <= 5
+                                ? 'text-yellow-400 font-medium'
+                                : 'text-green-400'
+                            }>
+                              {row.diasRestantes <= 0 ? 'Vencido' : `${row.diasRestantes}d`}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5 text-center">
+                            <div className="relative flex items-center justify-center gap-1">
+                              {/* Copy */}
+                              <button
+                                onClick={() => handleCopyCredentials(row)}
+                                className="p-1.5 hover:bg-gray-600/40 rounded-lg transition-colors text-gray-400 hover:text-white"
+                                title="Copiar credenciales"
+                              >
+                                <Copy size={14} />
+                              </button>
 
-                      {/* Link público auto-generado */}
-                      {purchase.linkTokens && purchase.linkTokens.length > 0 && (
-                        <div className="mt-2 flex items-center justify-between bg-primary-500/10 border border-primary-500/20 rounded-lg px-3 py-2">
-                          <code className="text-xs text-primary-400 truncate max-w-[200px]">
-                            ?token={purchase.linkTokens[0]}
-                          </code>
-                          <button
-                            onClick={() => {
-                              const link = `${window.location.origin}/?token=${purchase.linkTokens![0]}`;
-                              navigator.clipboard.writeText(link).catch(() => {});
-                            }}
-                            className="text-xs text-primary-400 hover:text-primary-300 font-medium flex items-center gap-1"
-                          >
-                            <Copy size={12} />
-                            Copiar link
-                          </button>
-                        </div>
-                      )}
+                              {/* 3-dot menu */}
+                              <div className="relative">
+                                <button
+                                  onClick={() => setOpenMenu(openMenu === row.rowId ? null : row.rowId)}
+                                  className="p-1.5 hover:bg-gray-600/40 rounded-lg transition-colors text-gray-400 hover:text-white"
+                                >
+                                  <MoreVertical size={14} />
+                                </button>
 
-                      {!purchase.linkTokens && (purchase.credential || (purchase.profiles && purchase.profiles.length > 0)) && (
-                        <div className="mt-2 text-xs text-gray-600 italic">URL: no aplica</div>
-                      )}
-
-                      <div className="flex items-center gap-4 mt-2 text-xs text-white/40">
-                        <span>${purchase.price.toLocaleString()}</span>
-                        <span>{new Date(purchase.createdAt).toLocaleDateString('es-CO')}</span>
-                        {purchase.expiresAt && (
-                          <span>Expira: {new Date(purchase.expiresAt).toLocaleDateString('es-CO')}</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-2 shrink-0">
-                      {(purchase.credential || (purchase.profiles && purchase.profiles.length > 0)) && (
-                        <button
-                          onClick={() => {
-                            if (purchase.profiles && purchase.profiles.length > 0) {
-                              const all = purchase.profiles.map(p => formatCredential(p.credential, p.profileName, p.profilePin)).join('\n\n');
-                              handleCopy(purchase.id, all);
-                            } else if (purchase.credential) {
-                              handleCopy(purchase.id, formatCredential(purchase.credential, purchase.profileName, purchase.profilePin));
-                            }
-                          }}
-                          className="p-2 rounded-lg bg-white/10 text-white/60 hover:text-white hover:bg-white/20 transition-all"
-                          title="Copiar credenciales"
-                        >
-                          {copiedId === purchase.id ? (
-                            <ClipboardCheck size={16} className="text-green-400" />
-                          ) : (
-                            <Copy size={16} />
-                          )}
-                        </button>
-                      )}
-                      {purchase.status === 'active' && (
-                        <>
-                          <button
-                            onClick={() => handleExtraerCodigo(purchase.id)}
-                            disabled={processing === purchase.id}
-                            className="p-2 rounded-lg bg-primary-500/20 text-primary-400 hover:bg-primary-500/30 disabled:opacity-50 transition-all"
-                            title="Extraer código"
-                          >
-                            {processing === purchase.id ? (
-                              <Loader className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <RefreshCw size={16} />
-                            )}
-                          </button>
-                          <button
-                            onClick={() => handleRenovar(purchase.serviceId, purchase.id)}
-                            disabled={processing === purchase.id}
-                            className="p-2 rounded-lg bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 disabled:opacity-50 transition-all"
-                            title="Renovar"
-                          >
-                            <Sparkles size={16} />
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={() => handleReportar(purchase.serviceId)}
-                        className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-all"
-                        title="Reportar problema"
-                      >
-                        <AlertTriangle size={16} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Code extraction result */}
-                  {codeResult?.purchaseId === purchase.id && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      className="mt-3 p-3 bg-green-500/10 border border-green-500/30 rounded-lg"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-green-400 font-medium text-sm mb-1">Código extraído</p>
-                          <p className="text-white font-mono text-lg break-all">{codeResult.data.code}</p>
-                          {codeResult.data.from && (
-                            <p className="text-white/50 text-xs mt-1">De: {codeResult.data.from}</p>
-                          )}
-                          {codeResult.data.subject && (
-                            <p className="text-white/50 text-xs">Asunto: {codeResult.data.subject}</p>
-                          )}
-                          {codeResult.data.extractedAt && (
-                            <p className="text-white/30 text-xs mt-1">
-                              {new Date(codeResult.data.extractedAt).toLocaleString('es-CO')}
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => setCodeResult(null)}
-                          className="text-white/40 hover:text-white shrink-0"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                      <button
-                        onClick={() => handleCopy(purchase.id + '-code', codeResult.data.code)}
-                        className="mt-2 flex items-center gap-1 text-xs text-white/60 hover:text-white transition-all"
-                      >
-                        {copiedId === purchase.id + '-code' ? (
-                          <><Check size={12} className="text-green-400" /> Copiado</>
-                        ) : (
-                          <><Copy size={12} /> Copiar código</>
-                        )}
-                      </button>
-                    </motion.div>
-                  )}
-                </motion.div>
-              ))}
-            </div>
-          )}
+                                {openMenu === row.rowId && (
+                                  <div ref={menuRef} className="absolute right-0 top-full mt-1 z-50 w-48 bg-gray-700 border border-gray-600 rounded-lg shadow-xl overflow-hidden">
+                                    <button
+                                      onClick={() => { setOpenMenu(null); setModalRow(row); }}
+                                      className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-gray-200 hover:bg-gray-600 transition-colors text-xs"
+                                    >
+                                      <Ticket size={14} />
+                                      Ver ticket
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setOpenMenu(null);
+                                        setReportServiceId(row.purchase.serviceId);
+                                        setActiveTab('reportar');
+                                      }}
+                                      className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-gray-200 hover:bg-gray-600 transition-colors text-xs"
+                                    >
+                                      <Flag size={14} />
+                                      Reportar
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </motion.div>
         </>
       )}
 
-      {activeTab === 'movimientos' && (
-        <Movimientos purchases={purchases} />
-      )}
+      {/* ─── TAB: MOVIMIENTOS ────────────────────────────────────────────── */}
+      {activeTab === 'movimientos' && <Movimientos purchases={purchases} />}
 
+      {/* ─── TAB: CÓDIGOS ────────────────────────────────────────────────── */}
+      {activeTab === 'codigos' && <Codigos purchases={purchases} />}
+
+      {/* ─── TAB: REPORTAR ───────────────────────────────────────────────── */}
       {activeTab === 'reportar' && (
         <Reportar purchases={purchases} selectedServiceId={reportServiceId} />
       )}
+
+      {activeTab === 'mis-reportes' && <MisReportesCliente />}
+
+      {/* ─── Modal de Ticket ──────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {modalRow && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setModalRow(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-gray-800 rounded-2xl w-full max-w-lg p-6 border border-gray-700"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-500/20 mb-4">
+                  <Ticket size={36} className="text-primary-400" />
+                </div>
+                <h2 className="text-2xl font-bold text-white">Ticket de Acceso</h2>
+                <p className="text-gray-400 mt-1">
+                  {modalRow.plataforma} —{' '}
+                  <span className="text-primary-400 font-mono font-medium">
+                    {buildTicketId(modalRow.purchaseId, modalRow.idx)}
+                  </span>
+                </p>
+              </div>
+
+              <div className="bg-gray-900 rounded-lg p-4 border border-gray-700 mb-4">
+                <pre className="text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed">
+                  {buildTemplate(modalRow.plataforma, modalRow)}
+                </pre>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 mb-6">
+                <div className="bg-gray-900 rounded-lg p-3 text-center border border-gray-700">
+                  <p className="text-gray-500 text-xs">Entrega</p>
+                  <p className="text-white text-sm font-medium mt-0.5">{modalRow.fechaEntrega.toLocaleDateString()}</p>
+                </div>
+                <div className="bg-gray-900 rounded-lg p-3 text-center border border-gray-700">
+                  <p className="text-gray-500 text-xs">Vence</p>
+                  <p className="text-white text-sm font-medium mt-0.5">{modalRow.fechaVencimiento.toLocaleDateString()}</p>
+                </div>
+                <div className="bg-gray-900 rounded-lg p-3 text-center border border-gray-700">
+                  <p className="text-gray-500 text-xs">Restan</p>
+                  <p className={`text-sm font-medium mt-0.5 ${
+                    modalRow.diasRestantes <= 0
+                      ? 'text-red-400'
+                      : modalRow.diasRestantes <= 5
+                      ? 'text-yellow-400'
+                      : 'text-green-400'
+                  }`}>
+                    {modalRow.diasRestantes <= 0 ? 'Vencido' : `${modalRow.diasRestantes} días`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => { handleCopyTemplate(modalRow); }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium transition-colors"
+                >
+                  <Copy size={14} />
+                  {copiedTemplate ? '¡Copiado!' : 'Copiar plantilla'}
+                </button>
+                <button onClick={() => setModalRow(null)} className="w-full text-gray-400 hover:text-white font-medium py-2 transition-colors text-sm">
+                  Cerrar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Toast */}
       {toast && (
@@ -376,9 +539,7 @@ const MisServicios = () => {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -20, opacity: 0 }}
           className={`fixed top-20 left-1/2 -translate-x-1/2 px-4 py-3 rounded-xl shadow-2xl z-50 ${
-            toast.type === 'error'
-              ? 'bg-red-500/90 text-white'
-              : 'bg-green-500/90 text-white'
+            toast.type === 'error' ? 'bg-red-500/90 text-white' : 'bg-green-500/90 text-white'
           }`}
         >
           <p className="font-medium text-sm">{toast.msg}</p>

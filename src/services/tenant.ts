@@ -60,26 +60,27 @@ export const getTenantBySubdomain = async (subdomain: string): Promise<Tenant | 
 };
 
 export const detectTenantFromUrl = (): string | null => {
+  // 1. Parámetros de URL (prioridad máxima)
   const urlParams = new URLSearchParams(window.location.search);
-  
   const tenantFromV = urlParams.get('v');
   const tenantFromQuery = urlParams.get('tenant');
-  
-  if (tenantFromV) {
-    return tenantFromV;
-  }
-  if (tenantFromQuery) {
-    return tenantFromQuery;
-  }
+  if (tenantFromV) return tenantFromV;
+  if (tenantFromQuery) return tenantFromQuery;
 
+  // 2. Subdominio (ej: mitienda.ejstore-web.web.app)
   const hostname = window.location.hostname;
-  
   if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
     const parts = hostname.split('.');
     if (parts.length >= 2 && parts[0] !== 'www' && parts[0] !== 'ejstore-web') {
+      // Guardar en sessionStorage para refrescos
+      sessionStorage.setItem('ejstore_tenant_id', parts[0]);
       return parts[0];
     }
   }
-  
+
+  // 3. SessionStorage (para refrescos de página)
+  const stored = sessionStorage.getItem('ejstore_tenant_id');
+  if (stored) return stored;
+
   return null;
 };

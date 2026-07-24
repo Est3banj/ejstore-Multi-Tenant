@@ -47,7 +47,8 @@ const Services = () => {
     isPopular: false,
     hasCodeExtraction: false,
     benefits: [],
-    pricing: []
+    pricing: [],
+    terms: ''
   });
   const [pricingInput, setPricingInput] = useState({ months: '', price: '' });
   const [uploading, setUploading] = useState(false);
@@ -113,8 +114,10 @@ const Services = () => {
         active: service.active !== undefined ? service.active : true,
         isPopular: service.isPopular || false,
         hasCodeExtraction: service.hasCodeExtraction || false,
+        durationDays: service.durationDays || '',
         benefits: service.benefits || [],
-        pricing: service.pricing || []
+        pricing: service.pricing || [],
+        terms: service.terms || ''
       });
     } else {
       setEditingService(null);
@@ -131,8 +134,10 @@ const Services = () => {
         active: true,
         isPopular: false,
         hasCodeExtraction: false,
+        durationDays: '',
         benefits: [],
-        pricing: []
+        pricing: [],
+        terms: ''
       });
     }
     setUrlValidation({ isValid: true, error: '', warning: '' });
@@ -239,8 +244,10 @@ const Services = () => {
         active: formData.active,
         isPopular: formData.isPopular,
         hasCodeExtraction: formData.hasCodeExtraction,
+        durationDays: formData.durationDays ? parseInt(formData.durationDays) : null,
         benefits: formData.benefits,
-        pricing: formData.pricing
+        pricing: formData.pricing,
+        terms: formData.terms || null
       };
 
       if (editingService) {
@@ -425,6 +432,18 @@ const Services = () => {
                 placeholder="Ej: 15999"
               />
             </div>
+            <div>
+              <label className="block text-white/70 mb-2">Días de Servicio</label>
+              <input
+                type="number"
+                value={formData.durationDays}
+                onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
+                className="input-field"
+                min="1"
+                placeholder="Ej: 30 (mensual)"
+              />
+              <p className="text-gray-500 text-xs mt-1">Días que dura el servicio desde la compra. Se usa para calcular fechas de vencimiento.</p>
+            </div>
           </div>
 
           <div>
@@ -547,6 +566,20 @@ const Services = () => {
                 </span>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="block text-white/70 mb-2">
+              Términos y Condiciones del Servicio
+              <span className="text-gray-500 text-sm ml-2">(se muestra al comprador antes de confirmar)</span>
+            </label>
+            <textarea
+              value={formData.terms}
+              onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
+              className="input-field font-mono text-sm"
+              rows="6"
+              placeholder={`Ej: ✔️ Catálogo completo incluido\n✔️ Perfil personalizable\n❌ Prohibido cambiar clave\n☠️ No cumplir condiciones anula garantía`}
+            />
           </div>
 
           {/* Precios Manuales */}

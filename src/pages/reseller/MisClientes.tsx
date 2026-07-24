@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { useAuthStore } from '../../store/authStore';
-import { getResellerById, extraerCodigo } from '../../services/marketplace';
-import type { ExtraerCodigoResponse } from '../../types/marketplace';
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { useAuthStore } from "../../store/authStore";
 import {
   collection,
   query,
@@ -13,28 +12,20 @@ import {
   doc,
   setDoc,
   serverTimestamp,
-} from 'firebase/firestore';
-import { db } from '../../services/firebase';
+} from "firebase/firestore";
+import { db } from "../../services/firebase";
 import {
-  Plus, Copy, ShoppingBag,
-  ChevronDown, ChevronRight, CheckCircle2,
-  Mail, Loader2,
-} from 'lucide-react';
+  ShoppingBag,
+  Search,
+  Copy,
+  MoreVertical,
+  Ticket,
+  Flag,
+  Loader2,
+  X,
+} from "lucide-react";
 
-interface PublicLink {
-  id: string;
-  token: string;
-  accountInfo: Record<string, string>;
-  serviceName: string;
-  createdAt: Date;
-  expiresAt: Date;
-  status: 'active' | 'expired';
-}
-
-interface PurchaseAccount {
-  accountId: string;
-  credential: Record<string, string>;
-}
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface PurchasedProfile {
   profileId: string;
@@ -46,6 +37,7 @@ interface PurchasedProfile {
 interface Purchase {
   id: string;
   customerEmail: string;
+  customerName?: string;
   serviceName: string;
   serviceId: string;
   createdAt: Date;
@@ -58,115 +50,248 @@ interface Purchase {
   profileName?: string;
   profilePin?: string;
   profiles?: PurchasedProfile[];
+  durationDays?: number;
 }
 
+interface AccountRow {
+  rowId: string;
+  purchaseId: string;
+  idx: number;
+  nombre: string;
+  plataforma: string;
+  correo: string;
+  contrasena: string;
+  perfil: string;
+  pinPerfil: string;
+  fechaEntrega: Date;
+  diasServicio: number;
+  fechaVencimiento: Date;
+  diasRestantes: number;
+  credential: Record<string, string>;
+  linkToken?: string;
+  purchase: Purchase;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const TEMPLATE_RULES = `⚠ REGLAS ⚠
+✅ NO EDITAR SOBRE EL MISMO PERFIL // NO CAMBIAR CONTRASEÑA, DE LO CONTRARIO NO SE DARÁ GARANTÍA
+USAR EN UN SOLO DISPOSITIVO.
+✅ SI LLEGA A PRESENTAR ALGUNA FALLA TU CUENTA, POR FAVOR ENVIAR EN ORDEN: CORREO, CONTRASEÑA Y EVIDENCIA DEL PROBLEMA`;
+
+const buildTicketId = (row: AccountRow): string => {
+  const shortId = row.purchaseId.slice(0, 6).toUpperCase();
+  return `TKT-${shortId}-${row.idx + 1}`;
+};
+
+const buildTemplate = (serviceName: string, row: AccountRow): string => {
+  const ticketId = buildTicketId(row);
+  const lines = [
+    `⭕️📺 SERVICIO DE ${serviceName} 📽️`,
+    "",
+    `*Ticket:* ${ticketId}`,
+    `*Correo:* ${row.correo}`,
+    `*Clave:* ${row.contrasena}`,
+    `*Perfil:* ${row.perfil}`,
+    `*Pin:* ${row.pinPerfil}`,
+    "",
+    `*Vence:* ${row.fechaVencimiento.toLocaleDateString()}`,
+    "",
+    TEMPLATE_RULES,
+  ];
+  return lines.join("\n");
+};
+
 const generateToken = (): string => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let result = "";
   for (let i = 0; i < 20; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
 };
 
+// ─── Component ────────────────────────────────────────────────────────────────
+
 const MisClientes = (): JSX.Element => {
   const { user } = useAuthStore();
-  const uid = user?.uid || '';
-  const [publicLinks, setPublicLinks] = useState<PublicLink[]>([]);
-  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const uid = user?.uid || "";
+  const navigate = useNavigate();
+  const [rows, setRows] = useState<AccountRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
-  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
-  const [resellerName, setResellerName] = useState('');
-  const [expandedPurchase, setExpandedPurchase] = useState<string | null>(null);
-  const [extractingCode, setExtractingCode] = useState<string | null>(null);
-  const [codeResults, setCodeResults] = useState<Record<string, ExtraerCodigoResponse>>({});
+  const [modalRow, setModalRow] = useState<AccountRow | null>(null);
+  const [copiedTemplate, setCopiedTemplate] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
+  // ─── Cerrar menú al hacer clic fuera ────────────────────────────────────
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenu(null);
+      }
+    };
+    if (openMenu) {
+      document.addEventListener("mousedown", handleClick);
+      return () => document.removeEventListener("mousedown", handleClick);
+    }
+  }, [openMenu]);
+
+  // ─── Filtrar filas por búsqueda ────────────────────────────────────────
+  const filteredRows = useMemo(() => {
+    if (!search.trim()) return rows;
+    const q = search.toLowerCase().trim();
+    return rows.filter(
+      (r) =>
+        r.nombre.toLowerCase().includes(q) ||
+        r.plataforma.toLowerCase().includes(q) ||
+        r.correo.toLowerCase().includes(q) ||
+        r.perfil.toLowerCase().includes(q) ||
+        r.rowId.toLowerCase().includes(q) ||
+        r.pinPerfil.toLowerCase().includes(q) ||
+        String(r.idx + 1).includes(q) ||
+        buildTicketId(r).toLowerCase().includes(q),
+    );
+  }, [rows, search]);
+
+  // ─── Cargar datos ───────────────────────────────────────────────────────
   const loadData = async () => {
     if (!uid) return;
+
+    let purchases: Purchase[] = [];
     try {
-      const resellerData = await getResellerById(uid);
-      if (resellerData) {
-        setResellerName(resellerData.name || '');
+      purchases = await loadPurchases();
+    } catch (err) {
+      console.error("Error loading purchases:", err);
+    }
+
+    // Construir filas con fechas calculadas
+    const allRows: AccountRow[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (const purchase of purchases) {
+      const durationDays = purchase.durationDays || 30;
+      const entrega = purchase.createdAt;
+      const vencimiento = new Date(
+        entrega.getTime() + durationDays * 24 * 60 * 60 * 1000,
+      );
+      const diffTime = vencimiento.getTime() - today.getTime();
+      const diasRestantes = Math.max(
+        0,
+        Math.ceil(diffTime / (1000 * 60 * 60 * 24)),
+      );
+
+      let accounts: { accountId: string; credential: Record<string, string> }[];
+      if (purchase.profiles && purchase.profiles.length > 0) {
+        accounts = purchase.profiles.map((p, i) => ({
+          accountId: p.profileId || purchase.accountIds[i] || `row-${i}`,
+          credential: {
+            ...p.credential,
+            profileName: p.profileName,
+            ...(p.profilePin ? { profilePin: p.profilePin } : {}),
+          },
+        }));
+      } else if (purchase.profileName) {
+        accounts = purchase.accountIds.map((id, i) => ({
+          accountId: id,
+          credential: {
+            ...(purchase.credentials[i] || {}),
+            profileName: purchase.profileName || "",
+            ...(purchase.profilePin ? { profilePin: purchase.profilePin } : {}),
+          },
+        }));
+      } else {
+        accounts = purchase.accountIds.map((id, i) => ({
+          accountId: id,
+          credential: purchase.credentials[i] || {},
+        }));
       }
 
-      // Load public links (from the global collection)
-      const linksQuery = query(
-        collection(db, 'public_links'),
-        where('resellerId', '==', uid),
-        orderBy('createdAt', 'desc'),
-        limit(50)
+      accounts.forEach((acct, idx) => {
+        const cred = acct.credential;
+        const rowId = `${purchase.id}_${idx}`;
+        allRows.push({
+          rowId,
+          purchaseId: purchase.id,
+          idx,
+          nombre: purchase.customerName || purchase.customerEmail || "-",
+          plataforma: purchase.serviceName || "-",
+          correo: cred.email || cred.correo || cred.usuario || "-",
+          contrasena: cred.password || cred.clave || cred.pass || "-",
+          perfil: cred.profileName || "-",
+          pinPerfil: cred.profilePin || "-",
+          fechaEntrega: entrega,
+          diasServicio: durationDays,
+          fechaVencimiento: vencimiento,
+          diasRestantes,
+          credential: cred,
+          linkToken: purchase.linkTokens?.[idx],
+          purchase,
+        });
+      });
+    }
+
+    setRows(allRows);
+    setLoading(false);
+  };
+
+  const loadPurchases = async (): Promise<Purchase[]> => {
+    try {
+      const purchasesQuery = query(
+        collection(db, "purchases"),
+        where("customerId", "==", uid),
+        orderBy("createdAt", "desc"),
+        limit(50),
       );
-      const linksSnapshot = await getDocs(linksQuery);
-      const links: PublicLink[] = linksSnapshot.docs.map((d) => {
+      const snapshot = await getDocs(purchasesQuery);
+      return snapshot.docs.map((d) => {
         const data = d.data();
         return {
           id: d.id,
-          token: d.id,
-          accountInfo: data.credential || {},
-          serviceName: data.serviceName || '',
+          customerEmail: data.customerEmail || "Reseller",
+          customerName: data.customerName || "",
+          serviceName: data.serviceName || "",
+          serviceId: data.serviceId || "",
           createdAt: data.createdAt?.toDate?.() || new Date(),
-          expiresAt: data.expiresAt?.toDate?.() || new Date(),
-          status: data.status || 'expired',
+          quantity: data.quantity || 1,
+          total: data.price || 0,
+          accountIds: data.accountIds || [],
+          credentials: data.credentials || [],
+          status: data.status || "active",
+          linkTokens: data.linkTokens || undefined,
+          profiles: data.profiles || undefined,
+          durationDays: data.durationDays || undefined,
         };
       });
-      setPublicLinks(links);
-
-      // Load purchases (usando resellerId ahora)
-      const purchasesQuery = query(
-        collection(db, 'purchases'),
-        where('resellerId', '==', uid),
-        orderBy('createdAt', 'desc'),
-        limit(50)
+    } catch {
+      const fallbackQuery = query(
+        collection(db, "purchases"),
+        where("customerId", "==", uid),
       );
-      try {
-        const purchasesSnapshot = await getDocs(purchasesQuery);
-        const purchasesList: Purchase[] = purchasesSnapshot.docs.map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            customerEmail: data.customerEmail || 'Reseller',
-            serviceName: data.serviceName || '',
-            serviceId: data.serviceId || '',
-            createdAt: data.createdAt?.toDate?.() || new Date(),
-            quantity: data.quantity || 1,
-            total: data.price || 0,
-            accountIds: data.accountIds || [],
-            credentials: data.credentials || [],
-            status: data.status || 'active',
-            linkTokens: data.linkTokens || undefined,
-          };
-        });
-        setPurchases(purchasesList);
-      } catch (err) {
-        // try without orderBy
-        const fallbackQuery = query(
-          collection(db, 'purchases'),
-          where('resellerId', '==', uid)
-        );
-        const fallbackSnapshot = await getDocs(fallbackQuery);
-        const purchasesList: Purchase[] = fallbackSnapshot.docs.map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            customerEmail: data.customerEmail || 'Reseller',
-            serviceName: data.serviceName || '',
-            serviceId: data.serviceId || '',
-            createdAt: data.createdAt?.toDate?.() || new Date(),
-            quantity: data.quantity || 1,
-            total: data.price || 0,
-            accountIds: data.accountIds || [],
-            credentials: data.credentials || [],
-            status: data.status || 'active',
-            linkTokens: data.linkTokens || undefined,
-          };
-        });
-        setPurchases(purchasesList);
-      }
-    } catch (err) {
-      console.error('Error loading data:', err);
-    } finally {
-      setLoading(false);
+      const snapshot = await getDocs(fallbackQuery);
+      return snapshot.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          customerEmail: data.customerEmail || "Reseller",
+          customerName: data.customerName || "",
+          serviceName: data.serviceName || "",
+          serviceId: data.serviceId || "",
+          createdAt: data.createdAt?.toDate?.() || new Date(),
+          quantity: data.quantity || 1,
+          total: data.price || 0,
+          accountIds: data.accountIds || [],
+          credentials: data.credentials || [],
+          status: data.status || "active",
+          linkTokens: data.linkTokens || undefined,
+          profiles: data.profiles || undefined,
+          durationDays: data.durationDays || undefined,
+        };
+      });
     }
   };
 
@@ -174,381 +299,395 @@ const MisClientes = (): JSX.Element => {
     if (uid) loadData();
   }, [uid]);
 
-  const handleCreateLink = async (purchase: Purchase, accountIndex: number) => {
-    if (!uid) return;
-    const accountId = purchase.accountIds[accountIndex];
-    const credential = purchase.credentials[accountIndex] || {};
-    if (!accountId) return;
-
-    const linkKey = `${purchase.id}_${accountIndex}`;
+  // ─── Generar Ticket (crea link público) ────────────────────────────────
+  const handleGenerateTicket = async (row: AccountRow) => {
+    const linkKey = row.rowId;
     setGeneratingFor(linkKey);
 
     try {
       const token = generateToken();
       const now = new Date();
-      const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
+      const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-      await setDoc(doc(db, 'public_links', token), {
+      await setDoc(doc(db, "public_links", token), {
         token,
         resellerId: uid,
-        accountId,
-        serviceId: purchase.serviceId,
-        serviceName: purchase.serviceName,
-        purchaseId: purchase.id,
-        accountIndex,
-        credential,
+        accountId: row.purchase.accountIds[row.idx] || "",
+        serviceId: row.purchase.serviceId,
+        serviceName: row.purchase.serviceName,
+        purchaseId: row.purchase.id,
+        accountIndex: row.idx,
+        credential: row.credential,
         createdAt: serverTimestamp(),
         expiresAt,
-        status: 'active',
+        status: "active",
       });
 
       await loadData();
     } catch (err) {
-      console.error('Error creating link:', err);
+      console.error("Error generando ticket:", err);
     } finally {
       setGeneratingFor(null);
     }
   };
 
-  const handleCopyLink = async (token: string) => {
-    const link = `${window.location.origin}/?token=${token}`;
+  // ─── Copiar template al portapapeles ───────────────────────────────────
+  const handleCopyTemplate = async (row: AccountRow) => {
+    const template = buildTemplate(row.plataforma, row);
     try {
-      await navigator.clipboard.writeText(link);
-      setCopyFeedback(token);
-      setTimeout(() => setCopyFeedback(null), 2000);
+      await navigator.clipboard.writeText(template);
     } catch {
-      const textarea = document.createElement('textarea');
-      textarea.value = link;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-      setCopyFeedback(token);
-      setTimeout(() => setCopyFeedback(null), 2000);
+      const ta = document.createElement("textarea");
+      ta.value = template;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
     }
+    setCopiedTemplate(true);
+    setTimeout(() => setCopiedTemplate(false), 2000);
   };
 
-  const handleExtractCode = async (purchaseId: string, accountIdx: number) => {
-    const key = `${purchaseId}_${accountIdx}`;
-    setExtractingCode(key);
-    try {
-      const result = await extraerCodigo({ purchaseId });
-      setCodeResults((prev) => ({ ...prev, [key]: result }));
-    } catch (err) {
-      console.error('Error extracting code:', err);
-    } finally {
-      setExtractingCode(null);
-    }
-  };
-
-  const handleCopyCode = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-    }
-  };
-
-  const formatCredential = (cred: Record<string, string>): string => {
-    // Filter out profileName/profilePin from credential display (shown separately)
-    const entries = Object.entries(cred).filter(([k]) => k !== 'profileName' && k !== 'profilePin');
-    if (entries.length === 0) return Object.entries(cred).map(([k, v]) => `${k}: ${v}`).join(' | ');
-    return entries.map(([k, v]) => `${k}: ${v}`).join(' | ');
-  };
-
+  // ─── Render ─────────────────────────────────────────────────────────────
   if (loading) {
-    return (
-      <div className="p-6 text-center text-gray-400">Cargando...</div>
-    );
+    return <div className="p-6 text-center text-gray-400">Cargando...</div>;
   }
 
   return (
-    <div className="p-6 space-y-8">
+    <div className="p-6 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Mis Clientes</h1>
-        {resellerName && (
-          <span className="text-gray-400 text-sm">{resellerName}</span>
+      </div>
+
+      {/* Buscador inteligente */}
+      <div className="relative max-w-md">
+        <Search
+          size={16}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+        />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por nombre, plataforma, correo, perfil, ticket..."
+          className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-9 pr-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary-500 transition-colors"
+        />
+        {search && (
+          <button
+            onClick={() => setSearch("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+          >
+            <X size={14} />
+          </button>
         )}
       </div>
 
-      {/* ===== COMPRAS (con links por cuenta) ===== */}
+      {/* Tabla */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
         className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden"
       >
         <div className="p-5 border-b border-gray-700">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <ShoppingBag className="w-5 h-5 text-green-400" />
-            Compras
+            Clientes
+            {search && (
+              <span className="text-sm font-normal text-gray-400 ml-2">
+                ({filteredRows.length} resultado
+                {filteredRows.length !== 1 ? "s" : ""})
+              </span>
+            )}
           </h2>
-          <p className="text-gray-400 text-sm mt-1">
-            Expandí una compra para ver las cuentas, copiar credenciales o generar links de acceso
-          </p>
         </div>
 
-        {purchases.length === 0 ? (
+        {rows.length === 0 ? (
           <div className="text-center text-gray-400 py-8">
-            No tenés compras. Andá al <a href="/r/catalogo" className="text-primary-400 hover:underline">Catálogo</a> para comprar cuentas al por mayor.
+            No tenés compras. Andá al{" "}
+            <a href="/r/catalogo" className="text-primary-400 hover:underline">
+              Catálogo
+            </a>{" "}
+            para comprar cuentas al por mayor.
           </div>
         ) : (
-          <div className="divide-y divide-gray-700">
-            {purchases.map((purchase) => {
-              const isExpanded = expandedPurchase === purchase.id;
-
-              // Build account list from profiles (new format) or legacy credentials
-              let accounts: PurchaseAccount[];
-              if (purchase.profiles && purchase.profiles.length > 0) {
-                accounts = purchase.profiles.map((p, i) => ({
-                  accountId: p.profileId || purchase.accountIds[i] || '',
-                  credential: {
-                    ...p.credential,
-                    profileName: p.profileName,
-                    ...(p.profilePin ? { profilePin: p.profilePin } : {}),
-                  },
-                }));
-              } else if (purchase.profileName) {
-                accounts = purchase.accountIds.map((id, i) => ({
-                  accountId: id,
-                  credential: {
-                    ...(purchase.credentials[i] || {}),
-                    profileName: purchase.profileName || '',
-                    ...(purchase.profilePin ? { profilePin: purchase.profilePin } : {}),
-                  },
-                }));
-              } else {
-                // Legacy: no profiles
-                accounts = purchase.accountIds.map((id, i) => ({
-                  accountId: id,
-                  credential: purchase.credentials[i] || {},
-                }));
-              }
-
-              return (
-                <div key={purchase.id}>
-                  {/* Purchase row */}
-                  <button
-                    onClick={() =>
-                      setExpandedPurchase(isExpanded ? null : purchase.id)
-                    }
-                    className="w-full flex items-center justify-between p-5 hover:bg-gray-700/30 transition-colors text-left"
-                  >
-                    <div className="flex items-center gap-4">
-                      {isExpanded ? (
-                        <ChevronDown size={18} className="text-gray-400" />
-                      ) : (
-                        <ChevronRight size={18} className="text-gray-400" />
-                      )}
-                      <div>
-                        <span className="text-white font-medium">
-                          {purchase.serviceName}
-                        </span>
-                        <span className="text-gray-400 text-sm ml-3">
-                          {purchase.createdAt.toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="text-gray-300">
-                        {purchase.quantity} cuenta{purchase.quantity !== 1 ? 's' : ''}
-                      </span>
-                      <span className="text-white font-medium">
-                        ${purchase.total.toLocaleString()}
-                      </span>
-                      {purchase.status === 'active' ? (
-                        <span className="px-2 py-0.5 rounded-full text-xs bg-green-500/20 text-green-400">
-                          Activa
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full text-xs bg-gray-500/20 text-gray-400">
-                          {purchase.status}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-
-                  {/* Expanded accounts */}
-                  {isExpanded && (
-                    <div className="bg-gray-900/30 border-t border-gray-700">
-                      {accounts.length === 0 ? (
-                        <div className="px-5 py-4 text-gray-500 text-sm">
-                          No hay cuentas asociadas a esta compra.
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-700 bg-gray-800/80">
+                  <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">
+                    #
+                  </th>
+                  <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">
+                    Nombre
+                  </th>
+                  <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">
+                    Plataforma
+                  </th>
+                  <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">
+                    Correo
+                  </th>
+                  <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">
+                    Contraseña
+                  </th>
+                  <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">
+                    Perfil
+                  </th>
+                  <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">
+                    PIN Perfil
+                  </th>
+                  <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">
+                    Fecha Entrega
+                  </th>
+                  <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">
+                    Días Svc.
+                  </th>
+                  <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">
+                    Fecha Venc.
+                  </th>
+                  <th className="px-3 py-3 text-left text-gray-400 font-medium text-xs uppercase tracking-wider">
+                    Días Rest.
+                  </th>
+                  <th className="px-3 py-3 text-center text-gray-400 font-medium text-xs uppercase tracking-wider">
+                    Acciones
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700/50">
+                {filteredRows.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={12}
+                      className="px-3 py-8 text-center text-gray-500"
+                    >
+                      No hay resultados para "{search}"
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRows.map((row) => (
+                    <tr
+                      key={row.rowId}
+                      className="hover:bg-gray-700/20 transition-colors"
+                    >
+                      <td className="px-3 py-2.5">
+                        <div className="text-gray-500 font-mono text-xs">
+                          {row.idx + 1}
                         </div>
-                      ) : (
-                        <div className="divide-y divide-gray-700/50">
-                          {accounts.map((acct, idx) => {
-                            const linkKey = `${purchase.id}_${idx}`;
-                            const existingLink = publicLinks.find(
-                              (l) =>
-                                l.id === linkKey ||
-                                (l.id.startsWith(purchase.id) && l.id.endsWith(`_${idx}`))
-                            );
-
-                            const codeKey = `${purchase.id}_${idx}`;
-                            const codeResult = codeResults[codeKey];
-                            const isExtracting = extractingCode === codeKey;
-
-                            return (
-                              <div key={acct.accountId}>
-                                {/* Account row */}
-                                <div className="flex items-center justify-between px-5 py-3 hover:bg-gray-700/20">
-                                  <div className="flex items-center gap-4 min-w-0">
-                                    <span className="text-gray-500 text-sm w-6 shrink-0">
-                                      #{idx + 1}
-                                    </span>
-                                    <div className="flex flex-col min-w-0">
-                                      {acct.credential.profileName && (
-                                        <span className="text-primary-300 text-xs font-medium mb-0.5">
-                                          Perfil: {acct.credential.profileName}
-                                          {acct.credential.profilePin && (
-                                            <> · PIN: {acct.credential.profilePin}</>
-                                          )}
-                                        </span>
-                                      )}
-                                      <span className="text-gray-300 text-sm font-mono truncate">
-                                        {formatCredential(acct.credential)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    {/* Extraer código */}
-                                    <button
-                                      onClick={() =>
-                                        handleExtractCode(purchase.id, idx)
-                                      }
-                                      disabled={isExtracting}
-                                      className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs rounded-lg transition-colors"
-                                    >
-                                      {isExtracting ? (
-                                        <><Loader2 size={14} className="animate-spin" /> Extrayendo...</>
-                                      ) : codeResult ? (
-                                        <><Mail size={14} /> Ver correo</>
-                                      ) : (
-                                        <><Mail size={14} /> Extraer código</>
-                                      )}
-                                    </button>
-
-                                    {/* Link público (auto-generado o manual) */}
-                                    {(() => {
-                                      // 1) Link auto-generado (purchase tiene linkTokens)
-                                      if (purchase.linkTokens && purchase.linkTokens.length > 0) {
-                                        const autoToken = purchase.linkTokens[idx];
-                                        if (autoToken) {
-                                          return (
-                                            <div className="flex items-center gap-2">
-                                              <code className="text-xs text-primary-400 hidden sm:inline max-w-[120px] truncate">
-                                                ?token={autoToken}
-                                              </code>
-                                              <button
-                                                onClick={() => handleCopyLink(autoToken)}
-                                                className="flex items-center gap-1 text-primary-400 hover:text-primary-300 text-xs font-medium"
-                                              >
-                                                {copyFeedback === autoToken
-                                                  ? 'Copiado!'
-                                                  : <><Copy size={12} /> Copiar link</>}
-                                              </button>
-                                            </div>
-                                          );
-                                        }
-                                        // LinkTokens existe pero esta cuenta no tiene → no aplica
-                                        return (
-                                          <span className="text-xs text-gray-500 italic">
-                                            URL: no aplica
-                                          </span>
-                                        );
-                                      }
-
-                                      // 2) Link manual (purchase vieja sin linkTokens)
-                                      if (existingLink) {
-                                        return (
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-xs text-green-400 flex items-center gap-1">
-                                              <CheckCircle2 size={12} />
-                                              Link creado
-                                            </span>
-                                            <button
-                                              onClick={() => handleCopyLink(existingLink.token)}
-                                              className="flex items-center gap-1 text-primary-400 hover:text-primary-300 text-xs font-medium"
-                                            >
-                                              {copyFeedback === existingLink.token
-                                                ? 'Copiado!'
-                                                : <><Copy size={12} /> Copiar</>}
-                                            </button>
-                                          </div>
-                                        );
-                                      }
-
-                                      // 3) Sin link — solo mostrar "Generar" para compras viejas
-                                      return (
-                                        <button
-                                          onClick={() => handleCreateLink(purchase, idx)}
-                                          disabled={generatingFor === linkKey}
-                                          className="flex items-center gap-1 px-3 py-1.5 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white text-xs rounded-lg transition-colors"
-                                        >
-                                          {generatingFor === linkKey ? (
-                                            'Creando...'
-                                          ) : (
-                                            <><Plus size={14} /> Generar Link</>
-                                          )}
-                                        </button>
-                                      );
-                                    })()}
-                                  </div>
-                                </div>
-
-                                {/* Code result (collapsible) */}
-                                {codeResult && (
-                                  <div className="px-5 pb-3">
-                                    <div className="bg-gray-900/50 rounded-lg border border-gray-700/50 overflow-hidden">
-                                      <div className="px-4 py-2 border-b border-gray-700/50 flex items-center gap-2">
-                                        <Mail className="w-3.5 h-3.5 text-primary-400" />
-                                        <span className="text-xs text-gray-300">
-                                          {codeResult.subject}
-                                        </span>
-                                        <span className="text-xs text-gray-600 ml-auto">
-                                          {new Date(codeResult.extractedAt).toLocaleString()}
-                                        </span>
-                                      </div>
-                                      <pre className="p-4 text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
-                                        {codeResult.bodyText}
-                                      </pre>
-                                      <div className="px-4 py-2 border-t border-gray-700/50 flex items-center gap-2 text-xs">
-                                        <span className="text-gray-500">De:</span>
-                                        <span className="text-gray-400">{codeResult.from}</span>
-                                        <span className="text-gray-500 ml-2">Código:</span>
-                                        <span className="text-primary-400 font-mono font-bold">
-                                          {codeResult.code}
-                                        </span>
-                                        <button
-                                          onClick={() => handleCopyCode(codeResult.code)}
-                                          className="ml-auto text-primary-400 hover:text-primary-300"
-                                          title="Copiar código"
-                                        >
-                                          <Copy size={12} />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
+                        <div className="text-primary-400 font-mono text-[10px] leading-tight mt-0.5">
+                          {buildTicketId(row)}
                         </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                      </td>
+                      <td className="px-3 py-2.5 text-white font-medium">
+                        {row.nombre}
+                      </td>
+                      <td className="px-3 py-2.5 text-gray-300">
+                        {row.plataforma}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className="text-gray-200 font-mono text-xs">
+                          {row.correo}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className="text-gray-200 font-mono text-xs">
+                          {row.contrasena}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-gray-300">
+                        {row.perfil}
+                      </td>
+                      <td className="px-3 py-2.5 text-gray-300">
+                        {row.pinPerfil}
+                      </td>
+                      <td className="px-3 py-2.5 text-gray-400 text-xs whitespace-nowrap">
+                        {row.fechaEntrega.toLocaleDateString()}
+                      </td>
+                      <td className="px-3 py-2.5 text-gray-400 text-xs">
+                        {row.diasServicio}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs whitespace-nowrap">
+                        <span
+                          className={
+                            row.diasRestantes <= 0
+                              ? "text-red-400"
+                              : "text-gray-200"
+                          }
+                        >
+                          {row.fechaVencimiento.toLocaleDateString()}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-xs">
+                        <span
+                          className={
+                            row.diasRestantes <= 0
+                              ? "text-red-400 font-medium"
+                              : row.diasRestantes <= 5
+                                ? "text-yellow-400 font-medium"
+                                : "text-green-400"
+                          }
+                        >
+                          {row.diasRestantes <= 0
+                            ? "Vencido"
+                            : `${row.diasRestantes}d`}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-center">
+                        {/* Menú de 3 puntitos */}
+                        <div className="relative flex items-center justify-center">
+                          <button
+                            onClick={() =>
+                              setOpenMenu(
+                                openMenu === row.rowId ? null : row.rowId,
+                              )
+                            }
+                            className="p-1.5 hover:bg-gray-600/40 rounded-lg transition-colors text-gray-400 hover:text-white"
+                            title="Acciones"
+                          >
+                            <MoreVertical size={14} />
+                          </button>
+
+                          {/* Dropdown menu */}
+                          {openMenu === row.rowId && (
+                            <div
+                              ref={menuRef}
+                              className="absolute right-0 top-full mt-1 z-50 w-48 bg-gray-700 border border-gray-600 rounded-lg shadow-xl overflow-hidden"
+                            >
+                              <button
+                                onClick={() => {
+                                  setOpenMenu(null);
+                                  setModalRow(row);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-gray-200 hover:bg-gray-600 transition-colors text-xs"
+                              >
+                                <Ticket size={14} />
+                                Ver ticket
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setOpenMenu(null);
+                                  navigate(
+                                    `/r/reportar?pid=${row.purchaseId}&idx=${row.idx}&tkt=${buildTicketId(row)}&correo=${encodeURIComponent(row.correo)}`
+                                  );
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-gray-200 hover:bg-gray-600 transition-colors text-xs"
+                              >
+                                <Flag size={14} />
+                                Reportar
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         )}
       </motion.div>
+
+      {/* ─── Modal de Ticket ──────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {modalRow && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setModalRow(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-gray-800 rounded-2xl w-full max-w-lg p-6 border border-gray-700"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-500/20 mb-4">
+                  <Ticket size={36} className="text-primary-400" />
+                </div>
+                <h2 className="text-2xl font-bold text-white">
+                  Ticket de Acceso
+                </h2>
+                <p className="text-gray-400 mt-1">
+                  {modalRow.plataforma} —{" "}
+                  <span className="text-primary-400 font-mono font-medium">
+                    {buildTicketId(modalRow)}
+                  </span>
+                </p>
+              </div>
+
+              {/* Template */}
+              <div className="bg-gray-900 rounded-lg p-4 border border-gray-700 mb-4">
+                <pre className="text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed">
+                  {buildTemplate(modalRow.plataforma, modalRow)}
+                </pre>
+              </div>
+
+              {/* Fechas */}
+              <div className="grid grid-cols-3 gap-3 mb-6">
+                <div className="bg-gray-900 rounded-lg p-3 text-center border border-gray-700">
+                  <p className="text-gray-500 text-xs">Entrega</p>
+                  <p className="text-white text-sm font-medium mt-0.5">
+                    {modalRow.fechaEntrega.toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="bg-gray-900 rounded-lg p-3 text-center border border-gray-700">
+                  <p className="text-gray-500 text-xs">Vence</p>
+                  <p className="text-white text-sm font-medium mt-0.5">
+                    {modalRow.fechaVencimiento.toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="bg-gray-900 rounded-lg p-3 text-center border border-gray-700">
+                  <p className="text-gray-500 text-xs">Restan</p>
+                  <p
+                    className={`text-sm font-medium mt-0.5 ${
+                      modalRow.diasRestantes <= 0
+                        ? "text-red-400"
+                        : modalRow.diasRestantes <= 5
+                          ? "text-yellow-400"
+                          : "text-green-400"
+                    }`}
+                  >
+                    {modalRow.diasRestantes <= 0
+                      ? "Vencido"
+                      : `${modalRow.diasRestantes} días`}
+                  </p>
+                </div>
+              </div>
+
+              {/* Acciones */}
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    handleGenerateTicket(modalRow);
+                    handleCopyTemplate(modalRow);
+                  }}
+                  disabled={generatingFor === modalRow.rowId}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+                >
+                  {generatingFor === modalRow.rowId ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <>
+                      <Copy size={14} />
+                      {copiedTemplate ? "¡Copiado!" : "Copiar"}
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setModalRow(null)}
+                  className="w-full text-gray-400 hover:text-white font-medium py-2 transition-colors text-sm"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

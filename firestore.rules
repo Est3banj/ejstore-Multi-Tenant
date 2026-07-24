@@ -193,7 +193,8 @@ service cloud.firestore {
       allow read: if request.auth != null && (
         isSuperadmin() ||
         (isAdmin() && isTenantAdminFor(resource.data.tenantId)) ||
-        request.auth.uid == resource.data.customerId
+        request.auth.uid == resource.data.customerId ||
+        request.auth.uid == resource.data.resellerId
       );
       allow create: if false; // Only through Cloud Functions
       allow update: if false; // Only through Cloud Functions

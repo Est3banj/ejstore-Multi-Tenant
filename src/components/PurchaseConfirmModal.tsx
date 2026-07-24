@@ -11,6 +11,7 @@ interface PurchaseConfirmModalProps {
   currentBalance: number;
   loading: boolean;
   error: string | null;
+  terms?: string;
 }
 
 const PurchaseConfirmModal = ({
@@ -22,6 +23,7 @@ const PurchaseConfirmModal = ({
   currentBalance,
   loading,
   error,
+  terms,
 }: PurchaseConfirmModalProps) => {
   const remaining = currentBalance - price;
   const insufficient = price > currentBalance;
@@ -51,6 +53,17 @@ const PurchaseConfirmModal = ({
             </div>
           </div>
         </div>
+
+        {terms && (
+          <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-4 max-h-40 overflow-y-auto">
+            <h4 className="text-xs font-semibold text-yellow-400 uppercase tracking-wider mb-2">
+              Términos del Servicio
+            </h4>
+            <div className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">
+              {terms}
+            </div>
+          </div>
+        )}
 
         {error && (
           <motion.div
