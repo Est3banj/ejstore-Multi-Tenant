@@ -26,6 +26,8 @@ export interface Service {
   isActive: boolean;
   isPopular?: boolean; // Destacados en Home
   hasCodeExtraction?: boolean;
+  terms?: string;
+  durationDays?: number; // Días de servicio (ej: 30 = mensual)
   createdAt?: Date;
   plans?: ServicePlan[];
 }

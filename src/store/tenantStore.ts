@@ -48,6 +48,7 @@ export const useTenantStore = create<TenantState>((set, get) => ({
       const tenantData = await getTenantById(tenantId);
       
       if (tenantData) {
+        sessionStorage.setItem('ejstore_tenant_id', tenantId);
         set({ tenant: { ...TENANT_DEFAULTS, ...tenantData }, loading: false });
       } else {
         set({ error: 'Tenant no encontrado', loading: false });

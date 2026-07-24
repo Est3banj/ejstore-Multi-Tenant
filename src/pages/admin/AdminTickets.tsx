@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
-import { getTickets, updateTicket } from '../../services/marketplace';
+import { getTickets, updateTicket, updateTicketCredentials } from '../../services/marketplace';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 import type { Ticket } from '../../types/marketplace';
-import { Ticket as TicketIcon, HelpCircle, CheckCircle, XCircle, Loader, Eye, X } from 'lucide-react';
+import { Ticket as TicketIcon, HelpCircle, CheckCircle, XCircle, Loader, Eye, X, Save } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 type FilterTab = 'todos' | 'open' | 'resolved' | 'closed';
@@ -30,6 +32,11 @@ const AdminTickets = (): JSX.Element => {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [adminNotes, setAdminNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newProfileName, setNewProfileName] = useState('');
+  const [newProfilePin, setNewProfilePin] = useState('');
+  const [savingCreds, setSavingCreds] = useState(false);
 
   useEffect(() => {
     if (tenantId) loadTickets();
@@ -64,14 +71,68 @@ const AdminTickets = (): JSX.Element => {
     );
   }).length;
 
-  const openTicket = (ticket: Ticket) => {
+  const openTicket = async (ticket: Ticket) => {
     setSelectedTicket(ticket);
     setAdminNotes(ticket.adminNotes || '');
+    setNewEmail('');
+    setNewPassword('');
+    setNewProfileName('');
+    setNewProfilePin('');
+
+    // Si tiene purchaseDocId, cargar credenciales actuales de la compra
+    if (ticket.purchaseDocId && ticket.accountIndex !== undefined) {
+      try {
+        const purchaseSnap = await getDoc(doc(db, 'purchases', ticket.purchaseDocId));
+        if (purchaseSnap.exists()) {
+          const data = purchaseSnap.data();
+          const profiles = data.profiles || [];
+          const profile = profiles[ticket.accountIndex];
+          if (profile) {
+            setNewEmail(profile.credential?.email || '');
+            setNewPassword(profile.credential?.password || '');
+            setNewProfileName(profile.profileName || '');
+            setNewProfilePin(profile.profilePin || '');
+          }
+        }
+      } catch (err) {
+        console.error('Error loading purchase credentials:', err);
+      }
+    }
   };
 
   const closeDetail = () => {
     setSelectedTicket(null);
     setAdminNotes('');
+    setNewEmail('');
+    setNewPassword('');
+    setNewProfileName('');
+    setNewProfilePin('');
+  };
+
+  const handleSaveCredentials = async () => {
+    if (!selectedTicket || !selectedTicket.purchaseDocId || selectedTicket.accountIndex === undefined) return;
+    setSavingCreds(true);
+    try {
+      await updateTicketCredentials({
+        ticketId: selectedTicket.id,
+        purchaseDocId: selectedTicket.purchaseDocId,
+        accountIndex: selectedTicket.accountIndex,
+        newEmail: newEmail || undefined,
+        newPassword: newPassword || undefined,
+        newProfileName: newProfileName || undefined,
+        newProfilePin: newProfilePin || undefined,
+      });
+      await loadTickets();
+      setSelectedTicket((prev) => prev ? {
+        ...prev,
+        status: 'resolved',
+        newCredentials: { email: newEmail, password: newPassword, profileName: newProfileName, profilePin: newProfilePin },
+      } : null);
+    } catch (err) {
+      console.error('Error saving credentials:', err);
+    } finally {
+      setSavingCreds(false);
+    }
   };
 
   const handleStatusChange = async (status: 'open' | 'resolved' | 'closed') => {
@@ -272,6 +333,19 @@ const AdminTickets = (): JSX.Element => {
                     </span>
                   </div>
                 </div>
+                <div className="col-span-2">
+                  <p className="text-white/50 text-xs uppercase tracking-wider mb-1">Email del servicio</p>
+                  <p className="text-white text-sm font-mono">{selectedTicket.customerEmail || '—'}</p>
+                </div>
+                {selectedTicket.purchaseId && (
+                  <div className="col-span-2">
+                    <p className="text-white/50 text-xs uppercase tracking-wider mb-1">ID de Venta</p>
+                    <p className="text-primary-400 text-sm font-mono font-medium">
+                      TKT-{selectedTicket.purchaseId.slice(0, 6).toUpperCase()}-*
+                    </p>
+                    <p className="text-gray-500 text-[10px] mt-0.5">{selectedTicket.purchaseId}</p>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -292,6 +366,69 @@ const AdminTickets = (): JSX.Element => {
                     alt="Ticket"
                     className="rounded-lg max-h-64 object-contain bg-white/5"
                   />
+                </div>
+              )}
+
+              {/* Actualizar credenciales (solo si el ticket tiene purchaseDocId) */}
+              {selectedTicket.purchaseDocId && selectedTicket.status === 'open' && (
+                <div className="border border-primary-500/30 rounded-xl p-4 bg-primary-500/5">
+                  <p className="text-primary-400 text-xs uppercase tracking-wider mb-3 font-medium flex items-center gap-1.5">
+                    <CheckCircle size={12} />
+                    Actualizar credenciales
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-gray-400 text-xs mb-1 block">Nuevo email</label>
+                      <input
+                        type="email"
+                        value={newEmail}
+                        onChange={(e) => setNewEmail(e.target.value)}
+                        className="input-field text-sm"
+                        placeholder="correo@ejemplo.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-gray-400 text-xs mb-1 block">Nueva contraseña</label>
+                      <input
+                        type="text"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="input-field text-sm"
+                        placeholder="••••••••"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-gray-400 text-xs mb-1 block">Nuevo perfil</label>
+                      <input
+                        type="text"
+                        value={newProfileName}
+                        onChange={(e) => setNewProfileName(e.target.value)}
+                        className="input-field text-sm"
+                        placeholder="Nombre del perfil"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-gray-400 text-xs mb-1 block">Nuevo PIN</label>
+                      <input
+                        type="text"
+                        value={newProfilePin}
+                        onChange={(e) => setNewProfilePin(e.target.value)}
+                        className="input-field text-sm"
+                        placeholder="PIN del perfil"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleSaveCredentials}
+                    disabled={savingCreds || (!newEmail && !newPassword && !newProfileName && !newProfilePin)}
+                    className="w-full mt-3 flex items-center justify-center gap-2 py-2 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+                  >
+                    {savingCreds ? (
+                      <><Loader size={14} className="animate-spin" /> Guardando...</>
+                    ) : (
+                      <><Save size={14} /> Guardar y resolver ticket</>
+                    )}
+                  </button>
                 </div>
               )}
 

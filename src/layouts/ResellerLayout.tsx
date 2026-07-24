@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Package,
   ShoppingBag,
+  MessageSquare,
   Settings,
   LogOut,
   LucideIcon,
@@ -65,9 +66,10 @@ const ResellerLayout = (): JSX.Element => {
   const menuItems: MenuItem[] = [
     { path: '/r/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/r/catalogo', label: 'Catálogo', icon: Package },
-    { path: '/r/clientes', label: 'Mis Clientes', icon: ShoppingBag },
+    { path: '/r/mis-clientes', label: 'Mis Clientes', icon: ShoppingBag },
     { path: '/r/consultar-codigo', label: 'Consultar Códigos', icon: Search },
     { path: '/r/reportar', label: 'Reportar', icon: Flag },
+    { path: '/r/mis-reportes', label: 'Mis Reportes', icon: MessageSquare },
     { path: '/r/perfil', label: 'Perfil', icon: Settings },
   ];
 

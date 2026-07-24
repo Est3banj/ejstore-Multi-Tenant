@@ -25,10 +25,12 @@ const Tenants = lazy(() => import('./pages/admin/Tenants'));
 const Admins = lazy(() => import('./pages/admin/Admins'));
 const AdminResellers = lazy(() => import('./pages/admin/AdminResellers'));
 const AdminTickets = lazy(() => import('./pages/admin/AdminTickets'));
+const EmailConfig = lazy(() => import('./pages/admin/EmailConfig'));
 const ResellerDashboard = lazy(() => import('./pages/reseller/ResellerDashboard'));
 const CatalogoMayorista = lazy(() => import('./pages/reseller/CatalogoMayorista'));
 const MisClientes = lazy(() => import('./pages/reseller/MisClientes'));
 const ConsultarCodigo = lazy(() => import('./pages/reseller/ConsultarCodigo'));
+const MisReportes = lazy(() => import('./pages/reseller/MisReportes'));
 const Perfil = lazy(() => import('./pages/reseller/Perfil'));
 const ResellerReportar = lazy(() => import('./pages/reseller/ResellerReportar'));
 const VerCuenta = lazy(() => import('./pages/public/VerCuenta'));
@@ -67,8 +69,9 @@ const PublicRoutes = () => {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<ResellerDashboard />} />
             <Route path="catalogo" element={<CatalogoMayorista />} />
-            <Route path="clientes" element={<MisClientes />} />
+            <Route path="mis-clientes" element={<MisClientes />} />
             <Route path="consultar-codigo" element={<ConsultarCodigo />} />
+            <Route path="mis-reportes" element={<MisReportes />} />
             <Route path="perfil" element={<Perfil />} />
             <Route path="reportar" element={<ResellerReportar />} />
           </Route>
@@ -111,6 +114,7 @@ const AdminRoutes = () => {
         <Route path="admins" element={<Admins />} />
         <Route path="resellers" element={<AdminResellers />} />
         <Route path="tickets" element={<AdminTickets />} />
+        <Route path="email-config" element={<EmailConfig />} />
         <Route index element={<Navigate to="/admin/dashboard" replace />} />
       </Route>
     </Routes>

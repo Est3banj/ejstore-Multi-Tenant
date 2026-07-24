@@ -282,8 +282,12 @@ export const markNotificationRead = async (notificationId: string): Promise<void
 
 export const createTicket = async (data: Omit<Ticket, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
   try {
+    // Firestore no acepta undefined como valor, solo null
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
     const docRef = await addDoc(collection(db, 'tickets'), {
-      ...data,
+      ...cleanData,
       status: 'open',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -361,6 +365,37 @@ export const getServiceStock = async (serviceId: string): Promise<{
   }
 };
 
+/**
+ * Returns available stock count for a service — queries only `status == 'available'` accounts.
+ * Works within Firestore rules for resellers who don't have isSuperadmin()/isAdmin().
+ *
+ * The rules allow reading accounts where `resource.data.status == 'available'`,
+ * but for a list query to match this condition, the query MUST include a `where('status', '==', 'available')`.
+ * This function exists specifically for the reseller catalog view where we only need the available count
+ * and can't use getServiceStock() (which queries ALL accounts without a filter).
+ */
+export const getAvailableServiceStock = async (serviceId: string): Promise<number> => {
+  if (!serviceId) throw new Error('serviceId required');
+  try {
+    const q = query(
+      collection(db, 'services', serviceId, 'accounts'),
+      where('status', '==', 'available')
+    );
+    const snapshot = await getDocs(q);
+    let available = 0;
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      // New format: accounts have availableProfiles counter
+      // Legacy format: each account = 1 profile
+      available += data.availableProfiles ?? 1;
+    }
+    return available;
+  } catch (error) {
+    console.error('Error getting available stock:', error);
+    throw error;
+  }
+};
+
 // ===== RESELLER =====
 
 export const createReseller = async (data: {
@@ -388,10 +423,12 @@ export const processBulkPurchase = async (data: {
   serviceId: string;
   tenantId: string;
   quantity: number;
+  customerName?: string;
 }): Promise<{
   success: boolean;
   purchaseId: string;
   credentials: any[];
+  profiles?: any[];
   serviceName: string;
   quantity: number;
   newBalance: number;
@@ -419,4 +456,51 @@ export const getResellerById = async (resellerId: string): Promise<any | null> =
   const docSnap = await getDoc(docRef);
   if (docSnap.exists()) return { id: docSnap.id, ...docSnap.data() };
   return null;
+};
+
+// ─── Correo Madre ──────────────────────────────────────────────────────────
+
+export const saveEmailConfig = async (data: {
+  tenantId: string;
+  email: string;
+  password: string;
+  host: string;
+  port: number;
+}): Promise<{ success: boolean }> => {
+  const cf = httpsCallable(functions, 'saveEmailConfig');
+  const result = await cf(data);
+  return result.data as any;
+};
+
+export const getEmailConfig = async (tenantId: string): Promise<{
+  config: { email: string; host: string; port: number; hasPassword: boolean } | null;
+}> => {
+  const cf = httpsCallable(functions, 'getEmailConfig');
+  const result = await cf({ tenantId });
+  return result.data as any;
+};
+
+export const updateTicketCredentials = async (data: {
+  ticketId: string;
+  purchaseDocId: string;
+  accountIndex: number;
+  newEmail?: string;
+  newPassword?: string;
+  newProfileName?: string;
+  newProfilePin?: string;
+}): Promise<{ success: boolean }> => {
+  const cf = httpsCallable(functions, 'updateTicketCredentials');
+  const result = await cf(data);
+  return result.data as any;
+};
+
+export const testEmailConnection = async (data: {
+  email: string;
+  password: string;
+  host: string;
+  port: number;
+}): Promise<{ success: boolean; message: string }> => {
+  const cf = httpsCallable(functions, 'testEmailConnection');
+  const result = await cf(data);
+  return result.data as any;
 };

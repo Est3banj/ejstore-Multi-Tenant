@@ -3,13 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useAuthStore } from '../store/authStore';
 import { getServiceById } from '../services/firestore';
-import { processPurchase } from '../services/marketplace';
-import { PAYMENT_METHODS, PLANS } from '../utils/constants';
+import { getAvailableServiceStock, processPurchase } from '../services/marketplace';
+import { PLANS } from '../utils/constants';
 import { generateWhatsAppMessage } from '../utils/whatsapp';
 import Modal from '../components/Modal';
 import PurchaseConfirmModal from '../components/PurchaseConfirmModal';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Check } from 'lucide-react';
+import { ArrowLeft, Check, Wallet, MessageCircle } from 'lucide-react';
 
 const Product = () => {
   const { id } = useParams();
@@ -17,8 +17,8 @@ const Product = () => {
   const { terms, settings, tenant } = useApp();
   const [service, setService] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [stock, setStock] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState(null);
-  const [selectedPayment, setSelectedPayment] = useState(null);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
@@ -46,13 +46,17 @@ const Product = () => {
             }))
             : PLANS;
 
-          if (availablePlans.length > 0) {
-            setSelectedPlan(availablePlans[0]);
-          }
+        if (availablePlans.length > 0) {
+          setSelectedPlan(availablePlans[0]);
         }
-        if (PAYMENT_METHODS.length > 0) {
-          setSelectedPayment(PAYMENT_METHODS[0]);
+        // Cargar stock
+        try {
+          const stockCount = await getAvailableServiceStock(id);
+          setStock(stockCount);
+        } catch {
+          setStock(0);
         }
+        } // ← cierra if(serviceData)
       } catch (error) {
         console.error('Error loading service:', error);
       } finally {
@@ -93,21 +97,16 @@ const Product = () => {
     }
   }, [settings]);
 
-  const handleBuy = () => {
+  const handleBuyWhatsApp = () => {
     if (!acceptedTerms) {
       setShowTermsModal(true);
-      return;
-    }
-
-    if (!selectedPayment) {
-      alert('Por favor selecciona un método de pago');
       return;
     }
 
     const whatsappUrl = generateWhatsAppMessage(
       service,
       selectedPlan,
-      selectedPayment,
+      null,
       settings,
       `$${planPrice.toLocaleString()}`
     );
@@ -217,9 +216,25 @@ const Product = () => {
               <p className="text-white/70 text-lg">{service.description || 'Servicio de streaming premium'}</p>
             </div>
 
-            {/* Precio */}
+            {/* Precio + Stock */}
             <div className="glass p-6 rounded-xl">
-              <h3 className="text-lg font-semibold mb-4 text-white">Precio</h3>
+              <div className="flex items-start justify-between mb-2">
+                <h3 className="text-lg font-semibold text-white">Precio</h3>
+                {stock !== null && (
+                  <div className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 ${
+                    stock === 0
+                      ? 'bg-red-500/15 border-red-500/30 text-red-400'
+                      : stock <= 5
+                      ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                      : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                      stock === 0 ? 'bg-red-400' : stock <= 5 ? 'bg-amber-400' : 'bg-emerald-400'
+                    }`} />
+                    {stock === 0 ? 'Agotado' : stock <= 5 ? `Solo ${stock}` : `${stock} disponible${stock !== 1 ? 's' : ''}`}
+                  </div>
+                )}
+              </div>
               {hasPromo ? (
                 <div>
                   <p className="text-4xl font-bold text-white mb-2">
@@ -265,28 +280,15 @@ const Product = () => {
               </div>
             )}
 
-            {/* Métodos de pago */}
+            {/* Contacto por WhatsApp */}
             <div className="glass p-6 rounded-xl">
-              <h3 className="text-lg font-semibold mb-4 text-white">Método de pago</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {PAYMENT_METHODS.map((method) => (
-                  <button
-                    key={method.id}
-                    onClick={() => setSelectedPayment(method)}
-                    className={`p-4 rounded-lg border-2 transition-all flex items-center justify-center gap-2 ${selectedPayment?.id === method.id
-                      ? 'border-primary-500 bg-primary-500/10'
-                      : 'border-white/20 hover:border-white/40'
-                      }`}
-                  >
-                    {method.logo ? (
-                      <img src={method.icon} alt={method.name} className="w-8 h-8 object-contain" />
-                    ) : (
-                      <span className="text-2xl">{method.icon}</span>
-                    )}
-                    <span className="text-white font-semibold">{method.name}</span>
-                  </button>
-                ))}
-              </div>
+              <h3 className="text-lg font-semibold mb-4 text-white flex items-center gap-2">
+                <MessageCircle size={20} className="text-green-400" />
+                ¿Necesitas ayuda?
+              </h3>
+              <p className="text-white/70 text-sm">
+                Si tenés dudas o querés coordinar otro método de pago, contactanos por WhatsApp.
+              </p>
             </div>
 
             {/* Beneficios */}
@@ -324,28 +326,11 @@ const Product = () => {
               </label>
             </div>
 
-            {/* Botón comprar */}
-            <button
-              onClick={handleBuy}
-              disabled={!acceptedTerms || !selectedPayment}
-              className="w-full text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                background: settings?.primaryColor 
-                  ? `linear-gradient(135deg, ${settings.primaryColor}, ${settings.primaryColor}dd)`
-                  : 'linear-gradient(135deg, #E50914, #E50914dd)',
-                boxShadow: settings?.primaryColor
-                  ? `0 4px 15px -3px ${settings.primaryColor}80`
-                  : '0 4px 15px -3px rgba(229, 9, 20, 0.5)'
-              }}
-            >
-              Comprar Ahora
-            </button>
-
             {customer && (
               <button
                 onClick={() => setShowPurchaseModal(true)}
                 disabled={!acceptedTerms}
-                className="w-full text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed mt-3"
+                className="w-full flex items-center justify-center gap-2 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: settings?.primaryColor 
                     ? `linear-gradient(135deg, ${settings.primaryColor}, ${settings.primaryColor}dd)`
@@ -355,9 +340,19 @@ const Product = () => {
                     : '0 4px 15px -3px rgba(229, 9, 20, 0.5)'
                 }}
               >
+                <Wallet size={20} />
                 Comprar con saldo {customer?.balance ? `($${customer.balance.toLocaleString()})` : ''}
               </button>
             )}
+
+            <button
+              onClick={handleBuyWhatsApp}
+              disabled={!acceptedTerms}
+              className="w-full flex items-center justify-center gap-2 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed border-2 border-white/20 hover:border-white/40"
+            >
+              <MessageCircle size={20} className="text-green-400" />
+              Comprar por WhatsApp
+            </button>
           </motion.div>
         </div>
       </div>
@@ -399,6 +394,7 @@ const Product = () => {
         currentBalance={customer?.balance || 0}
         loading={purchaseLoading}
         error={purchaseError}
+        terms={service?.terms}
       />
     </div>
   );

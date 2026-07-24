@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { collection, doc, getDocs, addDoc, deleteDoc, query, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDocs, addDoc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
 import {
   getAccounts,
   createAccount,
   createAccountsBatch,
   deleteAccount,
   getServiceStock,
+  getAvailableServiceStock,
 } from './marketplace';
 
 vi.mock('./firebase', () => ({
@@ -27,6 +28,28 @@ const mockDocs = [
   { id: 'acc-2', data: () => ({ ...mockAccountData, label: 'Account 2', status: 'sold' }) },
   { id: 'acc-3', data: () => ({ ...mockAccountData, label: 'Account 3', status: 'expired' }) },
 ];
+
+// Legacy accounts: no availableProfiles field
+const mockLegacyAccountData = {
+  label: 'Account Legacy',
+  status: 'available',
+  serviceId: 'svc-1',
+  credential: { email: 'legacy@test.com', password: 'pass789' },
+  createdAt: new Date('2025-06-01'),
+  updatedAt: new Date('2025-06-01'),
+};
+
+// New format accounts: with availableProfiles
+const mockProfileAccountData = {
+  label: 'Account with Profiles',
+  serviceId: 'svc-1',
+  status: 'available',
+  totalProfiles: 10,
+  availableProfiles: 7,
+  credential: { email: 'profiles@test.com', password: 'pass999' },
+  createdAt: new Date('2025-06-01'),
+  updatedAt: new Date('2025-06-01'),
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -199,5 +222,56 @@ describe('getServiceStock', () => {
       sold: 0,
       expired: 0,
     });
+  });
+});
+
+describe('getAvailableServiceStock', () => {
+  it('returns count of legacy available accounts (no availableProfiles)', async () => {
+    vi.mocked(getDocs).mockResolvedValue({
+      docs: [
+        { id: 'acc-1', data: () => ({ ...mockLegacyAccountData }) },
+        { id: 'acc-2', data: () => ({ ...mockLegacyAccountData, label: 'Acc 2' }) },
+      ],
+    } as any);
+    vi.mocked(collection as any).mockReturnValue('col-ref');
+    vi.mocked(query as any).mockReturnValue('query-ref');
+    vi.mocked(where as any).mockReturnValue('filter-ref');
+
+    const result = await getAvailableServiceStock('svc-1');
+
+    expect(collection).toHaveBeenCalledWith({}, 'services', 'svc-1', 'accounts');
+    expect(where).toHaveBeenCalledWith('status', '==', 'available');
+    expect(result).toBe(2);
+  });
+
+  it('sums availableProfiles for new format accounts', async () => {
+    vi.mocked(getDocs).mockResolvedValue({
+      docs: [
+        { id: 'acc-1', data: () => ({ ...mockProfileAccountData }) },
+        { id: 'acc-2', data: () => ({ ...mockProfileAccountData, availableProfiles: 3, totalProfiles: 5 }) },
+      ],
+    } as any);
+    vi.mocked(collection as any).mockReturnValue('col-ref');
+    vi.mocked(query as any).mockReturnValue('query-ref');
+    vi.mocked(where as any).mockReturnValue('filter-ref');
+
+    const result = await getAvailableServiceStock('svc-1');
+
+    expect(result).toBe(10); // 7 + 3
+  });
+
+  it('returns 0 when no available accounts', async () => {
+    vi.mocked(getDocs).mockResolvedValue({ docs: [] } as any);
+    vi.mocked(collection as any).mockReturnValue('col-ref');
+    vi.mocked(query as any).mockReturnValue('query-ref');
+    vi.mocked(where as any).mockReturnValue('filter-ref');
+
+    const result = await getAvailableServiceStock('svc-1');
+
+    expect(result).toBe(0);
+  });
+
+  it('throws when serviceId is empty', async () => {
+    await expect(getAvailableServiceStock('')).rejects.toThrow('serviceId required');
   });
 });

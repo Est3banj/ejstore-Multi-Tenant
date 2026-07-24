@@ -43,11 +43,13 @@ export const getServices = async (tenantId: string): Promise<Service[]> => {
         description: data.description,
         price: data.price,
         promotionalPrice: data.promotionalPrice,
+        wholesalePrice: data.wholesalePrice,
         category: data.category,
         images: data.images || [],
         image: data.image || data.images?.[0] || '',
         isActive: data.active !== false,
         isPopular: data.isPopular || false,
+        terms: data.terms,
         createdAt: convertTimestamp(data.createdAt),
         plans: data.plans
       } as Service;
@@ -82,11 +84,13 @@ export const getAllServices = async (tenantId: string): Promise<Service[]> => {
         description: data.description,
         price: data.price,
         promotionalPrice: data.promotionalPrice,
+        wholesalePrice: data.wholesalePrice,
         category: data.category,
         images: data.images || [],
         image: data.image || data.images?.[0] || '',
         isActive: data.active !== false,
         isPopular: data.isPopular || false,
+        terms: data.terms,
         createdAt: convertTimestamp(data.createdAt),
         plans: data.plans
       } as Service;
@@ -123,6 +127,7 @@ export const getServiceById = async (id: string, tenantId: string): Promise<Serv
           image: data.image || data.images?.[0] || '',
           isActive: data.active !== false,
           isPopular: data.isPopular || false,
+          terms: data.terms,
           createdAt: convertTimestamp(data.createdAt),
           plans: data.plans
         } as Service;
@@ -143,6 +148,7 @@ interface ServiceInput {
   images: string[];
   isActive: boolean;
   isPopular?: boolean;
+  terms?: string;
   plans?: Service['plans'];
 }
 

@@ -7,9 +7,10 @@ import { useApp } from '../context/AppContext';
 interface ServiceCardProps {
   service: Service;
   index: number;
+  stock?: number;
 }
 
-const ServiceCard = ({ service, index }: ServiceCardProps): JSX.Element => {
+const ServiceCard = ({ service, index, stock }: ServiceCardProps): JSX.Element => {
   const hasPromo = service.promotionalPrice && service.promotionalPrice < service.price;
   const { settings } = useApp();
   const primaryColor = settings?.primaryColor || '#E50914';
@@ -71,6 +72,20 @@ const ServiceCard = ({ service, index }: ServiceCardProps): JSX.Element => {
                 </p>
               )}
             </div>
+            {stock !== undefined && (
+              <div className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 ${
+                stock === 0
+                  ? 'bg-red-500/15 border-red-500/30 text-red-400'
+                  : stock <= 5
+                  ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                  : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  stock === 0 ? 'bg-red-400' : stock <= 5 ? 'bg-amber-400' : 'bg-emerald-400'
+                }`} />
+                {stock === 0 ? 'Agotado' : stock <= 5 ? `Solo ${stock}` : `${stock} disp.`}
+              </div>
+            )}
           </div>
           <button 
               className="w-full flex items-center justify-center space-x-2 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300"

@@ -128,18 +128,6 @@ const Header = (): JSX.Element => {
               >
                 Servicios
               </Link>
-              {customer && (
-                <Link
-                  to="/mis-servicios"
-                  className={`px-4 py-2 rounded-lg transition-all ${
-                    isActive('/mis-servicios')
-                      ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/30'
-                      : 'text-white/80 hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  Mis Servicios
-                </Link>
-              )}
               {role === 'reseller' && (
                 <Link
                   to="/r/dashboard"
@@ -169,10 +157,17 @@ const Header = (): JSX.Element => {
                     <Wallet size={16} className="text-yellow-400" />
                     <span className="text-white font-medium">${customer.balance.toLocaleString()}</span>
                   </div>
-                  <div className="flex items-center gap-2 px-3 py-2">
-                    <User size={16} className="text-white/70" />
-                    <span className="text-white/90 text-sm">{customer.firstName}</span>
-                  </div>
+                  <Link
+                    to="/mis-servicios"
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+                      isActive('/mis-servicios')
+                        ? 'bg-primary-600 text-white'
+                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <User size={16} />
+                    <span className="text-sm font-medium">Mi Cuenta</span>
+                  </Link>
                   <button
                     onClick={handleLogout}
                     className="flex items-center gap-2 px-3 py-2 text-white/70 hover:text-white hover:bg-white/5 rounded-lg transition-all"
@@ -228,19 +223,6 @@ const Header = (): JSX.Element => {
               >
                 Servicios
               </Link>
-              {customer && (
-                <Link
-                  to="/mis-servicios"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`block px-4 py-2 rounded-lg ${
-                    isActive('/mis-servicios')
-                      ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/30'
-                      : 'text-white/80 hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  Mis Servicios
-                </Link>
-              )}
               {role === 'reseller' && (
                 <Link
                   to="/r/dashboard"
@@ -269,6 +251,18 @@ const Header = (): JSX.Element => {
                     <Plus size={16} />
                     Recargar saldo
                   </button>
+                  <Link
+                    to="/mis-servicios"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-2 w-full px-4 py-2 rounded-lg ${
+                      isActive('/mis-servicios')
+                        ? 'bg-primary-600 text-white'
+                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <User size={16} />
+                    Mi Cuenta
+                  </Link>
                   <button
                     onClick={handleLogout}
                     className="flex items-center gap-2 w-full px-4 py-2 text-white/70 hover:text-white hover:bg-white/5 rounded-lg"

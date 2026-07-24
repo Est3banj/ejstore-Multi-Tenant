@@ -1,8 +1,7 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
-const axios = require('axios');
-
 admin.initializeApp();
+const axios = require('axios');
 
 const db = admin.firestore();
 
@@ -1707,7 +1706,7 @@ exports.processBulkPurchase = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('permission-denied', 'Solo disponible para subdistribuidores');
   }
 
-  const { serviceId, tenantId, quantity } = data;
+  const { serviceId, tenantId, quantity, customerName } = data;
 
   if (!serviceId || !tenantId || !quantity) {
     throw new functions.https.HttpsError('invalid-argument', 'serviceId, tenantId y quantity son requeridos');
@@ -1810,21 +1809,20 @@ exports.processBulkPurchase = functions.https.onCall(async (data, context) => {
     }
 
     const result = await db.runTransaction(async (transaction) => {
+      // ═══════════════════════════════════════════════
+      // STEP 1: ALL reads FIRST (Firestore requires all reads before any write)
+      // ═══════════════════════════════════════════════
       const freshResellerDoc = await transaction.get(resellerRef);
       const freshBalance = freshResellerDoc.data().balance || 0;
       if (freshBalance < totalPrice) {
         throw new functions.https.HttpsError('failed-precondition', 'Saldo insuficiente');
       }
 
-      transaction.update(resellerRef, {
-        balance: freshBalance - totalPrice,
-        updatedAt: new Date().toISOString(),
-      });
-
-      const now = new Date().toISOString();
+      const now = admin.firestore.Timestamp.now();
       const purchaseRef = db.collection('purchases').doc();
       const soldProfiles = [];
       const soldAccountRefs = new Map(); // refPath -> { ref, count }
+      const writeOps = []; // deferred writes
 
       for (let i = 0; i < bulkCandidates.length && soldProfiles.length < qty; i++) {
         const candidate = bulkCandidates[i];
@@ -1839,11 +1837,15 @@ exports.processBulkPurchase = functions.https.onCall(async (data, context) => {
           const profData = profDoc.data();
           if ((acctData.availableProfiles || 0) <= 0 || profData.status !== 'available') continue;
 
-          transaction.update(candidate.profileRef, {
-            status: 'sold',
-            soldTo: context.auth.uid,
-            purchaseId: `${purchaseRef.id}_${i}`,
-            assignedAt: now,
+          writeOps.push({
+            ref: candidate.profileRef,
+            type: 'profile',
+            data: {
+              status: 'sold',
+              soldTo: context.auth.uid,
+              purchaseId: `${purchaseRef.id}_${i}`,
+              assignedAt: now,
+            },
           });
 
           const key = candidate.accountRef.path;
@@ -1866,10 +1868,14 @@ exports.processBulkPurchase = functions.https.onCall(async (data, context) => {
           const acctData = acctDoc.data();
           if (acctData.status !== 'available') continue;
 
-          transaction.update(candidate.accountRef, {
-            status: 'sold',
-            soldTo: context.auth.uid,
-            updatedAt: now,
+          writeOps.push({
+            ref: candidate.accountRef,
+            type: 'legacy_account',
+            data: {
+              status: 'sold',
+              soldTo: context.auth.uid,
+              updatedAt: now,
+            },
           });
 
           const key = candidate.accountRef.path;
@@ -1895,7 +1901,22 @@ exports.processBulkPurchase = functions.https.onCall(async (data, context) => {
         );
       }
 
-      // Apply per-account decrements
+      // ═══════════════════════════════════════════════
+      // STEP 2: ALL writes AFTER all reads
+      // ═══════════════════════════════════════════════
+
+      // 2a. Update reseller balance
+      transaction.update(resellerRef, {
+        balance: freshBalance - totalPrice,
+        updatedAt: now,
+      });
+
+      // 2b. Apply profile/account status changes
+      for (const op of writeOps) {
+        transaction.update(op.ref, op.data);
+      }
+
+      // 2c. Apply per-account decrements
       for (const [, { ref, count }] of soldAccountRefs) {
         transaction.update(ref, {
           availableProfiles: admin.firestore.FieldValue.increment(-count),
@@ -1920,6 +1941,7 @@ exports.processBulkPurchase = functions.https.onCall(async (data, context) => {
         return parts[parts.length - 1];
       });
 
+      // 2d. Create purchase document
       transaction.set(purchaseRef, {
         resellerId: context.auth.uid,
         customerId: context.auth.uid,
@@ -1935,6 +1957,8 @@ exports.processBulkPurchase = functions.https.onCall(async (data, context) => {
         status: 'active',
         type: 'bulk',
         tenantId,
+        durationDays: serviceData.durationDays || 30,
+        customerName: customerName || null,
         createdAt: now,
       });
 
@@ -2032,10 +2056,10 @@ exports.processBulkPurchase = functions.https.onCall(async (data, context) => {
 });
 
 // ========== EXTRAER CÓDIGO DE VERIFICACIÓN ==========
-// Busca en la Cuenta Madre (Gmail API) el email con el código de verificación
+// Busca en la Cuenta Madre (vía IMAP) el email con el código de verificación
 // para un servicio comprado. Devuelve: bodyText (el email completo), code, from, subject.
-// MODO MOCK: simula la búsqueda en Gmail sin conexión real.
-// TODO: Reemplazar con Gmail API real + OAuth2 (Client ID + Refresh Token).
+// La extracción es inteligente: si el email contiene un código numérico (4-6 dígitos)
+// lo devuelve como code; si contiene una URL la devuelve; si no, devuelve el body textual.
 exports.extraerCodigo = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
@@ -2048,133 +2072,264 @@ exports.extraerCodigo = functions.https.onCall(async (data, context) => {
 
   try {
     const ahora = new Date().toISOString();
-    const codigo = String(Math.floor(100000 + Math.random() * 900000));
 
-    console.log(`extraerCodigo mock: purchaseId=${purchaseId}, codigo=${codigo}`);
+    // ─── 1. Leer la compra ───────────────────────────────────────────────
+    const purchaseDoc = await db.collection('purchases').doc(purchaseId).get();
+    if (!purchaseDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Compra no encontrada');
+    }
+    const purchaseData = purchaseDoc.data();
+    const tenantId = purchaseData.tenantId;
+    const serviceName = (purchaseData.serviceName || '').toLowerCase();
 
-    // ─── Plantillas de email por servicio (mock) ─────────────────────────
-    // Cada plantilla simula el email REAL que llega a la Cuenta Madre.
-    // Cuando implementemos Gmail API real, reemplazar el bodyText dinámico
-    // y dejar solo las credenciales + code como campos extraídos.
-    const plantillas = {
-      netflix: {
-        from: 'Netflix <info@account.netflix.com>',
-        subject: 'Tu código de verificación Netflix',
-        bodyText: [
-          '',
-          `  Ingresa este código para iniciar sesión`,
-          '',
-          `        ╔══════════════════╗`,
-          `        ║                  ║`,
-          `        ║   ${codigo}  ║`,
-          `        ║                  ║`,
-          `        ╚══════════════════╝`,
-          '',
-          `  Ingresa este código en tu dispositivo para iniciar`,
-          `  sesión en Netflix. El código vence en 15 minutos.`,
-          '',
-          `  Si no enviaste esta solicitud, ignora este email`,
-          `  o revisa la actividad reciente de tus dispositivos.`,
-          '',
-          `  Por motivos de seguridad, no compartas este código`,
-          `  con personas que no viven contigo.`,
-          '',
-          `  ───────────────────────────────────────────────`,
-          `  El equipo de Netflix`,
-          '',
-          `  ¿Preguntas? Comunícate al 0800 591 8943`,
-          `  Netflix Entretenimento Brasil, Ltda.`,
-          `  Términos de uso • Privacidad • Centro de ayuda`,
-          '',
-          `  Netflix te envió este mensaje a`,
-          `  [cuentamadre@gmail.com] como parte de tu membresía.`,
-          '',
-        ].join('\n'),
-      },
-      disney: {
-        from: 'Disney+ <no-reply@accounts.disneyplus.com>',
-        subject: 'Código de verificación Disney+',
-        bodyText: [
-          '',
-          `  Tu código de verificación`,
-          '',
-          `        ╔══════════════════╗`,
-          `        ║                  ║`,
-          `        ║   ${codigo}  ║`,
-          `        ║                  ║`,
-          `        ╚══════════════════╝`,
-          '',
-          `  Ingresa este código en la pantalla de inicio de`,
-          `  sesión de Disney+.`,
-          '',
-          `  Este código vence en 10 minutos.`,
-          '',
-          `  Si no solicitaste este código, puedes ignorar`,
-          `  este mensaje de forma segura.`,
-          '',
-          `  ───────────────────────────────────────────────`,
-          `  El equipo de Disney+`,
-          '',
-          `  Ayuda • Privacidad • Términos`,
-          `  © Disney. Todos los derechos reservados.`,
-          '',
-        ].join('\n'),
-      },
-      hbo: {
-        from: 'HBO Max <no-reply@hbomax.com>',
-        subject: 'Código de verificación HBO Max',
-        bodyText: [
-          '',
-          `  Código de verificación`,
-          '',
-          `        ╔══════════════════╗`,
-          `        ║                  ║`,
-          `        ║   ${codigo}  ║`,
-          `        ║                  ║`,
-          `        ╚══════════════════╝`,
-          '',
-          `  Usa este código para iniciar sesión en tu cuenta`,
-          `  de HBO Max.`,
-          '',
-          `  El código expira en 15 minutos.`,
-          '',
-          `  Si no pediste este código, no reenvíes este`,
-          `  mensaje.`,
-          '',
-          `  ───────────────────────────────────────────────`,
-          `  El equipo de HBO Max`,
-          `  Centro de ayuda`,
-          '',
-        ].join('\n'),
-      },
-    };
+    // ─── 2. Leer configuración IMAP ──────────────────────────────────────
+    const configDoc = await db
+      .collection('tenants').doc(tenantId)
+      .collection('secrets').doc('emailConfig').get();
 
-    // Determinar servicio — leemos el purchaseId para sacar el servicio
-    let plantilla = plantillas.netflix; // default
+    if (!configDoc.exists) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'El administrador aún no configuró el Correo Madre para esta tienda'
+      );
+    }
+
+    const config = configDoc.data();
+    const { ImapFlow } = require('imapflow');
+
+    // ─── 3. Conectar a IMAP ──────────────────────────────────────────────
+    let client;
     try {
-      const purchaseDoc = await db.collection('purchases').doc(purchaseId).get();
-      if (purchaseDoc.exists) {
-        const svcName = (purchaseDoc.data().serviceName || '').toLowerCase();
-        if (svcName.includes('disney')) plantilla = plantillas.disney;
-        else if (svcName.includes('hbo') || svcName.includes('max')) plantilla = plantillas.hbo;
+      client = new ImapFlow({
+        host: config.host || 'imap.gmail.com',
+        port: config.port || 993,
+        secure: true,
+        auth: { user: config.email, pass: config.password },
+        logger: false,
+        timeout: 15000,
+      });
+      await client.connect();
+    } catch (connErr) {
+      console.error('IMAP connection error:', connErr.message);
+      throw new functions.https.HttpsError(
+        'internal',
+        'No se pudo conectar al correo. Verificá la configuración del Correo Madre.'
+      );
+    }
+
+    // ─── 4. Buscar emails recientes ──────────────────────────────────────
+    let foundEmail = null;
+    try {
+      const since = new Date(Date.now() - 15 * 60 * 1000);
+      await client.mailboxOpen('INBOX');
+
+      // Buscar solo UIDs de los últimos 15 min
+      const searchResult = await client.search({
+        since: since,
+      });
+
+      const uids = searchResult || [];
+      if (uids.length === 0) {
+        console.log('No hay emails en los últimos 15 min');
+      } else {
+        console.log(`Buscando en ${uids.length} emails recientes...`);
+
+        // Obtener solo los últimos 20 UIDs (para no saturar)
+        const recentUids = uids.slice(-20);
+
+        const lock = await client.getMailboxLock('INBOX');
+        try {
+          for await (const msg of client.fetch(recentUids, {
+            uid: true,
+            source: true,
+          })) {
+            const source = msg.source.toString('utf-8');
+            const parsed = parseSimpleEmail(source);
+
+            const subject = (parsed.subject || '').toLowerCase();
+            const from = (parsed.from || '').toLowerCase();
+            const bodyText = (parsed.text || parsed.html || '').toLowerCase();
+
+            // Keywords del servicio para matchear
+            const svcKeywords = extractServiceKeywords(serviceName);
+            const matches = svcKeywords.some(
+              (kw) => subject.includes(kw) || from.includes(kw) || bodyText.includes(kw)
+            );
+
+            if (!matches) continue;
+
+            // Extraer código/URL del body real
+            const fullBody = parsed.text || parsed.html || '';
+            const extractedCode = extractCodeFromBody(fullBody);
+
+            foundEmail = {
+              from: parsed.from || 'Desconocido',
+              subject: parsed.subject || 'Sin asunto',
+              bodyText: fullBody,
+              code: extractedCode,
+            };
+            break; // Tomar el primer match
+          }
+        } finally {
+          lock.release();
+        }
       }
-    } catch {
-      // si falla la lectura, usar default (netflix)
+    } catch (searchErr) {
+      console.error('IMAP search error:', searchErr.message);
+    } finally {
+      try { await client.logout(); } catch {}
+    }
+
+    // ─── 5. Resultado ────────────────────────────────────────────────────
+    if (!foundEmail) {
+      // No se encontró email. Devolver info útil para depuración
+      // El frontend ya muestra "Código extraído correctamente" con el resultado
+      return {
+        success: false,
+        code: null,
+        from: '',
+        subject: '',
+        bodyText: `No se encontró un email de verificación para "${serviceName}" en los últimos 15 minutos.\n\nAsegurate de que:\n1. El cliente solicitó el código desde su dispositivo\n2. La cuenta madre tiene configurado el reenvío de este servicio\n3. El correo llegó en los últimos 15 minutos`,
+        extractedAt: ahora,
+      };
     }
 
     return {
       success: true,
-      code: codigo,
-      from: plantilla.from,
-      subject: plantilla.subject,
-      bodyText: plantilla.bodyText,
+      code: foundEmail.code || 'Código no detectado automáticamente. Revisá el contenido del correo.',
+      from: foundEmail.from,
+      subject: foundEmail.subject,
+      bodyText: foundEmail.bodyText,
       extractedAt: ahora,
     };
   } catch (error) {
     console.error('Error en extraerCodigo:', error);
+
+    // Si ya es un HttpsError, relanzarlo
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
     throw new functions.https.HttpsError('internal', 'Error al extraer el código');
   }
 });
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// Extrae líneas relevantes de un email source crudo
+function parseSimpleEmail(source) {
+  const result = { from: '', subject: '', date: null, text: '', html: '' };
+
+  // Headers
+  const fromMatch = source.match(/^From:\s*(.+)$/im);
+  if (fromMatch) result.from = fromMatch[1].trim();
+
+  const subjectMatch = source.match(/^Subject:\s*(.+)$/im);
+  if (subjectMatch) result.subject = subjectMatch[1].trim();
+
+  const dateMatch = source.match(/^Date:\s*(.+)$/im);
+  if (dateMatch) {
+    result.date = new Date(dateMatch[1].trim());
+    if (isNaN(result.date.getTime())) result.date = null;
+  }
+
+  // Content-Type boundary detection
+  const boundaryMatch = source.match(/boundary="([^"]+)"/);
+  const boundary = boundaryMatch ? boundaryMatch[1] : null;
+
+  if (boundary) {
+    // Multipart: extraer text/plain y text/html
+    const parts = source.split(`--${boundary}`);
+    for (const part of parts) {
+      if (part.includes('text/plain')) {
+        const body = part.replace(/^[\s\S]*?\n\n/, '').replace(/\n--[\s\S]*$/, '').trim();
+        if (body) result.text = decodeB64IfNeeded(part, body);
+      }
+      if (part.includes('text/html')) {
+        const body = part.replace(/^[\s\S]*?\n\n/, '').replace(/\n--[\s\S]*$/, '').trim();
+        if (body) result.html = decodeB64IfNeeded(part, body);
+      }
+    }
+  } else {
+    // Single part — asumir text/plain después de headers
+    const body = source.replace(/^[\s\S]*?\n\n/, '').trim();
+    if (body) result.text = body;
+  }
+
+  // Si no hay text/html, intentar extraer todo después de headers
+  if (!result.text && !result.html) {
+    result.text = source.replace(/^[\s\S]*?\n\n/, '').trim();
+  }
+
+  // Limpiar HTML básico para tener texto plano legible
+  if (result.html && !result.text) {
+    result.text = result.html
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  return result;
+}
+
+// Decodifica Content-Transfer-Encoding: base64 si está presente
+function decodeB64IfNeeded(part, body) {
+  if (part.includes('Content-Transfer-Encoding: base64')) {
+    try {
+      return Buffer.from(body, 'base64').toString('utf-8');
+    } catch {
+      return body;
+    }
+  }
+  // Quoted-printable
+  if (part.includes('Content-Transfer-Encoding: quoted-printable')) {
+    try {
+      return body
+        .replace(/=\r\n/g, '')
+        .replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+    } catch {
+      return body;
+    }
+  }
+  return body;
+}
+
+// Extrae keywords del nombre del servicio para matchear en el email
+function extractServiceKeywords(serviceName) {
+  const kw = [];
+  kw.push(serviceName);
+
+  // Mapeo de servicios conocidos a keywords de verificación
+  if (serviceName.includes('netflix')) kw.push('netflix', 'código', 'verificación', 'acceso temporal');
+  else if (serviceName.includes('disney')) kw.push('disney', 'código', 'verificación');
+  else if (serviceName.includes('hbo') || serviceName.includes('max')) kw.push('hbo', 'max', 'código', 'verificación');
+  else if (serviceName.includes('win')) kw.push('win', 'código', 'verificación');
+  else if (serviceName.includes('chatgpt') || serviceName.includes('tools')) kw.push('chatgpt', 'openai', 'código');
+  else kw.push('código', 'verificación', 'code', 'verify', 'access');
+
+  return kw;
+}
+
+// Extrae un código (numérico) o URL del body del email
+function extractCodeFromBody(body) {
+  if (!body) return null;
+
+  // 1. Buscar URL — importante para Netflix y servicios que mandan link
+  const urlMatch = body.match(/https?:\/\/[^\s"<>]+/);
+  if (urlMatch) return urlMatch[0];
+
+  // 2. Buscar 4-6 dígitos (código de verificación típico)
+  //    Pero evitar números muy largos (IDs, fechas) o muy cortos
+  const codeMatch = body.match(/(?<!\d)(\d{4,6})(?!\d)/);
+  if (codeMatch) return codeMatch[1];
+
+  // 3. Fallback — nada detectable
+  return null;
+}
+
 
 // Lee una cuenta pública mediante token (sin autenticación).
 // El token es generado por un reseller al crear un link de acceso.
@@ -2419,3 +2574,179 @@ exports.createAccountWithProfiles = functions.https.onCall(async (data, context)
     failed,
   };
 });
+
+// ─── Correo Madre: guardar configuración IMAP ──────────────────────────────
+// Solo admin/tenantAdmin puede escribir en secrets
+exports.saveEmailConfig = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+  }
+
+  const { tenantId, email, password, host, port } = data;
+  if (!tenantId || !email || !password || !host || !port) {
+    throw new functions.https.HttpsError('invalid-argument', 'Todos los campos son requeridos');
+  }
+
+  // Verificar que sea admin del tenant
+  const userDoc = await db.collection('users').doc(context.auth.uid).get();
+  const userData = userDoc.data();
+  const role = userData?.role;
+  const userTenantId = userData?.tenantId;
+
+  if (role !== 'superadmin' && (role !== 'admin' || userTenantId !== tenantId)) {
+    throw new functions.https.HttpsError('permission-denied', 'No tienes permisos para esta acción');
+  }
+
+  await db.collection('tenants').doc(tenantId).collection('secrets').doc('emailConfig').set({
+    email,
+    password,
+    host,
+    port: parseInt(port),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedBy: context.auth.uid,
+  }, { merge: true });
+
+  return { success: true };
+});
+
+// ─── Correo Madre: obtener configuración (sin password) ──────────────────
+exports.getEmailConfig = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+  }
+
+  const { tenantId } = data;
+  if (!tenantId) {
+    throw new functions.https.HttpsError('invalid-argument', 'tenantId es requerido');
+  }
+
+  const userDoc = await db.collection('users').doc(context.auth.uid).get();
+  const userData = userDoc.data();
+  const role = userData?.role;
+  const userTenantId = userData?.tenantId;
+
+  if (role !== 'superadmin' && (role !== 'admin' || userTenantId !== tenantId)) {
+    throw new functions.https.HttpsError('permission-denied', 'No tienes permisos');
+  }
+
+  const configDoc = await db.collection('tenants').doc(tenantId).collection('secrets').doc('emailConfig').get();
+
+  if (!configDoc.exists) {
+    return { config: null };
+  }
+
+  const config = configDoc.data();
+  return {
+    config: {
+      email: config.email,
+      host: config.host,
+      port: config.port,
+      updatedAt: config.updatedAt,
+      // No devolvemos el password
+      hasPassword: !!config.password,
+    },
+  };
+});
+
+// ─── Correo Madre: probar conexión IMAP ─────────────────────────────────
+exports.testEmailConnection = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+  }
+
+  const { email, password, host, port } = data;
+  if (!email || !password || !host || !port) {
+    throw new functions.https.HttpsError('invalid-argument', 'Faltan campos requeridos');
+  }
+
+  let client = null;
+  try {
+    const { ImapFlow } = require('imapflow');
+    client = new ImapFlow({
+      host,
+      port: parseInt(port),
+      secure: true,
+      auth: { user: email, pass: password },
+      logger: false,
+      timeout: 10000,
+    });
+
+    await client.connect();
+    await client.mailboxOpen('INBOX');
+    await client.logout();
+
+    return { success: true, message: 'Conexión exitosa' };
+  } catch (err) {
+    if (client) {
+      try { await client.logout(); } catch {}
+    }
+    return {
+      success: false,
+      message: err.message || 'Error de conexión IMAP',
+    };
+  }
+});
+
+// ─── Actualizar credenciales desde un ticket ──────────────────────────────
+exports.updateTicketCredentials = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+  }
+
+  const { ticketId, purchaseDocId, accountIndex, newEmail, newPassword, newProfileName, newProfilePin } = data;
+  if (!ticketId || !purchaseDocId || accountIndex === undefined || accountIndex === null) {
+    throw new functions.https.HttpsError('invalid-argument', 'ticketId, purchaseDocId y accountIndex son requeridos');
+  }
+
+  const userDoc = await db.collection('users').doc(context.auth.uid).get();
+  const userData = userDoc.data();
+  const role = userData?.role;
+  if (role !== 'admin' && role !== 'superadmin') {
+    throw new functions.https.HttpsError('permission-denied', 'Solo administradores pueden actualizar credenciales');
+  }
+
+  const purchaseRef = db.collection('purchases').doc(purchaseDocId);
+  const purchaseDoc = await purchaseRef.get();
+
+  if (!purchaseDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Venta no encontrada');
+  }
+
+  const purchaseData = purchaseDoc.data();
+  const profiles = purchaseData.profiles || [];
+  const credentials = purchaseData.credentials || [];
+
+  if (accountIndex >= profiles.length) {
+    throw new functions.https.HttpsError('invalid-argument', `Índice ${accountIndex} fuera de rango. Solo hay ${profiles.length} perfiles`);
+  }
+
+  const profileUpdate = { ...profiles[accountIndex] };
+  if (newEmail !== undefined) profileUpdate.credential = { ...profileUpdate.credential, email: newEmail };
+  if (newPassword !== undefined) profileUpdate.credential = { ...profileUpdate.credential, password: newPassword };
+  if (newProfileName !== undefined) profileUpdate.profileName = newProfileName;
+  if (newProfilePin !== undefined) profileUpdate.profilePin = newProfilePin;
+
+  const updatedProfiles = [...profiles];
+  updatedProfiles[accountIndex] = profileUpdate;
+
+  const updatedCredentials = [...credentials];
+  if (updatedCredentials[accountIndex]) {
+    updatedCredentials[accountIndex] = { ...profileUpdate.credential };
+  }
+
+  await purchaseRef.update({
+    profiles: updatedProfiles,
+    credentials: updatedCredentials,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await db.collection('tickets').doc(ticketId).update({
+    status: 'resolved',
+    newCredentials: { email: newEmail, password: newPassword, profileName: newProfileName, profilePin: newProfilePin },
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { success: true };
+});
+
+
