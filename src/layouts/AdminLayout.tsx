@@ -3,6 +3,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { adminLogout } from '../services/auth';
 import { Menu, X, LayoutDashboard, Package, Image, FileText, Settings, LogOut, LucideIcon, Gift, Wallet, Users, Store, Ticket, Mail, UserCheck } from 'lucide-react';
+import MeshBackground from '../components/MeshBackground';
 
 interface MenuItem {
   path: string;
@@ -59,7 +60,8 @@ const AdminLayout = (): JSX.Element => {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-dark-100 to-black flex">
+    <div className="min-h-screen bg-black flex">
+      <MeshBackground />
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 glass-dark border-b border-white/10 p-4 flex items-center justify-between">
         <h1 className="text-xl font-bold gradient-text">Admin</h1>

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { getResellerById } from '../services/marketplace';
+import MeshBackground from '../components/MeshBackground';
 import {
   Menu,
   X,
@@ -81,7 +82,8 @@ const ResellerLayout = (): JSX.Element => {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-dark-100 to-black flex">
+    <div className="min-h-screen bg-black flex">
+      <MeshBackground />
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 glass-dark border-b border-white/10 p-4 flex items-center justify-between">
         <h1 className="text-xl font-bold gradient-text">Subdistribuidor</h1>
         <button

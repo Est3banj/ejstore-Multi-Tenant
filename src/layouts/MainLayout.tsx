@@ -6,6 +6,7 @@ import { useApp } from '../context/AppContext';
 import { useAuthStore } from '../store/authStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
+import MeshBackground from '../components/MeshBackground';
 
 interface HSL {
   h: number;
@@ -263,7 +264,8 @@ const MainLayout = (): JSX.Element => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-dark">
+    <div className="min-h-screen flex flex-col bg-black relative">
+      <MeshBackground />
       {/* Anuncio tipo toast para primera vez - CORNER NOTIFICATION */}
       <AnimatePresence>
         {showMarketingBanner && !user && (
