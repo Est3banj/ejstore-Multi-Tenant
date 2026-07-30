@@ -94,7 +94,7 @@ const Terms = () => {
 
       <div className="mt-8 glass p-6 rounded-xl">
         <h2 className="text-2xl font-bold mb-4 text-white">Vista Previa</h2>
-        <div className="bg-slate-800 p-6 rounded-lg">
+        <div className="bg-white/5 p-6 rounded-lg">
           <div className="text-white/80 whitespace-pre-wrap">
             {content || 'No hay contenido aún...'}
           </div>

@@ -196,7 +196,7 @@ const Banners = () => {
             animate={{ opacity: 1, y: 0 }}
             className={`glass rounded-xl overflow-hidden ${!banner.active ? 'opacity-50' : ''}`}
           >
-            <div className="h-48 bg-gradient-to-br from-primary-500/10 to-red-600/5 flex items-center justify-center overflow-hidden">
+            <div className="h-48 bg-gradient-to-br from-white/5 to-white/10 flex items-center justify-center overflow-hidden">
               {banner.image ? (
                 <img src={banner.image} alt={banner.title || 'Banner'} className="w-full h-full object-cover" />
               ) : (
