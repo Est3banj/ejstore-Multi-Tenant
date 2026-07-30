@@ -137,7 +137,7 @@ const VerCuenta = (): JSX.Element => {
         )}
 
         {loading && (
-          <div className="flex items-center gap-2 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-400 text-sm">
+          <div className="flex items-center gap-2 p-4 bg-white/5 border border-white/10 rounded-xl text-white/70 text-sm">
             <RefreshCw size={16} className="animate-spin" />
             Consultando...
           </div>

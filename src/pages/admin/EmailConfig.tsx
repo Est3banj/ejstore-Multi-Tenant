@@ -123,7 +123,7 @@ const ImapForm = ({
               : connectionStatus === 'disconnected'
               ? 'bg-red-500/10 border-red-500/30 text-red-400'
               : connectionStatus === 'checking'
-              ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+              ? 'bg-white/5 border-white/15 text-white/60'
               : 'bg-gray-500/10 border-gray-500/30 text-gray-400'
           }`}>
             {connectionStatus === 'checking' ? (
@@ -219,10 +219,10 @@ const EmailConfig = (): JSX.Element => {
         </p>
       </div>
 
-      <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 flex items-start gap-3">
-        <Shield size={18} className="text-blue-400 shrink-0 mt-0.5" />
-        <div className="text-sm text-blue-200 leading-relaxed">
-          <p className="font-medium text-blue-100 mb-1">Cómo funciona</p>
+      <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-start gap-3">
+        <Shield size={18} className="text-white/60 shrink-0 mt-0.5" />
+        <div className="text-sm text-white/70 leading-relaxed">
+          <p className="font-medium text-white/90 mb-1">Cómo funciona</p>
           <p>Necesitás dos cuentas de correo separadas:</p>
           <ul className="list-disc list-inside mt-1 space-y-1">
             <li><strong>Códigos:</strong> Recibe los códigos de verificación de Netflix, Disney+, etc.</li>

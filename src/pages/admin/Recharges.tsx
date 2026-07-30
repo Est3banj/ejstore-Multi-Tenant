@@ -273,7 +273,7 @@ const Recharges = () => {
                         <div className="flex items-center gap-2">
                           <p className="text-white font-medium truncate">{recharge.customerName}</p>
                           {recharge.emailUid && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-mono border border-blue-500/20 shrink-0">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 text-white/70 font-mono border border-white/10 shrink-0">
                               AUTO
                             </span>
                           )}
@@ -312,7 +312,7 @@ const Recharges = () => {
                         <button
                           onClick={() => handleReVerify(recharge)}
                           disabled={!!processing}
-                          className="p-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 disabled:opacity-30 transition-all"
+                          className="p-2 rounded-lg bg-white/5 text-white/70 hover:bg-white/10 disabled:opacity-30 transition-all"
                           title="Re-verificar pago"
                         >
                           {processing === recharge.id ? (
@@ -375,7 +375,7 @@ const Recharges = () => {
                   </p>
                 )}
                 {recharge.status === 'approved' && recharge.emailUid && (
-                  <p className="text-blue-400/70 text-xs mt-3 ml-12 flex items-center gap-1.5">
+                  <p className="text-white/60 text-xs mt-3 ml-12 flex items-center gap-1.5">
                     <CheckCircle size={12} />
                     Aprobada automáticamente por detección de pago
                   </p>
@@ -457,7 +457,7 @@ const Recharges = () => {
                   {detailTarget.emailUid && (
                     <div className="bg-gray-900/50 rounded-xl p-3 col-span-2">
                       <p className="text-gray-500 text-xs mb-1">ID de email (UID)</p>
-                      <p className="text-blue-400 text-xs font-mono">{detailTarget.emailUid}</p>
+                      <p className="text-white/70 text-xs font-mono">{detailTarget.emailUid}</p>
                     </div>
                   )}
                   <div className="bg-gray-900/50 rounded-xl p-3 col-span-2">

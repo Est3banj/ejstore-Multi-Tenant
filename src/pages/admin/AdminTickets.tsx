@@ -209,7 +209,7 @@ const AdminTickets = (): JSX.Element => {
 
   const userTypeBadge = (type: string) => {
     return type === 'customer' ? (
-      <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400">
+      <span className="px-2 py-1 rounded-full text-xs font-medium bg-white/10 text-white/70">
         Cliente
       </span>
     ) : (

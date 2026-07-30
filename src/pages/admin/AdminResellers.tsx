@@ -203,9 +203,9 @@ const AdminResellers = (): JSX.Element => {
         <div className="glass p-5 rounded-xl">
           <div className="flex items-center justify-between mb-2">
             <p className="text-white/50 text-sm">Resellers Activos</p>
-            <Activity size={18} className="text-blue-400" />
+            <Activity size={18} className="text-white/50" />
           </div>
-          <p className="text-2xl font-bold text-blue-400">{activeResellers}</p>
+          <p className="text-2xl font-bold text-white">{activeResellers}</p>
         </div>
       </div>
 

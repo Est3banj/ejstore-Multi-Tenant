@@ -35,7 +35,7 @@ const CopyButton = ({ text, label }: { text: string; label?: string }) => {
     setTimeout(() => setCopied(false), 1500);
   };
   return (
-    <button onClick={handleCopy} className="text-xs ml-2 text-blue-500 hover:text-blue-700">
+    <button onClick={handleCopy} className="text-xs ml-2 text-white/70 hover:text-white">
       {copied ? '✅ Copiado!' : (label || 'Copiar')}
     </button>
   );
