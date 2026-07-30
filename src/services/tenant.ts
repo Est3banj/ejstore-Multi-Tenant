@@ -2,6 +2,31 @@ import { doc, getDoc, where, getDocs, collection, query } from 'firebase/firesto
 import { db } from './firebase';
 import type { Tenant } from '../types';
 
+export const getAllActiveTenants = async (): Promise<Tenant[]> => {
+  try {
+    const q = query(collection(db, 'tenants'), where('isActive', '==', true));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(docSnap => {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        name: data.name,
+        subdomain: data.subdomain,
+        logoUrl: data.logoUrl,
+        primaryColor: data.primaryColor,
+        whatsappNumber: data.whatsappNumber,
+        contactEmail: data.contactEmail,
+        secondaryColor: data.secondaryColor,
+        isActive: data.isActive,
+        createdAt: data.createdAt?.toDate?.() || data.createdAt
+      };
+    });
+  } catch (error) {
+    console.error('Error fetching active tenants:', error);
+    return [];
+  }
+};
+
 export const getTenantById = async (tenantId: string): Promise<Tenant | null> => {
   if (!tenantId) return null;
   
