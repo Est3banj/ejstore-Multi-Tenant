@@ -13,13 +13,13 @@ const HeroSection = ({ onScrollToPlans, onScrollToTiendas }: {
     {/* Fondo animado */}
     <div className="absolute inset-0">
       <div className="absolute inset-0 bg-gradient-to-br from-black via-[#0A0A0A] to-[#1A0000]" />
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-600/20 rounded-full blur-[128px] animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-red-500/10 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '2s' }} />
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-600/20 rounded-full blur-[128px] animate-pulse" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '2s' }} />
       <div className="absolute inset-0">
-        <div className="absolute top-20 left-10 w-2 h-2 bg-red-400/50 rounded-full" />
-        <div className="absolute top-40 right-20 w-1.5 h-1.5 bg-red-400/30 rounded-full" />
-        <div className="absolute bottom-40 left-1/4 w-1.5 h-1.5 bg-red-400/40 rounded-full" />
-        <div className="absolute bottom-20 right-1/3 w-2 h-2 bg-red-400/30 rounded-full" />
+        <div className="absolute top-20 left-10 w-2 h-2 bg-cyan-400/50 rounded-full" />
+        <div className="absolute top-40 right-20 w-1.5 h-1.5 bg-cyan-400/30 rounded-full" />
+        <div className="absolute bottom-40 left-1/4 w-1.5 h-1.5 bg-cyan-400/40 rounded-full" />
+        <div className="absolute bottom-20 right-1/3 w-2 h-2 bg-cyan-400/30 rounded-full" />
       </div>
     </div>
 
@@ -29,7 +29,7 @@ const HeroSection = ({ onScrollToPlans, onScrollToTiendas }: {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8 }}
       >
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-full text-red-400 text-sm mb-8">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-cyan-400 text-sm mb-8">
           <Sparkles size={14} />
           <span>Plataforma líder en servicios digitales</span>
         </div>
@@ -37,8 +37,8 @@ const HeroSection = ({ onScrollToPlans, onScrollToTiendas }: {
         <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold text-white mb-6 leading-tight">
           Tu tienda de servicios
           <br />
-          <span className="bg-gradient-to-r from-red-500 via-red-400 to-red-600 bg-clip-text text-transparent">
-            digitales
+<span className="bg-gradient-to-r from-cyan-400 via-teal-400 to-teal-500 bg-clip-text text-transparent">
+        digitales
           </span>
         </h1>
 
@@ -50,7 +50,7 @@ const HeroSection = ({ onScrollToPlans, onScrollToTiendas }: {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <button
             onClick={onScrollToPlans}
-            className="group relative px-8 py-4 bg-gradient-to-r from-red-600 to-red-500 text-white font-semibold rounded-xl text-lg transition-all duration-300 hover:shadow-2xl hover:shadow-red-500/30 hover:scale-105"
+            className="group relative px-8 py-4 bg-gradient-to-r from-cyan-500 to-teal-500 text-white font-semibold rounded-xl text-lg transition-all duration-300 hover:shadow-2xl hover:shadow-cyan-500/30 hover:scale-105"
           >
             <span className="relative z-10 flex items-center gap-2">
               Quiero mi tienda
@@ -59,7 +59,7 @@ const HeroSection = ({ onScrollToPlans, onScrollToTiendas }: {
           </button>
           <button
             onClick={onScrollToTiendas}
-            className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-xl text-lg border border-white/10 hover:border-red-500/50 transition-all duration-300"
+            className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-xl text-lg border border-white/10 hover:border-cyan-500/50 transition-all duration-300"
           >
             Ver tiendas destacadas
           </button>
@@ -79,7 +79,7 @@ const HeroSection = ({ onScrollToPlans, onScrollToTiendas }: {
           { value: '99%', label: 'Servicio garantizado' },
         ].map((stat) => (
           <div key={stat.label} className="text-center">
-            <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-red-400 to-red-600 bg-clip-text text-transparent">
+            <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-cyan-400 to-teal-500 bg-clip-text text-transparent">
               {stat.value}
             </div>
             <div className="text-white/50 text-sm mt-1">{stat.label}</div>
@@ -115,21 +115,21 @@ const ComoFuncionaSection = () => (
             icon: Store,
             title: 'Creás tu tienda',
             desc: 'Elegís tu plan, configurás tu marca, colores y servicios. Sin conocimientos técnicos.',
-            color: 'from-red-500/20 to-red-600/10'
+            color: 'from-cyan-500/20 to-cyan-600/10'
           },
           {
             step: '02',
             icon: Zap,
             title: 'Agregás productos',
             desc: 'Subís tus servicios: cuentas de streaming, recargas, pines o lo que quieras vender.',
-            color: 'from-red-600/20 to-red-700/10'
+            color: 'from-cyan-600/20 to-cyan-700/10'
           },
           {
             step: '03',
             icon: TrendingUp,
             title: 'Empezás a vender',
             desc: 'Tus clientes compran, reciben automáticamente y vos ganás. Nosotros nos encargamos de la tecnología.',
-            color: 'from-red-700/20 to-red-800/10'
+            color: 'from-cyan-700/20 to-cyan-800/10'
           }
         ].map((item, i) => (
           <motion.div
@@ -141,12 +141,12 @@ const ComoFuncionaSection = () => (
             className="relative group"
           >
             <div className={`absolute inset-0 bg-gradient-to-br ${item.color} rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
-            <div className="relative bg-white/[0.03] backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-red-500/30 transition-all duration-300">
-              <div className="text-6xl font-bold bg-gradient-to-r from-red-500/20 to-transparent bg-clip-text text-transparent absolute top-4 right-6">
+            <div className="relative bg-white/[0.03] backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-cyan-500/30 transition-all duration-300">
+              <div className="text-6xl font-bold bg-gradient-to-r from-cyan-500/20 to-transparent bg-clip-text text-transparent absolute top-4 right-6">
                 {item.step}
               </div>
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-red-500/20 to-red-600/20 flex items-center justify-center mb-6 border border-red-500/20">
-                <item.icon size={28} className="text-red-400" />
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 flex items-center justify-center mb-6 border border-cyan-500/20">
+                <item.icon size={28} className="text-cyan-400" />
               </div>
               <h3 className="text-xl font-bold text-white mb-3">{item.title}</h3>
               <p className="text-white/60 leading-relaxed">{item.desc}</p>
@@ -164,7 +164,7 @@ const TiendasSection = ({ tenants }: { tenants: Tenant[] }) => {
 
   return (
     <section id="tiendas" className="relative py-24 px-4">
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-red-500/5 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-500/5 to-transparent" />
       
       <div className="max-w-6xl mx-auto relative">
         <motion.div
@@ -190,17 +190,17 @@ const TiendasSection = ({ tenants }: { tenants: Tenant[] }) => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
-              className="group relative bg-white/[0.03] backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:border-red-500/30 transition-all duration-300 overflow-hidden"
+              className="group relative bg-white/[0.03] backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:border-cyan-500/30 transition-all duration-300 overflow-hidden"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               
               <div className="relative flex items-center gap-4 mb-4">
                 {/* Avatar / Logo */}
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-red-500/20 to-red-600/20 flex items-center justify-center border border-red-500/20 overflow-hidden shrink-0">
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 flex items-center justify-center border border-cyan-500/20 overflow-hidden shrink-0">
                   {tenant.logoUrl ? (
                     <img src={tenant.logoUrl} alt={tenant.name} className="w-full h-full object-cover" />
                   ) : (
-                    <Store size={24} className="text-red-400" />
+                    <Store size={24} className="text-cyan-400" />
                   )}
                 </div>
                 <div className="min-w-0">
@@ -212,10 +212,10 @@ const TiendasSection = ({ tenants }: { tenants: Tenant[] }) => {
               </div>
 
               <div className="relative flex items-center justify-between">
-                <span className="text-white/50 text-sm group-hover:text-red-400 transition-colors">
+                <span className="text-white/50 text-sm group-hover:text-cyan-400 transition-colors">
                   Visitar tienda
                 </span>
-                <ChevronRight size={18} className="text-white/30 group-hover:text-red-400 group-hover:translate-x-1 transition-all" />
+                <ChevronRight size={18} className="text-white/30 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
               </div>
             </motion.a>
           ))}
@@ -228,7 +228,7 @@ const TiendasSection = ({ tenants }: { tenants: Tenant[] }) => {
 // ─── Sección Planes ─────────────────────────────────────────────────────────
 const PlanesSection = ({ onSelectPlan }: { onSelectPlan: (plan: string) => void }) => (
   <section id="planes" className="relative py-24 px-4">
-    <div className="absolute inset-0 bg-gradient-to-t from-black via-red-500/5 to-transparent" />
+    <div className="absolute inset-0 bg-gradient-to-t from-black via-cyan-500/5 to-transparent" />
     
     <div className="max-w-5xl mx-auto relative">
       <motion.div
@@ -237,7 +237,7 @@ const PlanesSection = ({ onSelectPlan }: { onSelectPlan: (plan: string) => void 
         viewport={{ once: true }}
         className="text-center mb-16"
       >
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-full text-red-400 text-sm mb-6">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-cyan-400 text-sm mb-6">
           <Sparkles size={14} />
           <span>Planes flexibles</span>
         </div>
@@ -257,17 +257,17 @@ const PlanesSection = ({ onSelectPlan }: { onSelectPlan: (plan: string) => void 
           viewport={{ once: true }}
           className="group relative"
         >
-          <div className="absolute -inset-0.5 bg-gradient-to-br from-red-500 to-red-700 rounded-2xl blur-lg opacity-40 group-hover:opacity-70 transition-opacity duration-500" />
-          <div className="relative bg-[#0A0A0A] border border-red-500/20 rounded-2xl p-8">
+          <div className="absolute -inset-0.5 bg-gradient-to-br from-cyan-500 to-teal-500 rounded-2xl blur-lg opacity-40 group-hover:opacity-70 transition-opacity duration-500" />
+          <div className="relative bg-[#0A0A0A] border border-cyan-500/20 rounded-2xl p-8">
             {/* Popular tag */}
-            <div className="inline-flex items-center gap-1 px-3 py-1 bg-red-500/20 border border-red-500/30 rounded-full text-red-400 text-xs font-medium mb-6">
+            <div className="inline-flex items-center gap-1 px-3 py-1 bg-cyan-500/20 border border-cyan-500/30 rounded-full text-cyan-400 text-xs font-medium mb-6">
               <Sparkles size={12} />
               <span>Más popular</span>
             </div>
 
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500/20 to-red-600/20 flex items-center justify-center border border-red-500/20">
-                <Store size={24} className="text-red-400" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 flex items-center justify-center border border-cyan-500/20">
+                <Store size={24} className="text-cyan-400" />
               </div>
               <div>
                 <h3 className="text-xl font-bold text-white">Dueño de Tienda</h3>
@@ -299,7 +299,7 @@ const PlanesSection = ({ onSelectPlan }: { onSelectPlan: (plan: string) => void 
 
             <button
               onClick={() => onSelectPlan('tienda')}
-              className="w-full py-4 bg-gradient-to-r from-red-600 to-red-500 text-white font-semibold rounded-xl transition-all duration-300 hover:shadow-2xl hover:shadow-red-500/30 hover:scale-[1.02]"
+              className="w-full py-4 bg-gradient-to-r from-cyan-500 to-teal-500 text-white font-semibold rounded-xl transition-all duration-300 hover:shadow-2xl hover:shadow-cyan-500/30 hover:scale-[1.02]"
             >
               Quiero mi tienda
             </button>
@@ -313,11 +313,11 @@ const PlanesSection = ({ onSelectPlan }: { onSelectPlan: (plan: string) => void 
           viewport={{ once: true }}
           className="group relative"
         >
-          <div className="absolute -inset-0.5 bg-gradient-to-br from-red-400 to-red-600 rounded-2xl blur-lg opacity-20 group-hover:opacity-40 transition-opacity duration-500" />
-          <div className="relative bg-[#0A0A0A] border border-white/10 rounded-2xl p-8 group-hover:border-red-500/30 transition-colors">
+          <div className="absolute -inset-0.5 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-2xl blur-lg opacity-20 group-hover:opacity-40 transition-opacity duration-500" />
+          <div className="relative bg-[#0A0A0A] border border-white/10 rounded-2xl p-8 group-hover:border-cyan-500/30 transition-colors">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500/20 to-red-600/20 flex items-center justify-center border border-red-500/20">
-                <Users size={24} className="text-red-400" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 flex items-center justify-center border border-cyan-500/20">
+                <Users size={24} className="text-cyan-400" />
               </div>
               <div>
                 <h3 className="text-xl font-bold text-white">Distribuidor</h3>
@@ -349,7 +349,7 @@ const PlanesSection = ({ onSelectPlan }: { onSelectPlan: (plan: string) => void 
 
             <button
               onClick={() => onSelectPlan('distribuidor')}
-              className="w-full py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-xl border border-white/20 hover:border-red-500/50 transition-all duration-300"
+              className="w-full py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-xl border border-white/20 hover:border-cyan-500/50 transition-all duration-300"
             >
               Quiero ser distribuidor
             </button>
@@ -382,12 +382,12 @@ const VideoSection = () => (
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="relative aspect-video rounded-2xl overflow-hidden bg-gradient-to-br from-red-500/10 via-black to-red-600/10 border border-white/10"
+        className="relative aspect-video rounded-2xl overflow-hidden bg-gradient-to-br from-cyan-500/10 via-black to-cyan-600/10 border border-white/10"
       >
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center">
-            <div className="w-20 h-20 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center mx-auto mb-4">
-              <div className="w-0 h-0 border-t-[12px] border-t-transparent border-l-[20px] border-l-red-400 border-b-[12px] border-b-transparent ml-1" />
+            <div className="w-20 h-20 rounded-full bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center mx-auto mb-4">
+              <div className="w-0 h-0 border-t-[12px] border-t-transparent border-l-[20px] border-l-cyan-400 border-b-[12px] border-b-transparent ml-1" />
             </div>
             <p className="text-white/40 text-sm">Video próximamente</p>
           </div>
@@ -430,10 +430,10 @@ const FeaturesSection = () => (
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: i * 0.1 }}
-            className="group bg-white/[0.03] backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:border-red-500/30 transition-all duration-300"
+            className="group bg-white/[0.03] backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:border-cyan-500/30 transition-all duration-300"
           >
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500/20 to-red-600/20 flex items-center justify-center mb-4 border border-red-500/20">
-              <feature.icon size={24} className="text-red-400" />
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 flex items-center justify-center mb-4 border border-cyan-500/20">
+              <feature.icon size={24} className="text-cyan-400" />
             </div>
             <h3 className="text-lg font-bold text-white mb-2">{feature.title}</h3>
             <p className="text-white/60 text-sm leading-relaxed">{feature.desc}</p>
@@ -458,8 +458,8 @@ const FooterSection = () => (
         <div>
           <h4 className="text-sm font-semibold text-white/70 mb-3 uppercase tracking-wider">Planes</h4>
           <ul className="space-y-2">
-            <li><a href="#planes" className="text-white/50 hover:text-red-400 text-sm transition-colors">Dueño de Tienda</a></li>
-            <li><a href="#planes" className="text-white/50 hover:text-red-400 text-sm transition-colors">Distribuidor</a></li>
+            <li><a href="#planes" className="text-white/50 hover:text-cyan-400 text-sm transition-colors">Dueño de Tienda</a></li>
+            <li><a href="#planes" className="text-white/50 hover:text-cyan-400 text-sm transition-colors">Distribuidor</a></li>
           </ul>
         </div>
         <div>
@@ -550,8 +550,8 @@ const FormModal = ({ plan, onClose }: { plan: string; onClose: () => void }) => 
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <div className={`w-12 h-12 rounded-xl bg-gradient-to-br from-red-500/20 to-red-600/20 flex items-center justify-center border border-red-500/20`}>
-            {isTienda ? <Store size={24} className="text-red-400" /> : <Users size={24} className="text-red-400" />}
+          <div className={`w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 flex items-center justify-center border border-cyan-500/20`}>
+            {isTienda ? <Store size={24} className="text-cyan-400" /> : <Users size={24} className="text-cyan-400" />}
           </div>
           <div>
             <h2 className="text-xl font-bold text-white">
@@ -570,7 +570,7 @@ const FormModal = ({ plan, onClose }: { plan: string; onClose: () => void }) => 
               type="text"
               value={nombre}
               onChange={e => setNombre(e.target.value)}
-              className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
               placeholder="Ej: Juan Pérez"
             />
           </div>
@@ -581,7 +581,7 @@ const FormModal = ({ plan, onClose }: { plan: string; onClose: () => void }) => 
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
               placeholder="ejemplo@correo.com"
             />
           </div>
@@ -593,7 +593,7 @@ const FormModal = ({ plan, onClose }: { plan: string; onClose: () => void }) => 
                 type="text"
                 value={nombreNegocio}
                 onChange={e => setNombreNegocio(e.target.value)}
-                className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
                 placeholder="Ej: StreamZone"
               />
             </div>
@@ -615,7 +615,7 @@ const FormModal = ({ plan, onClose }: { plan: string; onClose: () => void }) => 
               <button
                 onClick={handleEmail}
                 disabled={!canSendEmail}
-                className="w-full py-3.5 bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed text-white font-semibold rounded-xl flex items-center justify-center gap-2 border border-white/20 hover:border-red-500/50 transition-all"
+                className="w-full py-3.5 bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed text-white font-semibold rounded-xl flex items-center justify-center gap-2 border border-white/20 hover:border-cyan-500/50 transition-all"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                 Enviar por Correo
@@ -656,7 +656,7 @@ const LandingPage = () => {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-lg border-b border-white/10">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <a href="/" className="text-xl font-bold">
-            <span className="bg-gradient-to-r from-red-500 to-red-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-cyan-400 to-teal-500 bg-clip-text text-transparent">
               EJ STREAM
             </span>
           </a>
@@ -665,13 +665,13 @@ const LandingPage = () => {
             <a href="#planes" className="text-white/70 hover:text-white text-sm transition-colors">Planes</a>
             <a
               href="/login"
-              className="px-4 py-2 text-white/80 hover:text-white text-sm font-semibold rounded-lg border border-white/20 hover:border-red-500/50 hover:bg-red-500/10 transition-all"
+              className="px-4 py-2 text-white/80 hover:text-white text-sm font-semibold rounded-lg border border-white/20 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all"
             >
               Login
             </a>
             <button
               onClick={scrollToPlans}
-              className="px-4 py-2 bg-gradient-to-r from-red-600 to-red-500 text-white text-sm font-semibold rounded-lg hover:shadow-lg hover:shadow-red-500/30 transition-all"
+              className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white text-sm font-semibold rounded-lg hover:shadow-lg hover:shadow-cyan-500/30 transition-all"
             >
               Quiero mi tienda
             </button>
