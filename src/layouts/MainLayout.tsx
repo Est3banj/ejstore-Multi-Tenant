@@ -76,21 +76,7 @@ const MainLayout = (): JSX.Element => {
 
   useEffect(() => {
     if (settings?.primaryColor) {
-      const root = document.documentElement;
-      const primary = settings.primaryColor || '#C0C0C0';
-      const secondary = settings.secondaryColor || '#1A1A1A';
-      
-      const primaryHsl = hexToHsl(primary);
-      const secondaryHsl = hexToHsl(secondary);
-      
-      // Aplicar variables CSS para Tailwind
-      root.style.setProperty('--primary', `${primaryHsl.h} ${primaryHsl.s}% ${primaryHsl.l}%`);
-      root.style.setProperty('--primary-foreground', '0 0% 100%');
-      root.style.setProperty('--secondary', `${secondaryHsl.h} ${secondaryHsl.s}% ${secondaryHsl.l}%`);
-      root.style.setProperty('--secondary-foreground', '0 0% 100%');
-      root.style.setProperty('--ring', `${primaryHsl.h} ${primaryHsl.s}% ${primaryHsl.l}%`);
-      
-      // Crear estilos dinámicos para elementos Tailwind hardcodeados
+      // Crear estilos dinámicos con la paleta blanca/gris de la landing page
       let styleElement = document.getElementById('tenant-colors');
       if (!styleElement) {
         styleElement = document.createElement('style');
@@ -98,67 +84,14 @@ const MainLayout = (): JSX.Element => {
         document.head.appendChild(styleElement);
       }
       
-      // Generar clases dinámicas basadas en los colores del tenant
-      // Colores base del tenant
-      const primaryHex = primary;
-      
-      // Para el rojo que está hardcodeado, usamos el color primario
       styleElement.textContent = `
-        /* Reemplazar rojo con el color primario del tenant */
-        .text-red-400, .text-red-500, .text-red-600 { color: ${primaryHex} !important; }
-        .bg-red-500, .bg-red-600, .bg-red-500\\/20 { background-color: ${primaryHex} !important; }
-        .border-red-500 { border-color: ${primaryHex} !important; }
-        .hover\\:text-red-400:hover { color: ${primaryHex} !important; }
-        .hover\\:bg-red-500\\/10:hover { background-color: ${primaryHex}20 !important; }
-        .hover\\:bg-red-500\\/30:hover { background-color: ${primaryHex}40 !important; }
-        
-/* Sombras con rojo - más específico */
-        .shadow-red-500\/30, .shadow-primary-500\/30 { 
-          --tw-shadow-color: ${primaryHex}50 !important; 
-        }
-        .shadow-lg.shadow-primary-500\/30 {
-          --tw-shadow-color: ${primaryHex}30 !important;
-        }
-        
-        /* Sobreescribir todas las sombras principales con el color del tenant */
-        .shadow-sm { --tw-shadow-color: ${primaryHex}30 !important; }
-        .shadow { --tw-shadow-color: ${primaryHex}40 !important; }
-        .shadow-md { --tw-shadow-color: ${primaryHex}40 !important; }
-        .shadow-lg { --tw-shadow-color: ${primaryHex}40 !important; }
-        .shadow-xl { --tw-shadow-color: ${primaryHex}50 !important; }
-        .shadow-2xl { --tw-shadow-color: ${primaryHex}50 !important; }
-        
-        /* Sombra dinámica de tarjetas */
-        .card-shadow {
-          --tw-shadow-color: ${primaryHex}25 !important;
-        }
-        
-        /* Sombras con opacity */
-        .shadow-lg\/40 { --tw-shadow-color: ${primaryHex}40 !important; }
-        .shadow-xl\/50 { --tw-shadow-color: ${primaryHex}50 !important; }
-        .shadow-2xl\/50 { --tw-shadow-color: ${primaryHex}50 !important; }
-        .shadow-lg.shadow-primary-500\\/30 {
-          --tw-shadow-color: ${primaryHex}30 !important;
-        }
-        .shadow-xl, .shadow-2xl {
-          --tw-shadow-color: ${primaryHex}40 !important;
-        }
-        
         /* Checkbox y form elements */
         input[type="checkbox"]:checked {
-          background-color: ${primaryHex} !important;
-          border-color: ${primaryHex} !important;
+          background-color: white !important;
+          border-color: white !important;
         }
         
-        /* Links de términos y condiciones */
-        .text-primary-400, .text-primary-300 {
-          color: ${primaryHex} !important;
-        }
-        .hover\\:text-primary-300:hover {
-          color: ${primaryHex}cc !important;
-        }
-        
-        /* Buttons primarios */
+        /* Botones primarios */
         .btn-primary {
           background: white !important;
           color: #111111 !important;
@@ -168,14 +101,6 @@ const MainLayout = (): JSX.Element => {
           background: #f0f0f0 !important;
         }
         
-        /* Botones rojos forzados */
-        .\\!bg-red-500, .bg-red-500\\/90 {
-          background-color: ${primaryHex} !important;
-        }
-        .hover\\:\\!bg-red-600:hover {
-          background-color: ${primaryHex}cc !important;
-        }
-        
         /* Textos destacados */
         .gradient-text {
           background: linear-gradient(135deg, #ffffff, #888888) !important;
@@ -183,61 +108,47 @@ const MainLayout = (): JSX.Element => {
           -webkit-text-fill-color: transparent !important;
         }
         
-        /* Bordes primarios */
-        .border-primary, .border-primary-500 {
-          border-color: ${primaryHex} !important;
-        }
-        
-        /*Fondos con opacidad del color primario */
-        .bg-primary-500\\/10, .bg-primary-500\\/20, .bg-primary-500\\/5 {
-          background-color: ${primaryHex}20 !important;
-        }
-        
-        /* Fondos con gradiente hacia rojo */
-        .from-primary-500.to-red-600, .from-primary-500.to-red-600\\/5 {
-          --tw-gradient-from: ${primaryHex} !important;
-          --tw-gradient-to: ${primaryHex}dd !important;
-        }
-        .from-primary-500\\/10.to-red-600\\/5 {
-          --tw-gradient-from: ${primaryHex}20 !important;
-          --tw-gradient-to: ${primaryHex}10 !important;
-        }
-        .from-red-500.to-red-600 {
-          --tw-gradient-from: ${primaryHex} !important;
-          --tw-gradient-to: ${primaryHex}cc !important;
-        }
-        .from-yellow-400.via-orange-500.to-red-500 {
-          --tw-gradient-stops: var(--tw-gradient-from), #FFD700, var(--tw-gradient-via), ${primaryHex}, var(--tw-gradient-to) !important;
-        }
-        
-        /* Efectos hover primarios */
-        .hover\\:border-primary-500\\/50:hover {
-          border-color: ${primaryHex}80 !important;
-        }
-        
-        /* Estados activo primary */
+        /* Estados activo primary (sidebar, etc) */
         .bg-primary-600 {
-          background-color: ${primaryHex} !important;
+          background-color: rgba(255,255,255,0.15) !important;
         }
         .active.bg-primary-600 {
-          background-color: ${primaryHex}cc !important;
+          background-color: rgba(255,255,255,0.25) !important;
         }
-        
-        /* Hover states con bg-primary */
         .hover\\:bg-primary-600:hover {
-          background-color: ${primaryHex} !important;
+          background-color: rgba(255,255,255,0.15) !important;
         }
         
-        /* Botones específicos de tarjetas y badges */
-        .bg-red-500\\/20 { background-color: ${primaryHex}20 !important; }
-        .bg-red-500\\/10 { background-color: ${primaryHex}15 !important; }
-        .text-red-400 { color: ${primaryHex} !important; }
+        /* Fondos con opacidad */
+        .bg-primary-500\\/10, .bg-primary-500\\/20, .bg-primary-500\\/5 {
+          background-color: rgba(255,255,255,0.1) !important;
+        }
         
-        /* Estados activo adicionales */
-        .active, [data-active="true"] {
-          background-color: ${primaryHex} !important;
+        /* Textos primarios */
+        .text-primary-400, .text-primary-300 {
+          color: rgba(255,255,255,0.7) !important;
+        }
+        .hover\\:text-primary-300:hover {
+          color: rgba(255,255,255,0.9) !important;
+        }
+        
+        /* Bordes primarios */
+        .border-primary, .border-primary-500 {
+          border-color: rgba(255,255,255,0.15) !important;
+        }
+        .hover\\:border-primary-500\\/50:hover {
+          border-color: rgba(255,255,255,0.3) !important;
         }
       `;
+      
+      // Theme color para el navegador
+      let themeMeta = document.querySelector('meta[name="theme-color"]');
+      if (!themeMeta) {
+        themeMeta = document.createElement('meta');
+        themeMeta.setAttribute('name', 'theme-color');
+        document.head.appendChild(themeMeta);
+      }
+      themeMeta.setAttribute('content', '#000000');
     }
   }, [settings]);
 
