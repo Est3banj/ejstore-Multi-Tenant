@@ -43,8 +43,9 @@ const HeroSection = ({ onScrollToPlans, onScrollToTiendas }: {
         </h1>
 
         <p className="text-lg md:text-xl text-white/60 max-w-2xl mx-auto mb-10 leading-relaxed">
-          La plataforma todo-en-uno para vender cuentas de streaming, 
-          diamantes de juegos y más. Creá tu tienda en minutos y empezá a vender.
+          La plataforma #1 para vender cuentas de streaming, pines de regalo 
+          y más servicios digitales. Creá tu tienda en minutos y empezá 
+          a facturar sin límites.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -121,7 +122,7 @@ const ComoFuncionaSection = () => (
             step: '02',
             icon: Zap,
             title: 'Agregás productos',
-            desc: 'Subís tus servicios: cuentas de streaming, recargas, pines o lo que quieras vender.',
+            desc: 'Subís tus servicios: cuentas de streaming, pines de regalo o lo que quieras vender.',
             color: 'from-cyan-600/20 to-cyan-700/10'
           },
           {
