@@ -637,14 +637,17 @@ const LandingPage = () => {
   const planesRef = useRef<HTMLDivElement>(null);
   const tiendasRef = useRef<HTMLDivElement>(null);
 
-  // Cambiar favicon al entrar a la landing, restaurar al salir
+  // Cambiar favicon + title al entrar a la landing, restaurar al salir
   useEffect(() => {
     const originalFavicon = document.querySelector('link[rel="icon"]')?.getAttribute('href') || '/logoej2026.png';
+    const originalTitle = document.title;
     const favicon = document.querySelector('link[rel="icon"]');
     if (favicon) favicon.setAttribute('href', '/ejstream.png');
+    document.title = 'EJ STREAM';
 
     return () => {
       if (favicon) favicon.setAttribute('href', originalFavicon);
+      document.title = originalTitle;
     };
   }, []);
 
