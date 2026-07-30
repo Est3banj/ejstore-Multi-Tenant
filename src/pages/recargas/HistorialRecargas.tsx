@@ -134,46 +134,54 @@ const HistorialRecargas = (): JSX.Element => {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="min-h-screen p-8">
+      <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-white">Historial de Recargas</h1>
-          <p className="text-gray-400 text-sm mt-1">
+          <h1 className="text-4xl font-bold gradient-text">Historial de Recargas</h1>
+          <p className="text-white/70 mt-2">
             Todas tus solicitudes de recarga de saldo
           </p>
         </div>
         <button
           onClick={loadHistory}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors disabled:opacity-50"
+          className="btn-secondary flex items-center gap-2"
         >
-          <Loader2 size={14} className={loading ? 'animate-spin' : ''} />
+          <Loader2 size={16} className={loading ? 'animate-spin' : ''} />
           Actualizar
         </button>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-4 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" />
+          <div className="w-10 h-10 border-4 border-white/10 border-t-white rounded-full animate-spin" />
         </div>
       ) : recharges.length === 0 ? (
-        <div className="text-center py-20">
-          <DollarSign size={48} className="mx-auto text-gray-600 mb-4" />
-          <p className="text-gray-400 text-lg">No hay recargas aún</p>
-          <p className="text-gray-500 text-sm mt-1">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center py-20"
+        >
+          <DollarSign size={48} className="mx-auto text-white/20 mb-4" />
+          <p className="text-white/50 text-lg">No hay recargas aún</p>
+          <p className="text-white/30 text-sm mt-1">
             Tus solicitudes de recarga aparecerán aquí
           </p>
-        </div>
+        </motion.div>
       ) : (
-        <div className="overflow-x-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass rounded-xl overflow-hidden"
+        >
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-700">
-                <th className="text-left text-gray-400 text-sm font-medium pb-3 pr-4">Fecha</th>
-                <th className="text-left text-gray-400 text-sm font-medium pb-3 pr-4">Nombre</th>
-                <th className="text-right text-gray-400 text-sm font-medium pb-3 pr-4">Monto</th>
-                <th className="text-center text-gray-400 text-sm font-medium pb-3 pr-4">Estado</th>
-                <th className="text-right text-gray-400 text-sm font-medium pb-3">Acciones</th>
+              <tr className="border-b border-white/10">
+                <th className="text-left text-white/50 text-sm font-medium pb-3 pr-4 pt-3 px-4">Fecha</th>
+                <th className="text-left text-white/50 text-sm font-medium pb-3 pr-4 pt-3">Nombre</th>
+                <th className="text-right text-white/50 text-sm font-medium pb-3 pr-4 pt-3">Monto</th>
+                <th className="text-center text-white/50 text-sm font-medium pb-3 pr-4 pt-3">Estado</th>
+                <th className="text-right text-white/50 text-sm font-medium pb-3 pt-3 pr-4">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -181,12 +189,12 @@ const HistorialRecargas = (): JSX.Element => {
                 const status = statusConfig[recharge.status] || statusConfig.pending;
                 const StatusIcon = status.icon;
                 return (
-                  <tr key={recharge.id} className="border-b border-gray-800 hover:bg-white/5 transition-colors">
-                    <td className="py-4 pr-4">
+                  <tr key={recharge.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                    <td className="py-4 pr-4 px-4">
                       <span className="text-white text-sm">{formatDate(recharge.createdAt)}</span>
                     </td>
                     <td className="py-4 pr-4">
-                      <span className="text-gray-300 text-sm">{recharge.customerName || '-'}</span>
+                      <span className="text-white/70 text-sm">{recharge.customerName || '-'}</span>
                     </td>
                     <td className="py-4 pr-4 text-right">
                       <span className="text-white font-medium">{formatAmount(recharge.amount)}</span>
@@ -199,17 +207,17 @@ const HistorialRecargas = (): JSX.Element => {
                         </span>
                       </div>
                     </td>
-                    <td className="py-4 text-right">
+                    <td className="py-4 text-right pr-4">
                       {canVerify(recharge.status) ? (
                         <button
                           onClick={() => handleVerifyClick(recharge)}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-xs font-medium transition-colors ml-auto"
                         >
                           <Search size={12} />
-                          Verificar pago
+                          Verificar
                         </button>
                       ) : (
-                        <span className="text-gray-500 text-xs">-</span>
+                        <span className="text-white/30 text-xs">-</span>
                       )}
                     </td>
                   </tr>
@@ -217,7 +225,7 @@ const HistorialRecargas = (): JSX.Element => {
               })}
             </tbody>
           </table>
-        </div>
+        </motion.div>
       )}
 
       {/* Modal para ingresar nombre del cliente */}

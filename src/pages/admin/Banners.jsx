@@ -10,6 +10,7 @@ import { adminDb } from '../../services/firebase';
 import { uploadImage } from '../../services/storage';
 import { validateImageUrl } from '../../utils/validation';
 import Modal from '../../components/Modal';
+import Loader from '../../components/Loader';
 import { motion } from 'framer-motion';
 import { Plus, Edit, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
 
@@ -175,7 +176,7 @@ const Banners = () => {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen"><div className="loader"></div></div>;
+    return <Loader />;
   }
 
   return (

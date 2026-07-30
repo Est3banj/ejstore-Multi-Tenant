@@ -4,6 +4,7 @@ import { getTerms, updateTerms } from '../../services/firestore';
 import { adminDb } from '../../services/firebase';
 import { motion } from 'framer-motion';
 import { Save } from 'lucide-react';
+import Loader from '../../components/Loader';
 
 const Terms = () => {
   const { refreshTerms, tenant, userTenantId } = useApp();
@@ -50,7 +51,7 @@ const Terms = () => {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen"><div className="loader"></div></div>;
+    return <Loader />;
   }
 
   return (

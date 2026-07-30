@@ -153,7 +153,7 @@ const AdminResellers = (): JSX.Element => {
   }
 
   return (
-    <div className="p-4 md:p-6">
+    <div className="min-h-screen p-8">
       {/* Toast */}
       {toast && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 text-sm ${
@@ -164,16 +164,16 @@ const AdminResellers = (): JSX.Element => {
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-white">Subdistribuidores</h1>
-          <p className="text-white/60 text-sm">Gestión de resellers y saldos</p>
+          <h1 className="text-4xl font-bold gradient-text">Subdistribuidores</h1>
+          <p className="text-white/70 mt-2">Gestión de resellers y saldos</p>
         </div>
         <button
           onClick={() => setCreateModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors text-sm"
+          className="btn-primary flex items-center gap-2"
         >
-          <UserPlus size={16} />
+          <UserPlus size={20} />
           Crear Subdistribuidor
         </button>
       </div>
@@ -185,7 +185,7 @@ const AdminResellers = (): JSX.Element => {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
         <div className="glass p-5 rounded-xl">
           <div className="flex items-center justify-between mb-2">
             <p className="text-white/50 text-sm">Total Resellers</p>
