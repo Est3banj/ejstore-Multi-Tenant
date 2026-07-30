@@ -23,7 +23,8 @@ export const useTenantStore = create<TenantState>((set, get) => ({
     if (tenantId) {
       get().loadTenant(tenantId);
     } else {
-      set({ error: 'No tenant especificado en la URL', loading: false });
+      // Sin tenant en URL: estado válido para mostrar landing page (sin error)
+      set({ tenant: null, error: null, loading: false });
     }
   },
 

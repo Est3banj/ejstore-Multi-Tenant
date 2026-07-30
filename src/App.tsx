@@ -7,6 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Loader from './components/Loader';
 import NoTenantPage from './components/NoTenantPage';
 
+const LandingPage = lazy(() => import('./pages/LandingPage'));
 const Home = lazy(() => import('./pages/Home'));
 const Product = lazy(() => import('./pages/Product'));
 const Login = lazy(() => import('./pages/admin/Login'));
@@ -30,7 +31,7 @@ const useAppLoading = () => {
 };
 
 const PublicRoutes = () => {
-  const { loading, tenant } = useTenantStore();
+  const { loading, tenant, error } = useTenantStore();
   const appLoading = useAppLoading();
   const hasTenant = !!tenant;
   
@@ -38,8 +39,14 @@ const PublicRoutes = () => {
     return <Loader />;
   }
 
+  // Sin tenant en URL: mostrar Landing Page principal
   if (!hasTenant) {
-    return <NoTenantPage />;
+    // Si hay error (tenant buscado pero no encontrado), mostrar NoTenantPage
+    if (error) {
+      return <NoTenantPage />;
+    }
+    // Dominio principal sin ?v= : mostrar landing
+    return <LandingPage />;
   }
 
   return (
