@@ -91,6 +91,16 @@ const AppRoutes = () => {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
   
+  // /login es accesible sin tenant
+  if (location.pathname === '/login') {
+    return <Login />;
+  }
+  
+  // /admin/login redirige a /login
+  if (location.pathname === '/admin/login') {
+    return <Navigate to="/login" replace />;
+  }
+  
   if (isAdminRoute) {
     return <AdminRoutes />;
   }
