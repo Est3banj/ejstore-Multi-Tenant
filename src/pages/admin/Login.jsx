@@ -121,6 +121,18 @@ const Login = () => {
             {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
           </button>
         </form>
+
+        <div className="mt-6 text-center">
+          <a
+            href="/"
+            className="inline-flex items-center gap-1.5 text-white/40 hover:text-white/70 text-sm transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Volver al inicio
+          </a>
+        </div>
       </motion.div>
     </div>
   );
