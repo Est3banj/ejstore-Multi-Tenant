@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Store, Users, ChevronRight, Sparkles, Shield, Zap, TrendingUp, Globe, ArrowRight, Check } from 'lucide-react';
+import { Menu, X, Store, Users, ChevronRight, Sparkles, Shield, Zap, TrendingUp, Globe, ArrowRight, Check } from 'lucide-react';
 import { getAllActiveTenants } from '../services/tenant';
 import type { Tenant } from '../types';
 
@@ -633,6 +633,7 @@ const FormModal = ({ plan, onClose }: { plan: string; onClose: () => void }) => 
 const LandingPage = () => {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const planesRef = useRef<HTMLDivElement>(null);
   const tiendasRef = useRef<HTMLDivElement>(null);
@@ -673,6 +674,8 @@ const LandingPage = () => {
           <a href="/" className="flex items-center gap-2">
             <img src="/ejstream.png" alt="EJ STREAM" className="h-9 w-auto" />
           </a>
+
+          {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-6">
             <a href="#tiendas" className="text-white/70 hover:text-white text-sm transition-colors">Tiendas</a>
             <a href="#planes" className="text-white/70 hover:text-white text-sm transition-colors">Planes</a>
@@ -689,7 +692,57 @@ const LandingPage = () => {
               Quiero mi tienda
             </button>
           </div>
+
+          {/* Mobile hamburger */}
+          <button
+            className="md:hidden text-white/70 hover:text-white transition-colors"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
         </div>
+
+        {/* Mobile menu */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="md:hidden border-t border-white/10 overflow-hidden"
+            >
+              <div className="px-4 py-4 space-y-3">
+                <a
+                  href="#tiendas"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-4 py-3 text-white/80 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                >
+                  Tiendas
+                </a>
+                <a
+                  href="#planes"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-4 py-3 text-white/80 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                >
+                  Planes
+                </a>
+                <a
+                  href="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-4 py-3 text-center text-white font-semibold rounded-lg border border-white/20 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all"
+                >
+                  Login
+                </a>
+                <button
+                  onClick={() => { scrollToPlans(); setMobileMenuOpen(false); }}
+                  className="w-full py-3 bg-gradient-to-r from-cyan-500 to-teal-500 text-white font-semibold rounded-lg transition-all"
+                >
+                  Quiero mi tienda
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </nav>
 
       {/* Hero */}
