@@ -663,6 +663,12 @@ const LandingPage = () => {
           <div className="hidden md:flex items-center gap-6">
             <a href="#tiendas" className="text-white/70 hover:text-white text-sm transition-colors">Tiendas</a>
             <a href="#planes" className="text-white/70 hover:text-white text-sm transition-colors">Planes</a>
+            <a
+              href="/login"
+              className="text-white/50 hover:text-white text-sm transition-colors"
+            >
+              Login
+            </a>
             <button
               onClick={scrollToPlans}
               className="px-4 py-2 bg-gradient-to-r from-red-600 to-red-500 text-white text-sm font-semibold rounded-lg hover:shadow-lg hover:shadow-red-500/30 transition-all"
