@@ -76,7 +76,7 @@ const MainLayout = (): JSX.Element => {
   useEffect(() => {
     if (settings?.primaryColor) {
       const root = document.documentElement;
-      const primary = settings.primaryColor || '#E50914';
+      const primary = settings.primaryColor || '#C0C0C0';
       const secondary = settings.secondaryColor || '#1A1A1A';
       
       const primaryHsl = hexToHsl(primary);
@@ -160,11 +160,12 @@ const MainLayout = (): JSX.Element => {
         
         /* Buttons primarios */
         .btn-primary {
-          background: linear-gradient(135deg, ${primaryHex}, ${primaryHex}dd) !important;
-          border-color: ${primaryHex} !important;
+          background: white !important;
+          color: #111111 !important;
+          border-color: #ffffff30 !important;
         }
         .btn-primary:hover {
-          background: linear-gradient(135deg, ${primaryHex}cc, ${primaryHex}aa) !important;
+          background: #f0f0f0 !important;
         }
         
         /* Botones rojos forzados */
@@ -177,7 +178,7 @@ const MainLayout = (): JSX.Element => {
         
         /* Textos destacados */
         .gradient-text {
-          background: linear-gradient(135deg, ${primaryHex}, ${primaryHex}dd) !important;
+          background: linear-gradient(135deg, #ffffff, #888888) !important;
           -webkit-background-clip: text !important;
           -webkit-text-fill-color: transparent !important;
         }

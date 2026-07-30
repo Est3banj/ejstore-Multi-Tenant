@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, Store, Users, ChevronRight, Sparkles, Shield, Zap, TrendingUp, Globe, ArrowRight, Check } from 'lucide-react';
-import { getAllActiveTenants } from '../services/tenant';
+import { getFeaturedTenants, getTenantById } from '../services/tenant';
 import type { Tenant } from '../types';
 
 // ─── Sección Hero ───────────────────────────────────────────────────────────
@@ -13,13 +13,13 @@ const HeroSection = ({ onScrollToPlans, onScrollToTiendas }: {
     {/* Fondo animado */}
     <div className="absolute inset-0">
       <div className="absolute inset-0 bg-gradient-to-br from-black via-[#0A0A0A] to-[#1A0000]" />
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-600/20 rounded-full blur-[128px] animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '2s' }} />
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-white/5 rounded-full blur-[128px] animate-pulse" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-white/5 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '2s' }} />
       <div className="absolute inset-0">
-        <div className="absolute top-20 left-10 w-2 h-2 bg-cyan-400/50 rounded-full" />
-        <div className="absolute top-40 right-20 w-1.5 h-1.5 bg-cyan-400/30 rounded-full" />
-        <div className="absolute bottom-40 left-1/4 w-1.5 h-1.5 bg-cyan-400/40 rounded-full" />
-        <div className="absolute bottom-20 right-1/3 w-2 h-2 bg-cyan-400/30 rounded-full" />
+        <div className="absolute top-20 left-10 w-2 h-2 bg-white/30 rounded-full" />
+        <div className="absolute top-40 right-20 w-1.5 h-1.5 bg-white/20 rounded-full" />
+        <div className="absolute bottom-40 left-1/4 w-1.5 h-1.5 bg-white/20 rounded-full" />
+        <div className="absolute bottom-20 right-1/3 w-2 h-2 bg-white/20 rounded-full" />
       </div>
     </div>
 
@@ -29,7 +29,7 @@ const HeroSection = ({ onScrollToPlans, onScrollToTiendas }: {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8 }}
       >
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-cyan-400 text-sm mb-8">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-white/70 text-sm mb-8">
           <Sparkles size={14} />
           <span>Plataforma líder en servicios digitales</span>
         </div>
@@ -37,7 +37,7 @@ const HeroSection = ({ onScrollToPlans, onScrollToTiendas }: {
         <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold text-white mb-6 leading-tight">
           Tu tienda de servicios
           <br />
-<span className="bg-gradient-to-r from-cyan-400 via-teal-400 to-teal-500 bg-clip-text text-transparent">
+<span className="bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
         digitales
           </span>
         </h1>
@@ -51,7 +51,7 @@ const HeroSection = ({ onScrollToPlans, onScrollToTiendas }: {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <button
             onClick={onScrollToPlans}
-            className="group relative px-8 py-4 bg-gradient-to-r from-cyan-500 to-teal-500 text-white font-semibold rounded-xl text-lg transition-all duration-300 hover:shadow-2xl hover:shadow-cyan-500/30 hover:scale-105"
+            className="group relative px-8 py-4 bg-white text-gray-900 font-semibold rounded-xl text-lg transition-all duration-300 hover:shadow-2xl hover:shadow-white/20 hover:scale-105"
           >
             <span className="relative z-10 flex items-center gap-2">
               Quiero mi tienda
@@ -60,7 +60,7 @@ const HeroSection = ({ onScrollToPlans, onScrollToTiendas }: {
           </button>
           <button
             onClick={onScrollToTiendas}
-            className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-xl text-lg border border-white/10 hover:border-cyan-500/50 transition-all duration-300"
+            className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-xl text-lg border border-white/10 hover:border-white/50 transition-all duration-300"
           >
             Ver tiendas destacadas
           </button>
@@ -80,7 +80,7 @@ const HeroSection = ({ onScrollToPlans, onScrollToTiendas }: {
           { value: '99%', label: 'Servicio garantizado' },
         ].map((stat) => (
           <div key={stat.label} className="text-center">
-            <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-cyan-400 to-teal-500 bg-clip-text text-transparent">
+            <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
               {stat.value}
             </div>
             <div className="text-white/50 text-sm mt-1">{stat.label}</div>
@@ -116,21 +116,21 @@ const ComoFuncionaSection = () => (
             icon: Store,
             title: 'Creás tu tienda',
             desc: 'Elegís tu plan, configurás tu marca, colores y servicios. Sin conocimientos técnicos.',
-            color: 'from-cyan-500/20 to-cyan-600/10'
+            color: 'from-white/10 to-gray-500/5'
           },
           {
             step: '02',
             icon: Zap,
             title: 'Agregás productos',
             desc: 'Subís tus servicios: cuentas de streaming, pines de regalo o lo que quieras vender.',
-            color: 'from-cyan-600/20 to-cyan-700/10'
+            color: 'from-gray-500/10 to-gray-600/5'
           },
           {
             step: '03',
             icon: TrendingUp,
             title: 'Empezás a vender',
             desc: 'Tus clientes compran, reciben automáticamente y vos ganás. Nosotros nos encargamos de la tecnología.',
-            color: 'from-cyan-700/20 to-cyan-800/10'
+            color: 'from-gray-600/10 to-gray-700/5'
           }
         ].map((item, i) => (
           <motion.div
@@ -142,12 +142,12 @@ const ComoFuncionaSection = () => (
             className="relative group"
           >
             <div className={`absolute inset-0 bg-gradient-to-br ${item.color} rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
-            <div className="relative bg-white/[0.03] backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-cyan-500/30 transition-all duration-300">
-              <div className="text-6xl font-bold bg-gradient-to-r from-cyan-500/20 to-transparent bg-clip-text text-transparent absolute top-4 right-6">
+            <div className="relative bg-white/[0.03] backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-white/30 transition-all duration-300">
+              <div className="text-6xl font-bold bg-gradient-to-r from-white/10 to-transparent bg-clip-text text-transparent absolute top-4 right-6">
                 {item.step}
               </div>
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 flex items-center justify-center mb-6 border border-cyan-500/20">
-                <item.icon size={28} className="text-cyan-400" />
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-white/10 to-gray-500/10 flex items-center justify-center mb-6 border border-white/10">
+                <item.icon size={28} className="text-white/70" />
               </div>
               <h3 className="text-xl font-bold text-white mb-3">{item.title}</h3>
               <p className="text-white/60 leading-relaxed">{item.desc}</p>
@@ -165,7 +165,40 @@ const TiendasSection = ({ tenants }: { tenants: Tenant[] }) => {
 
   return (
     <section id="tiendas" className="relative py-24 px-4">
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-500/5 to-transparent" />
+      <style>{`
+        @keyframes card-float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-6px); }
+        }
+        @keyframes card-glow {
+          0%, 100% { box-shadow: 0 0 20px -12px rgba(255, 255, 255, 0.08); border-color: rgba(255,255,255,0.08); }
+          50% { box-shadow: 0 0 40px -8px rgba(255, 255, 255, 0.15), 0 0 60px -16px rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.25); }
+        }
+        @keyframes border-shine {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .card-featured {
+          animation: card-float 4s ease-in-out infinite, card-glow 3s ease-in-out infinite;
+        }
+        .card-featured:hover {
+          animation-duration: 2s, 1.5s;
+        }
+        .card-border-shine::before {
+          content: '';
+          position: absolute;
+          inset: -1px;
+          border-radius: inherit;
+          background: linear-gradient(135deg, transparent 30%, rgba(255, 255, 255, 0.3), transparent 70%);
+          background-size: 200% 200%;
+          animation: border-shine 4s ease-in-out infinite;
+          pointer-events: none;
+          z-index: 0;
+        }
+      `}</style>
+      
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/5 to-transparent" />
       
       <div className="max-w-6xl mx-auto relative">
         <motion.div
@@ -191,32 +224,33 @@ const TiendasSection = ({ tenants }: { tenants: Tenant[] }) => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
-              className="group relative bg-white/[0.03] backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:border-cyan-500/30 transition-all duration-300 overflow-hidden"
+              className="card-featured card-border-shine group relative bg-white/[0.03] backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:scale-[1.02] hover:border-white/50 transition-all duration-500 overflow-hidden"
+              style={{ animationDelay: `${i * 0.3}s` }}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               
-              <div className="relative flex items-center gap-4 mb-4">
+              <div className="relative flex items-center gap-4 mb-4 z-10">
                 {/* Avatar / Logo */}
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 flex items-center justify-center border border-cyan-500/20 overflow-hidden shrink-0">
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-white/10 to-gray-500/10 flex items-center justify-center border border-white/10 overflow-hidden shrink-0 group-hover:border-white/40 transition-colors duration-500">
                   {tenant.logoUrl ? (
                     <img src={tenant.logoUrl} alt={tenant.name} className="w-full h-full object-cover" />
                   ) : (
-                    <Store size={24} className="text-cyan-400" />
+                    <Store size={24} className="text-white/70" />
                   )}
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-lg font-bold text-white truncate">{tenant.name}</h3>
+                  <h3 className="text-lg font-bold text-white truncate group-hover:text-white transition-colors duration-500">{tenant.name}</h3>
                   {tenant.subdomain && (
                     <p className="text-white/40 text-sm truncate">{tenant.subdomain}.ejstreaming.shop</p>
                   )}
                 </div>
               </div>
 
-              <div className="relative flex items-center justify-between">
-                <span className="text-white/50 text-sm group-hover:text-cyan-400 transition-colors">
-                  Visitar tienda
+              <div className="relative flex items-center justify-between z-10">
+                <span className="text-white/50 text-sm group-hover:text-white transition-colors duration-300">
+                  Visitar tienda →
                 </span>
-                <ChevronRight size={18} className="text-white/30 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
+                <ChevronRight size={18} className="text-white/30 group-hover:text-white/70 group-hover:translate-x-1 transition-all duration-300" />
               </div>
             </motion.a>
           ))}
@@ -229,7 +263,7 @@ const TiendasSection = ({ tenants }: { tenants: Tenant[] }) => {
 // ─── Sección Planes ─────────────────────────────────────────────────────────
 const PlanesSection = ({ onSelectPlan }: { onSelectPlan: (plan: string) => void }) => (
   <section id="planes" className="relative py-24 px-4">
-    <div className="absolute inset-0 bg-gradient-to-t from-black via-cyan-500/5 to-transparent" />
+    <div className="absolute inset-0 bg-gradient-to-t from-black via-white/5 to-transparent" />
     
     <div className="max-w-5xl mx-auto relative">
       <motion.div
@@ -238,7 +272,7 @@ const PlanesSection = ({ onSelectPlan }: { onSelectPlan: (plan: string) => void 
         viewport={{ once: true }}
         className="text-center mb-16"
       >
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-cyan-400 text-sm mb-6">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-white/70 text-sm mb-6">
           <Sparkles size={14} />
           <span>Planes flexibles</span>
         </div>
@@ -258,17 +292,17 @@ const PlanesSection = ({ onSelectPlan }: { onSelectPlan: (plan: string) => void 
           viewport={{ once: true }}
           className="group relative"
         >
-          <div className="absolute -inset-0.5 bg-gradient-to-br from-cyan-500 to-teal-500 rounded-2xl blur-lg opacity-40 group-hover:opacity-70 transition-opacity duration-500" />
-          <div className="relative bg-[#0A0A0A] border border-cyan-500/20 rounded-2xl p-8">
+          <div className="absolute -inset-0.5 bg-gradient-to-br from-white/80 to-gray-400 rounded-2xl blur-lg opacity-40 group-hover:opacity-70 transition-opacity duration-500" />
+          <div className="relative bg-[#0A0A0A] border border-white/10 rounded-2xl p-8">
             {/* Popular tag */}
-            <div className="inline-flex items-center gap-1 px-3 py-1 bg-cyan-500/20 border border-cyan-500/30 rounded-full text-cyan-400 text-xs font-medium mb-6">
+            <div className="inline-flex items-center gap-1 px-3 py-1 bg-white/10 border border-white/20 rounded-full text-white/70 text-xs font-medium mb-6">
               <Sparkles size={12} />
               <span>Más popular</span>
             </div>
 
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 flex items-center justify-center border border-cyan-500/20">
-                <Store size={24} className="text-cyan-400" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-white/10 to-gray-500/10 flex items-center justify-center border border-white/10">
+                <Store size={24} className="text-white/70" />
               </div>
               <div>
                 <h3 className="text-xl font-bold text-white">Dueño de Tienda</h3>
@@ -300,7 +334,7 @@ const PlanesSection = ({ onSelectPlan }: { onSelectPlan: (plan: string) => void 
 
             <button
               onClick={() => onSelectPlan('tienda')}
-              className="w-full py-4 bg-gradient-to-r from-cyan-500 to-teal-500 text-white font-semibold rounded-xl transition-all duration-300 hover:shadow-2xl hover:shadow-cyan-500/30 hover:scale-[1.02]"
+              className="w-full py-4 bg-white text-gray-900 font-semibold rounded-xl transition-all duration-300 hover:shadow-2xl hover:shadow-white/20 hover:scale-[1.02]"
             >
               Quiero mi tienda
             </button>
@@ -314,15 +348,15 @@ const PlanesSection = ({ onSelectPlan }: { onSelectPlan: (plan: string) => void 
           viewport={{ once: true }}
           className="group relative"
         >
-          <div className="absolute -inset-0.5 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-2xl blur-lg opacity-20 group-hover:opacity-40 transition-opacity duration-500" />
-          <div className="relative bg-[#0A0A0A] border border-white/10 rounded-2xl p-8 group-hover:border-cyan-500/30 transition-colors">
+          <div className="absolute -inset-0.5 bg-gradient-to-br from-gray-400 to-gray-600 rounded-2xl blur-lg opacity-20 group-hover:opacity-40 transition-opacity duration-500" />
+          <div className="relative bg-[#0A0A0A] border border-white/10 rounded-2xl p-8 group-hover:border-white/30 transition-colors">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 flex items-center justify-center border border-cyan-500/20">
-                <Users size={24} className="text-cyan-400" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-white/10 to-gray-500/10 flex items-center justify-center border border-white/10">
+                <Users size={24} className="text-white/70" />
               </div>
               <div>
                 <h3 className="text-xl font-bold text-white">Distribuidor</h3>
-                <p className="text-white/50 text-sm">Ganá vendiendo</p>
+                <p className="text-white/50 text-sm">Precios mayoristas</p>
               </div>
             </div>
 
@@ -334,12 +368,12 @@ const PlanesSection = ({ onSelectPlan }: { onSelectPlan: (plan: string) => void 
 
             <ul className="space-y-3 mb-8">
               {[
-                'Registro gratuito',
-                '$5 USD de saldo para empezar',
-                'Catálogo mayorista de servicios',
-                'Tus propios precios de venta',
-                'Sin mensualidades',
-                'Comisiones desde el día 1',
+                'Precios mayoristas bajos',
+                'Definí tu margen de ganancia',
+                'Generá ingresos desde el día 1',
+                'Catálogo completo de servicios',
+                'Sin mensualidades ni costos ocultos',
+                'Escalá sin límites',
               ].map((f) => (
                 <li key={f} className="flex items-start gap-3 text-white/70">
                   <Check size={18} className="text-green-400 shrink-0 mt-0.5" />
@@ -350,7 +384,7 @@ const PlanesSection = ({ onSelectPlan }: { onSelectPlan: (plan: string) => void 
 
             <button
               onClick={() => onSelectPlan('distribuidor')}
-              className="w-full py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-xl border border-white/20 hover:border-cyan-500/50 transition-all duration-300"
+              className="w-full py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-xl border border-white/20 hover:border-white/50 transition-all duration-300"
             >
               Quiero ser distribuidor
             </button>
@@ -383,12 +417,12 @@ const VideoSection = () => (
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="relative aspect-video rounded-2xl overflow-hidden bg-gradient-to-br from-cyan-500/10 via-black to-cyan-600/10 border border-white/10"
+        className="relative aspect-video rounded-2xl overflow-hidden bg-gradient-to-br from-white/5 via-black to-white/5 border border-white/10"
       >
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center">
-            <div className="w-20 h-20 rounded-full bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center mx-auto mb-4">
-              <div className="w-0 h-0 border-t-[12px] border-t-transparent border-l-[20px] border-l-cyan-400 border-b-[12px] border-b-transparent ml-1" />
+            <div className="w-20 h-20 rounded-full bg-white/10 border border-white/20 flex items-center justify-center mx-auto mb-4">
+              <div className="w-0 h-0 border-t-[12px] border-t-transparent border-l-[20px] border-l-white/70 border-b-[12px] border-b-transparent ml-1" />
             </div>
             <p className="text-white/40 text-sm">Video próximamente</p>
           </div>
@@ -431,10 +465,10 @@ const FeaturesSection = () => (
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: i * 0.1 }}
-            className="group bg-white/[0.03] backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:border-cyan-500/30 transition-all duration-300"
+            className="group bg-white/[0.03] backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:border-white/30 transition-all duration-300"
           >
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 flex items-center justify-center mb-4 border border-cyan-500/20">
-              <feature.icon size={24} className="text-cyan-400" />
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-white/10 to-gray-500/10 flex items-center justify-center mb-4 border border-white/10">
+              <feature.icon size={24} className="text-white/70" />
             </div>
             <h3 className="text-lg font-bold text-white mb-2">{feature.title}</h3>
             <p className="text-white/60 text-sm leading-relaxed">{feature.desc}</p>
@@ -446,7 +480,7 @@ const FeaturesSection = () => (
 );
 
 // ─── Footer ─────────────────────────────────────────────────────────────────
-const FooterSection = () => (
+const FooterSection = ({ whatsapp, email }: { whatsapp?: string; email?: string }) => (
   <footer className="relative border-t border-white/10 py-12 px-4">
     <div className="max-w-6xl mx-auto">
       <div className="grid md:grid-cols-3 gap-8 mb-8">
@@ -459,14 +493,27 @@ const FooterSection = () => (
         <div>
           <h4 className="text-sm font-semibold text-white/70 mb-3 uppercase tracking-wider">Planes</h4>
           <ul className="space-y-2">
-            <li><a href="#planes" className="text-white/50 hover:text-cyan-400 text-sm transition-colors">Dueño de Tienda</a></li>
-            <li><a href="#planes" className="text-white/50 hover:text-cyan-400 text-sm transition-colors">Distribuidor</a></li>
+            <li><a href="#planes" className="text-white/50 hover:text-white/70 text-sm transition-colors">Dueño de Tienda</a></li>
+            <li><a href="#planes" className="text-white/50 hover:text-white/70 text-sm transition-colors">Distribuidor</a></li>
           </ul>
         </div>
         <div>
           <h4 className="text-sm font-semibold text-white/70 mb-3 uppercase tracking-wider">Contacto</h4>
           <ul className="space-y-2">
-            <li className="text-white/50 text-sm">ventas@ejstreaming.shop</li>
+            {whatsapp && (
+              <li>
+                <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white/70 text-sm transition-colors">
+                  WhatsApp
+                </a>
+              </li>
+            )}
+            {email && (
+              <li>
+                <a href={`mailto:${email}`} className="text-white/50 hover:text-white/70 text-sm transition-colors">
+                  {email}
+                </a>
+              </li>
+            )}
           </ul>
         </div>
       </div>
@@ -478,9 +525,9 @@ const FooterSection = () => (
 );
 
 // ─── Modal Forms ────────────────────────────────────────────────────────────
-const FormModal = ({ plan, onClose }: { plan: string; onClose: () => void }) => {
+const FormModal = ({ plan, onClose, whatsapp, email }: { plan: string; onClose: () => void; whatsapp?: string; email?: string }) => {
   const [nombre, setNombre] = useState('');
-  const [email, setEmail] = useState('');
+  const [emailForm, setEmailForm] = useState('');
   const [nombreNegocio, setNombreNegocio] = useState('');
 
   const isTienda = plan === 'tienda';
@@ -490,7 +537,7 @@ const FormModal = ({ plan, onClose }: { plan: string; onClose: () => void }) => 
     let msg = `Hola, quiero el plan *${planName}*%0A`;
     msg += `%0A📋 *Mis datos:*%0A`;
     msg += `👤 Nombre: ${nombre}%0A`;
-    msg += `📧 Correo: ${email}%0A`;
+    msg += `📧 Correo: ${emailForm}%0A`;
     if (isTienda && nombreNegocio) {
       msg += `🏪 Negocio: ${nombreNegocio}`;
     }
@@ -506,7 +553,7 @@ const FormModal = ({ plan, onClose }: { plan: string; onClose: () => void }) => 
     let msg = `Hola, quiero el plan: ${isTienda ? 'Dueño de Tienda - $20 USD/mes' : 'Distribuidor - $5 USD'}\n\n`;
     msg += `Mis datos:\n`;
     msg += `Nombre: ${nombre}\n`;
-    msg += `Correo: ${email}\n`;
+    msg += `Correo: ${emailForm}\n`;
     if (isTienda && nombreNegocio) {
       msg += `Nombre del negocio: ${nombreNegocio}\n`;
     }
@@ -514,18 +561,19 @@ const FormModal = ({ plan, onClose }: { plan: string; onClose: () => void }) => 
   };
 
   const handleWhatsApp = () => {
-    if (!nombre || !email || (isTienda && !nombreNegocio)) return;
-    window.open(`https://wa.me/573101234567?text=${getWhatsAppMessage()}`, '_blank');
+    if (!nombre || !emailForm) return;
+    const waNumber = whatsapp || '573101234567';
+    window.open(`https://wa.me/${waNumber}?text=${getWhatsAppMessage()}`, '_blank');
   };
 
   const handleEmail = () => {
-    if (!nombre || !email) return;
-    window.location.href = `mailto:ventas@ejstreaming.shop?subject=${getEmailSubject()}&body=${getEmailBody()}`;
+    if (!nombre || !emailForm) return;
+    const mailTo = email || 'ventas@ejstreaming.shop';
+    window.location.href = `mailto:${mailTo}?subject=${getEmailSubject()}&body=${getEmailBody()}`;
   };
 
-  const isValid = nombre && email && (isTienda ? true : true);
-  const canSendWA = nombre && email;
-  const canSendEmail = nombre && email;
+  const canSendWA = nombre && emailForm;
+  const canSendEmail = nombre && emailForm;
 
   return (
     <motion.div
@@ -551,8 +599,8 @@ const FormModal = ({ plan, onClose }: { plan: string; onClose: () => void }) => 
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <div className={`w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 flex items-center justify-center border border-cyan-500/20`}>
-            {isTienda ? <Store size={24} className="text-cyan-400" /> : <Users size={24} className="text-cyan-400" />}
+          <div className={`w-12 h-12 rounded-xl bg-gradient-to-br from-white/10 to-gray-500/10 flex items-center justify-center border border-white/10`}>
+            {isTienda ? <Store size={24} className="text-white/70" /> : <Users size={24} className="text-white/70" />}
           </div>
           <div>
             <h2 className="text-xl font-bold text-white">
@@ -571,7 +619,7 @@ const FormModal = ({ plan, onClose }: { plan: string; onClose: () => void }) => 
               type="text"
               value={nombre}
               onChange={e => setNombre(e.target.value)}
-              className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent transition-all"
               placeholder="Ej: Juan Pérez"
             />
           </div>
@@ -580,9 +628,9 @@ const FormModal = ({ plan, onClose }: { plan: string; onClose: () => void }) => 
             <label className="block text-sm text-white/70 mb-1.5">Correo electrónico</label>
             <input
               type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
+              value={emailForm}
+              onChange={e => setEmailForm(e.target.value)}
+              className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent transition-all"
               placeholder="ejemplo@correo.com"
             />
           </div>
@@ -594,7 +642,7 @@ const FormModal = ({ plan, onClose }: { plan: string; onClose: () => void }) => 
                 type="text"
                 value={nombreNegocio}
                 onChange={e => setNombreNegocio(e.target.value)}
-                className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent transition-all"
                 placeholder="Ej: StreamZone"
               />
             </div>
@@ -616,7 +664,7 @@ const FormModal = ({ plan, onClose }: { plan: string; onClose: () => void }) => 
               <button
                 onClick={handleEmail}
                 disabled={!canSendEmail}
-                className="w-full py-3.5 bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed text-white font-semibold rounded-xl flex items-center justify-center gap-2 border border-white/20 hover:border-cyan-500/50 transition-all"
+                className="w-full py-3.5 bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed text-white font-semibold rounded-xl flex items-center justify-center gap-2 border border-white/20 hover:border-white/50 transition-all"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                 Enviar por Correo
@@ -634,6 +682,7 @@ const LandingPage = () => {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [ejContact, setEjContact] = useState<{ whatsapp?: string; email?: string }>({});
   const [loading, setLoading] = useState(true);
   const planesRef = useRef<HTMLDivElement>(null);
   const tiendasRef = useRef<HTMLDivElement>(null);
@@ -653,9 +702,18 @@ const LandingPage = () => {
   }, []);
 
   useEffect(() => {
-    getAllActiveTenants()
-      .then(setTenants)
-      .finally(() => setLoading(false));
+    Promise.all([
+      getFeaturedTenants().catch(() => [] as Tenant[]),
+      getTenantById('ej').catch(() => null)
+    ]).then(([tenantsData, ejTenant]) => {
+      setTenants(tenantsData);
+      if (ejTenant) {
+        setEjContact({
+          whatsapp: ejTenant.whatsappNumber,
+          email: ejTenant.contactEmail
+        });
+      }
+    }).finally(() => setLoading(false));
   }, []);
 
   const scrollToPlans = () => {
@@ -681,13 +739,13 @@ const LandingPage = () => {
             <a href="#planes" className="text-white/70 hover:text-white text-sm transition-colors">Planes</a>
             <a
               href="/login"
-              className="px-4 py-2 text-white/80 hover:text-white text-sm font-semibold rounded-lg border border-white/20 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all"
+              className="px-4 py-2 text-white/80 hover:text-white text-sm font-semibold rounded-lg border border-white/20 hover:border-white/50 hover:bg-white/10 transition-all"
             >
               Login
             </a>
             <button
               onClick={scrollToPlans}
-              className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white text-sm font-semibold rounded-lg hover:shadow-lg hover:shadow-cyan-500/30 transition-all"
+              className="px-4 py-2 bg-white text-gray-900 text-sm font-semibold rounded-lg hover:shadow-lg hover:shadow-white/20 transition-all"
             >
               Quiero mi tienda
             </button>
@@ -729,13 +787,13 @@ const LandingPage = () => {
                 <a
                   href="/login"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block px-4 py-3 text-center text-white font-semibold rounded-lg border border-white/20 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all"
+                  className="block px-4 py-3 text-center text-white font-semibold rounded-lg border border-white/20 hover:border-white/50 hover:bg-white/10 transition-all"
                 >
                   Login
                 </a>
                 <button
                   onClick={() => { scrollToPlans(); setMobileMenuOpen(false); }}
-                  className="w-full py-3 bg-gradient-to-r from-cyan-500 to-teal-500 text-white font-semibold rounded-lg transition-all"
+                  className="w-full py-3 bg-white text-gray-900 font-semibold rounded-lg transition-all"
                 >
                   Quiero mi tienda
                 </button>
@@ -768,12 +826,17 @@ const LandingPage = () => {
       </div>
 
       {/* Footer */}
-      <FooterSection />
+      <FooterSection whatsapp={ejContact.whatsapp} email={ejContact.email} />
 
       {/* Modal de formulario */}
       <AnimatePresence>
         {selectedPlan && (
-          <FormModal plan={selectedPlan} onClose={() => setSelectedPlan(null)} />
+          <FormModal
+            plan={selectedPlan}
+            onClose={() => setSelectedPlan(null)}
+            whatsapp={ejContact.whatsapp}
+            email={ejContact.email}
+          />
         )}
       </AnimatePresence>
     </div>

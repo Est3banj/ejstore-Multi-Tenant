@@ -27,6 +27,32 @@ export const getAllActiveTenants = async (): Promise<Tenant[]> => {
   }
 };
 
+export const getFeaturedTenants = async (): Promise<Tenant[]> => {
+  try {
+    const q = query(collection(db, 'tenants'), where('isFeatured', '==', true));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(docSnap => {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        name: data.name,
+        subdomain: data.subdomain,
+        logoUrl: data.logoUrl,
+        primaryColor: data.primaryColor,
+        whatsappNumber: data.whatsappNumber,
+        contactEmail: data.contactEmail,
+        secondaryColor: data.secondaryColor,
+        isActive: data.isActive,
+        isFeatured: data.isFeatured,
+        createdAt: data.createdAt?.toDate?.() || data.createdAt
+      };
+    });
+  } catch (error) {
+    console.error('Error fetching featured tenants:', error);
+    return [];
+  }
+};
+
 export const getTenantById = async (tenantId: string): Promise<Tenant | null> => {
   if (!tenantId) return null;
   

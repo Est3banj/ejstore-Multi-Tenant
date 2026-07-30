@@ -8,6 +8,7 @@ export interface Tenant {
   contactEmail?: string;
   secondaryColor?: string;
   isActive?: boolean;
+  isFeatured?: boolean;
   discordConfigured?: boolean;
   createdAt?: Date;
 }

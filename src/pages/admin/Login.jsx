@@ -59,79 +59,149 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-dark-100 to-black px-4">
+    <div className="min-h-screen flex items-center justify-center bg-black px-4 relative overflow-hidden">
+      {/* Mesh gradient animado */}
+      <div className="absolute inset-0 overflow-hidden">
+        <style>{`
+          @keyframes mesh-float-1 {
+            0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+            25% { transform: translate(60px, -40px) scale(1.1); opacity: 0.5; }
+            50% { transform: translate(20px, 80px) scale(0.9); opacity: 0.3; }
+            75% { transform: translate(-40px, 20px) scale(1.05); opacity: 0.45; }
+          }
+          @keyframes mesh-float-2 {
+            0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.35; }
+            25% { transform: translate(-50px, 60px) scale(1.15); opacity: 0.25; }
+            50% { transform: translate(40px, -30px) scale(0.85); opacity: 0.4; }
+            75% { transform: translate(-20px, -60px) scale(1.1); opacity: 0.3; }
+          }
+          @keyframes mesh-float-3 {
+            0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.25; }
+            33% { transform: translate(30px, 50px) scale(1.2); opacity: 0.35; }
+            66% { transform: translate(-60px, -20px) scale(0.8); opacity: 0.2; }
+          }
+          @keyframes mesh-rotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          .mesh-blob-1 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(ellipse at center, rgba(255,255,255,0.15) 0%, transparent 70%);
+            border-radius: 50%;
+            animation: mesh-float-1 12s ease-in-out infinite;
+            filter: blur(80px);
+          }
+          .mesh-blob-2 {
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(ellipse at center, rgba(150,150,150,0.12) 0%, transparent 70%);
+            border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+            animation: mesh-float-2 15s ease-in-out infinite;
+            filter: blur(60px);
+          }
+          .mesh-blob-3 {
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(ellipse at center, rgba(200,200,200,0.1) 0%, transparent 70%);
+            border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+            animation: mesh-float-3 18s ease-in-out infinite;
+            filter: blur(50px);
+          }
+        `}</style>
+        <div className="absolute top-1/4 left-1/4 mesh-blob-1" />
+        <div className="absolute bottom-1/3 right-1/4 mesh-blob-2" style={{ animationDelay: '-4s' }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 mesh-blob-3" style={{ animationDelay: '-8s' }} />
+      </div>
+      
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="glass-dark p-8 rounded-2xl w-full max-w-md"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative w-full max-w-md px-4"
       >
-        <h1 className="text-3xl font-bold text-center mb-8 gradient-text">
-          Panel de Administración
-        </h1>
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <img src="/ejstream.png" alt="EJ STREAM" className="h-12 w-auto mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-white">Panel de Administración</h1>
+          <p className="text-white/40 text-sm mt-1">Iniciá sesión para gestionar tu plataforma</p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-white/70 mb-2">Email</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50" size={20} />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="input-field pl-10"
-                placeholder="admin@ejstore.com"
-                required
-              />
+        {/* Card */}
+        <div className="bg-white/[0.03] backdrop-blur-sm border border-white/10 rounded-2xl p-8">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-white/60 text-sm mb-2">Email</label>
+              <div className="relative">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent transition-all"
+                  placeholder="juradoesteban001@gmail.com"
+                  required
+                />
+              </div>
             </div>
+
+            <div>
+              <label className="block text-white/60 text-sm mb-2">Contraseña</label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-10 pr-12 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent transition-all"
+                  placeholder="••••••••••••••••"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-white text-gray-900 font-semibold rounded-xl hover:bg-white/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-gray-900/30 border-t-gray-900 rounded-full animate-spin" />
+                  Iniciando sesión...
+                </span>
+              ) : (
+                'Iniciar Sesión'
+              )}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <a
+              href="/"
+              className="inline-flex items-center gap-2 text-white/30 hover:text-white/60 text-sm transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Volver al inicio
+            </a>
           </div>
-
-          <div>
-            <label className="block text-white/70 mb-2">Contraseña</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50" size={20} />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input-field pl-10 pr-10"
-                placeholder="••••••••"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors"
-              >
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
-            </div>
-          </div>
-
-          {error && (
-            <div className="bg-red-500/20 border border-red-500/50 text-red-200 px-4 py-3 rounded-lg">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full btn-primary disabled:opacity-50"
-          >
-            {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-          </button>
-        </form>
-
-        <div className="mt-6 text-center">
-          <a
-            href="/"
-            className="inline-flex items-center gap-1.5 text-white/40 hover:text-white/70 text-sm transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Volver al inicio
-          </a>
         </div>
       </motion.div>
     </div>

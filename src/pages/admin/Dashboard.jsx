@@ -106,19 +106,19 @@ const Dashboard = () => {
       title: 'Servicios Totales',
       value: stats.totalServices,
       icon: Package,
-      color: 'from-primary-500 to-red-600'
+      color: 'from-gray-400 to-gray-600'
     },
     {
       title: 'Servicios Activos',
       value: stats.activeServices,
       icon: Tag,
-      color: 'from-green-500 to-emerald-500'
+      color: 'from-gray-300 to-gray-500'
     },
     {
       title: 'Banners Activos',
       value: stats.activeBanners,
       icon: Image,
-      color: 'from-purple-500 to-pink-500'
+      color: 'from-gray-400 to-gray-600'
     }
   ];
 

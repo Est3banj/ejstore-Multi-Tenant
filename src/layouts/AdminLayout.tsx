@@ -99,7 +99,7 @@ const AdminLayout = (): JSX.Element => {
                 to={item.path}
                 className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
                   isActive(item.path)
-                    ? 'bg-primary-600 text-white'
+                    ? 'bg-white/10 text-white'
                     : 'text-white/70 hover:text-white hover:bg-white/5'
                 }`}
               >
@@ -112,7 +112,7 @@ const AdminLayout = (): JSX.Element => {
           {isSuperadmin && (
             <>
               <div className="pt-4 pb-2">
-                <span className="text-xs font-bold text-yellow-500 uppercase tracking-wider px-4">
+                <span className="text-xs font-bold text-white/40 uppercase tracking-wider px-4">
                   Superadmin
                 </span>
               </div>
@@ -124,8 +124,8 @@ const AdminLayout = (): JSX.Element => {
                     to={item.path}
                     className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
                       isActive(item.path)
-                        ? 'bg-yellow-600 text-white'
-                        : 'text-yellow-400 hover:text-yellow-300 hover:bg-white/5'
+                        ? 'bg-white/10 text-white'
+                        : 'text-white/50 hover:text-white hover:bg-white/5'
                     }`}
                   >
                     <Icon size={20} />

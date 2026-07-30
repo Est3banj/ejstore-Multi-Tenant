@@ -6,7 +6,7 @@
     --card-foreground: 0 0% 100%;
     --popover: 0 0% 4%;
     --popover-foreground: 0 0% 100%;
-    --primary: 0 84% 49%;
+    --primary: 0 0% 62%;
     --primary-foreground: 0 0% 100%;
     --secondary: 0 0% 13%;
     --secondary-foreground: 0 0% 100%;
@@ -18,7 +18,7 @@
     --destructive-foreground: 0 0% 100%;
     --border: 0 0% 17%;
     --input: 0 0% 17%;
-    --ring: 0 84% 49%;
+    --ring: 0 0% 62%;
     --radius: 0.5rem;
   }
 
@@ -79,23 +79,23 @@
   
   /* Sombra dinámica para tarjetas - se sobrescribe con color del tenant */
   .card-shadow {
-    box-shadow: 0 25px 50px -12px rgba(229, 9, 20, 0.25);
+    box-shadow: 0 25px 50px -12px rgba(255, 255, 255, 0.08);
   }
 
   .btn-primary {
-    @apply bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-primary-500/50 transform hover:scale-105;
+    @apply bg-white text-gray-900 font-semibold py-3 px-6 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-white/20 hover:scale-105;
   }
 
   .btn-secondary {
-    @apply bg-white/5 hover:bg-white/10 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 border border-white/20 hover:border-primary-500/50;
+    @apply bg-white/5 hover:bg-white/10 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 border border-white/20 hover:border-white/50;
   }
 
   .input-field {
-    @apply w-full px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all;
+    @apply w-full px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent transition-all;
   }
 
   .gradient-text {
-    @apply bg-gradient-to-r from-primary-400 via-red-500 to-red-600 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent;
   }
 }
 
