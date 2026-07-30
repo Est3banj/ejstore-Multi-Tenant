@@ -450,7 +450,7 @@ const FooterSection = () => (
     <div className="max-w-6xl mx-auto">
       <div className="grid md:grid-cols-3 gap-8 mb-8">
         <div>
-          <h3 className="text-lg font-bold text-white mb-3">EJ STREAM</h3>
+          <img src="/ejstream.png" alt="EJ STREAM" className="h-8 w-auto mb-3" />
           <p className="text-white/50 text-sm leading-relaxed">
             La plataforma líder de servicios digitales. Creá tu tienda y empezá a vender hoy.
           </p>
@@ -636,6 +636,17 @@ const LandingPage = () => {
   const planesRef = useRef<HTMLDivElement>(null);
   const tiendasRef = useRef<HTMLDivElement>(null);
 
+  // Cambiar favicon al entrar a la landing, restaurar al salir
+  useEffect(() => {
+    const originalFavicon = document.querySelector('link[rel="icon"]')?.getAttribute('href') || '/logoej2026.png';
+    const favicon = document.querySelector('link[rel="icon"]');
+    if (favicon) favicon.setAttribute('href', '/ejstream.png');
+
+    return () => {
+      if (favicon) favicon.setAttribute('href', originalFavicon);
+    };
+  }, []);
+
   useEffect(() => {
     getAllActiveTenants()
       .then(setTenants)
@@ -655,10 +666,8 @@ const LandingPage = () => {
       {/* Navbar */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-lg border-b border-white/10">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <a href="/" className="text-xl font-bold">
-            <span className="bg-gradient-to-r from-cyan-400 to-teal-500 bg-clip-text text-transparent">
-              EJ STREAM
-            </span>
+          <a href="/" className="flex items-center gap-2">
+            <img src="/ejstream.png" alt="EJ STREAM" className="h-9 w-auto" />
           </a>
           <div className="hidden md:flex items-center gap-6">
             <a href="#tiendas" className="text-white/70 hover:text-white text-sm transition-colors">Tiendas</a>
