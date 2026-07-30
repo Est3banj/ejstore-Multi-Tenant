@@ -43,8 +43,8 @@ const HeroSection = ({ onScrollToPlans, onScrollToTiendas }: {
         </h1>
 
         <p className="text-lg md:text-xl text-white/60 max-w-2xl mx-auto mb-10 leading-relaxed">
-          La plataforma todo-en-uno para vender cuentas de streaming, recargas móviles, 
-          diamantes de juegos y más. Crea tu tienda en minutos y empieza a vender.
+          La plataforma todo-en-uno para vender cuentas de streaming, 
+          diamantes de juegos y más. Creá tu tienda en minutos y empezá a vender.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -450,7 +450,7 @@ const FooterSection = () => (
     <div className="max-w-6xl mx-auto">
       <div className="grid md:grid-cols-3 gap-8 mb-8">
         <div>
-          <h3 className="text-lg font-bold text-white mb-3">EJ Streaming Shop</h3>
+          <h3 className="text-lg font-bold text-white mb-3">EJ STREAM</h3>
           <p className="text-white/50 text-sm leading-relaxed">
             La plataforma líder de servicios digitales. Creá tu tienda y empezá a vender hoy.
           </p>
@@ -470,7 +470,7 @@ const FooterSection = () => (
         </div>
       </div>
       <div className="border-t border-white/10 pt-6 text-center">
-        <p className="text-white/30 text-sm">© {new Date().getFullYear()} EJ Streaming Shop. Todos los derechos reservados.</p>
+        <p className="text-white/30 text-sm">© {new Date().getFullYear()} EJ STREAM. Todos los derechos reservados.</p>
       </div>
     </div>
   </footer>
@@ -657,7 +657,7 @@ const LandingPage = () => {
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <a href="/" className="text-xl font-bold">
             <span className="bg-gradient-to-r from-red-500 to-red-400 bg-clip-text text-transparent">
-              EJ Streaming Shop
+              EJ STREAM
             </span>
           </a>
           <div className="hidden md:flex items-center gap-6">
@@ -665,7 +665,7 @@ const LandingPage = () => {
             <a href="#planes" className="text-white/70 hover:text-white text-sm transition-colors">Planes</a>
             <a
               href="/login"
-              className="text-white/50 hover:text-white text-sm transition-colors"
+              className="px-4 py-2 text-white/80 hover:text-white text-sm font-semibold rounded-lg border border-white/20 hover:border-red-500/50 hover:bg-red-500/10 transition-all"
             >
               Login
             </a>
