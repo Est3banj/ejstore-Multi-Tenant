@@ -1,18 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminLogin } from '../../services/auth';
-import { useTenantStore } from '../../store';
+import { useAuthStore, useTenantStore } from '../../store';
 import { motion } from 'framer-motion';
 import { Lock, Mail, Eye, EyeOff } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { settings } = useTenantStore();
+  const { tenant: settings } = useTenantStore();
+  const storeRole = useAuthStore((s) => s.role);
+  const storeInitialized = useAuthStore((s) => s.initialized);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const loginAttempted = useRef(false); // Solo redirigir si el usuario hizo login explícito
 
   // Aplicar colores dinámicos del tenant
   useEffect(() => {
@@ -42,17 +45,39 @@ const Login = () => {
     }
   }, [settings]);
 
-  const handleSubmit = async (e) => {
+  // Redirigir SOLO después de un intento de login explícito
+  useEffect(() => {
+    if (loginAttempted.current && !loading && storeInitialized && storeRole) {
+      loginAttempted.current = false;
+      if (storeRole === 'reseller') {
+        navigate('/r/dashboard', { replace: true });
+      } else if (storeRole === 'admin' || storeRole === 'superadmin') {
+        navigate('/admin/dashboard', { replace: true });
+      }
+    }
+  }, [storeRole, storeInitialized, loading, navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+    loginAttempted.current = true;
 
     try {
       await adminLogin(email, password);
-      navigate('/admin/dashboard');
-    } catch (err) {
-      setError('Credenciales incorrectas. Por favor intenta de nuevo.');
+      // No navegamos acá — el useEffect de arriba lo hace
+      // cuando el authStore termine de inicializar con el role
+    } catch (err: any) {
       console.error('Login error:', err);
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        setError('Correo o contraseña incorrectos');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Demasiados intentos. Intenta más tarde');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Correo electrónico inválido');
+      } else {
+        setError('Error al iniciar sesión. Verifica tu conexión.');
+      }
     } finally {
       setLoading(false);
     }
@@ -119,11 +144,9 @@ const Login = () => {
         animate={{ opacity: 1, y: 0 }}
         className="relative w-full max-w-md px-4"
       >
-        {/* Logo */}
         <div className="text-center mb-8">
           <img src="/ejstream.png" alt="EJ STREAM" className="h-12 w-auto mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white">Panel de Administración</h1>
-          <p className="text-white/40 text-sm mt-1">Iniciá sesión para gestionar tu plataforma</p>
+          <h1 className="text-3xl font-bold gradient-text">Iniciar Sesión</h1>
         </div>
 
         {/* Card */}

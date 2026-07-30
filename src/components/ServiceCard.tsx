@@ -3,15 +3,19 @@ import { motion } from 'framer-motion';
 import { ShoppingCart } from 'lucide-react';
 import type { Service } from '../types';
 import { useApp } from '../context/AppContext';
+import { useAuthStore } from '../store/authStore';
 
 interface ServiceCardProps {
   service: Service;
   index: number;
+  stock?: number;
 }
 
-const ServiceCard = ({ service, index }: ServiceCardProps): JSX.Element => {
+const ServiceCard = ({ service, index, stock }: ServiceCardProps): JSX.Element => {
   const hasPromo = service.promotionalPrice && service.promotionalPrice < service.price;
   const { settings } = useApp();
+  const { user } = useAuthStore();
+  const showStock = stock !== undefined && !!user; // Solo mostrar stock si el usuario está logueado
   const primaryColor = settings?.primaryColor || '#E50914';
   
   // Generar color de sombra basado en el color primario del tenant
@@ -43,6 +47,11 @@ const ServiceCard = ({ service, index }: ServiceCardProps): JSX.Element => {
               PROMO
             </div>
           )}
+          {service.hasCodeExtraction && (
+            <div className="absolute top-2 left-2 bg-blue-500/90 text-white px-3 py-1 rounded-full text-sm font-semibold">
+              📡 Extracción de Código
+            </div>
+          )}
         </div>
         <div className="p-5">
           <h3 className="text-xl font-bold mb-2 text-white">{service.name}</h3>
@@ -66,6 +75,20 @@ const ServiceCard = ({ service, index }: ServiceCardProps): JSX.Element => {
                 </p>
               )}
             </div>
+            {showStock && (
+              <div className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 ${
+                stock === 0
+                  ? 'bg-red-500/15 border-red-500/30 text-red-400'
+                  : stock <= 5
+                  ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                  : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  stock === 0 ? 'bg-red-400' : stock <= 5 ? 'bg-amber-400' : 'bg-emerald-400'
+                }`} />
+                {stock === 0 ? 'Agotado' : stock <= 5 ? `Solo ${stock}` : `${stock} disp.`}
+              </div>
+            )}
           </div>
           <button 
               className="w-full flex items-center justify-center space-x-2 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300"

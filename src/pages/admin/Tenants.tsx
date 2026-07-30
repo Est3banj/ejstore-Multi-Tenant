@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs, deleteDoc, doc, query, orderBy, updateDoc } from 'firebase/firestore';
-import { db } from '../../services/firebase';
+import { adminDb as db } from '../../services/firebase';
 import { Plus, Trash2, ExternalLink, Loader2, Star, Search, Store } from 'lucide-react';
 import { motion } from 'framer-motion';
 

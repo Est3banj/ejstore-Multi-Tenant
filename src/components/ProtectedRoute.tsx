@@ -8,15 +8,15 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps): JSX.Element => {
-  const { user, isAdmin, loading, initialized } = useAuthStore();
+  const { adminUser, isAdmin, loading, initialized } = useAuthStore();
 
   if (!initialized || loading) {
     return <Loader />;
   }
 
   // Solo permitir acceso si es admin (tiene tenantId en la colección users)
-  if (!user || !isAdmin) {
-    return <Navigate to="/admin/login" replace />;
+  if (!adminUser || !isAdmin) {
+    return <Navigate to="/login" replace />;
   }
 
   return <>{children}</>;

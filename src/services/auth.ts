@@ -3,13 +3,13 @@ import {
   signOut,
   onAuthStateChanged,
   setPersistence,
-  browserSessionPersistence,
   browserLocalPersistence,
   createUserWithEmailAndPassword,
   User
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { auth, adminAuth, db, adminDb } from './firebase';
+import { FirebaseError } from 'firebase/app';
 import type { User as AppUser } from '../types';
 
 export interface AuthUser extends User {
@@ -45,20 +45,22 @@ export const login = async (email: string, password: string): Promise<AuthUser> 
     }
     
     return user as AuthUser;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error logging in:', error);
     
-    // Traducir códigos de error de Firebase a mensajes amigables
-    if (error.code === 'auth/invalid-credential') {
-      throw new Error('Correo o contraseña incorrectos');
-    } else if (error.code === 'auth/user-not-found') {
-      throw new Error('Usuario no encontrado');
-    } else if (error.code === 'auth/wrong-password') {
-      throw new Error('Contraseña incorrecta');
-    } else if (error.code === 'auth/invalid-email') {
-      throw new Error('Correo electrónico inválido');
-    } else if (error.code === 'auth/too-many-requests') {
-      throw new Error('Demasiados intentos. Intenta más tarde');
+    if (error instanceof FirebaseError) {
+      // Traducir códigos de error de Firebase a mensajes amigables
+      if (error.code === 'auth/invalid-credential') {
+        throw new Error('Correo o contraseña incorrectos');
+      } else if (error.code === 'auth/user-not-found') {
+        throw new Error('Usuario no encontrado');
+      } else if (error.code === 'auth/wrong-password') {
+        throw new Error('Contraseña incorrecta');
+      } else if (error.code === 'auth/invalid-email') {
+        throw new Error('Correo electrónico inválido');
+      } else if (error.code === 'auth/too-many-requests') {
+        throw new Error('Demasiados intentos. Intenta más tarde');
+      }
     }
     
     throw error;
@@ -71,7 +73,8 @@ export const register = async (
   firstName: string,
   lastName: string,
   phone: string,
-  tenantId?: string
+  tenantId?: string,
+  resellerId?: string
 ): Promise<AuthUser> => {
   try {
     // Cliente usa localStorage (persistencia entre tabs)
@@ -93,6 +96,11 @@ export const register = async (
     // Incluir tenantId si se proporciona
     if (tenantId) {
       customerData.tenantId = tenantId;
+    }
+    
+    // Si el cliente se registra a través de un distribuidor, guardamos quién lo refirió
+    if (resellerId) {
+      customerData.createdBy = resellerId;
     }
     
     await setDoc(doc(db, 'customers', user.uid), customerData);
@@ -121,13 +129,13 @@ export const onAuthChange = (callback: (user: User | null) => void): (() => void
 
 export const adminLogin = async (email: string, password: string): Promise<AuthUser> => {
   try {
-    // Usar sessionStorage para aislar la sesión del admin de la del cliente
-    // El cliente usa localStorage (compartido entre tabs), admin usa sessionStorage (solo pestaña actual)
-    await setPersistence(auth, browserSessionPersistence);
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    // Usar localStorage (persistencia entre recargas)
+    // La sesión ya está aislada del cliente por usar una instancia de Firebase App separada (adminApp)
+    await setPersistence(adminAuth, browserLocalPersistence);
+    const userCredential = await signInWithEmailAndPassword(adminAuth, email, password);
     const user = userCredential.user;
 
-    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    const userDoc = await getDoc(doc(adminDb, 'users', user.uid));
     if (userDoc.exists()) {
       const userData = userDoc.data();
       return {
@@ -138,19 +146,21 @@ export const adminLogin = async (email: string, password: string): Promise<AuthU
     }
 
     return user as AuthUser;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error logging in admin:', error);
 
-    if (error.code === 'auth/invalid-credential') {
-      throw new Error('Correo o contraseña incorrectos');
-    } else if (error.code === 'auth/user-not-found') {
-      throw new Error('Usuario no encontrado');
-    } else if (error.code === 'auth/wrong-password') {
-      throw new Error('Contraseña incorrecta');
-    } else if (error.code === 'auth/invalid-email') {
-      throw new Error('Correo electrónico inválido');
-    } else if (error.code === 'auth/too-many-requests') {
-      throw new Error('Demasiados intentos. Intenta más tarde');
+    if (error instanceof FirebaseError) {
+      if (error.code === 'auth/invalid-credential') {
+        throw new Error('Correo o contraseña incorrectos');
+      } else if (error.code === 'auth/user-not-found') {
+        throw new Error('Usuario no encontrado');
+      } else if (error.code === 'auth/wrong-password') {
+        throw new Error('Contraseña incorrecta');
+      } else if (error.code === 'auth/invalid-email') {
+        throw new Error('Correo electrónico inválido');
+      } else if (error.code === 'auth/too-many-requests') {
+        throw new Error('Demasiados intentos. Intenta más tarde');
+      }
     }
 
     throw error;
@@ -158,17 +168,34 @@ export const adminLogin = async (email: string, password: string): Promise<AuthU
 };
 
 export const onAdminAuthChange = (callback: (user: User | null) => void): (() => void) => {
-  return onAuthStateChanged(auth, callback);
+  return onAuthStateChanged(adminAuth, callback);
 };
 
 export const adminLogout = async (): Promise<void> => {
   try {
-    // Restaurar persistencia a localStorage antes de cerrar sesión
-    await setPersistence(auth, browserLocalPersistence);
-    await signOut(auth);
+    await signOut(adminAuth);
   } catch (error) {
     console.error('Error logging out admin:', error);
     throw error;
+  }
+};
+
+export const checkAdminRole = async (uid: string): Promise<AppUser | null> => {
+  try {
+    const userDoc = await getDoc(doc(adminDb, 'users', uid));
+    if (userDoc.exists()) {
+      const data = userDoc.data();
+      return {
+        uid: uid,
+        email: data.email || '',
+        tenantId: data.tenantId,
+        role: data.role as AppUser['role']
+      } as AppUser;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error checking admin role:', error);
+    return null;
   }
 };
 
@@ -181,7 +208,7 @@ export const checkUserRole = async (uid: string): Promise<AppUser | null> => {
         uid: uid,
         email: data.email || '',
         tenantId: data.tenantId,
-        role: data.role as 'admin' | 'superadmin'
+        role: data.role as AppUser['role']
       } as AppUser;
     }
     return null;

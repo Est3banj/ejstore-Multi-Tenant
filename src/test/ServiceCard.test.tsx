@@ -64,4 +64,6 @@ describe('ServiceCard', () => {
     const link = screen.getByRole('link');
     expect(link).toHaveAttribute('href', '/servicio/1');
   });
+
+  // Nota: tests de 'Extracción de Código' eliminados porque ese feature fue removido
 });

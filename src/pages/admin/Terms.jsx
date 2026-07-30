@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getTerms, updateTerms } from '../../services/firestore';
+import { adminDb } from '../../services/firebase';
 import { motion } from 'framer-motion';
 import { Save } from 'lucide-react';
 
@@ -22,7 +23,7 @@ const Terms = () => {
   const loadTerms = async () => {
     if (!tenantId) return;
     try {
-      const termsData = await getTerms(tenantId);
+      const termsData = await getTerms(tenantId, adminDb);
       setContent(termsData);
     } catch (error) {
       console.error('Error loading terms:', error);
@@ -36,7 +37,7 @@ const Terms = () => {
     setSaving(true);
     setSaved(false);
     try {
-      await updateTerms(tenantId, content);
+      await updateTerms(tenantId, content, adminDb);
       await refreshTerms();
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);

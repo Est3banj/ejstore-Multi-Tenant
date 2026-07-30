@@ -1,5 +1,5 @@
 // Compatibility layer - re-export old Context hooks from new stores
-import { useAuthStore, useTenantStore, useEffectiveTenantId } from '../store';
+import { useAuthStore, useTenantStore } from '../store';
 import { useServices, useBanners, useSettings, useTerms, useAllServices, useAllBanners } from '../hooks/useQueries';
 
 // Create a hook that mimics old useApp

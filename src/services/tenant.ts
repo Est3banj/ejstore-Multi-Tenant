@@ -111,26 +111,33 @@ export const getTenantBySubdomain = async (subdomain: string): Promise<Tenant | 
 };
 
 export const detectTenantFromUrl = (): string | null => {
+  // Limpiar sessionStorage para evitar valores stale de detecciones previas erróneas
+  sessionStorage.removeItem('ejstore_tenant_id');
+
+  // 1. Parámetros de URL (prioridad máxima)
   const urlParams = new URLSearchParams(window.location.search);
-  
   const tenantFromV = urlParams.get('v');
   const tenantFromQuery = urlParams.get('tenant');
-  
   if (tenantFromV) {
+    sessionStorage.setItem('ejstore_tenant_id', tenantFromV);
     return tenantFromV;
   }
   if (tenantFromQuery) {
+    sessionStorage.setItem('ejstore_tenant_id', tenantFromQuery);
     return tenantFromQuery;
   }
 
+  // 2. Subdominio (ej: mitienda.ejstreaming.shop)
   const hostname = window.location.hostname;
-  
   if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
     const parts = hostname.split('.');
-    if (parts.length >= 2 && parts[0] !== 'www' && parts[0] !== 'ejstore-web') {
+    // Solo detectar subdominio si hay 3+ partes (mitienda.ejstreaming.shop)
+    // NO cuando es dominio principal (ejstreaming.shop → 2 partes)
+    if (parts.length >= 3 && parts[0] !== 'www' && parts[0] !== 'ejstore-web') {
+      sessionStorage.setItem('ejstore_tenant_id', parts[0]);
       return parts[0];
     }
   }
-  
+
   return null;
 };
