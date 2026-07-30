@@ -46,7 +46,6 @@ const RouletteSettings = () => {
     }
     setSaving(true);
     try {
-      console.log('Guardando config para tenant:', tenantId);
       await saveRouletteConfig({
         tenantId,
         isEnabled,
@@ -56,7 +55,6 @@ const RouletteSettings = () => {
       });
       
       alert('✅ Configuración guardada correctamente en Firestore!');
-      console.log('Config guardada:', { isEnabled, pricePerSpin, spinsForFreeSpin, prizes });
     } catch (error: any) {
       console.error('Error saving roulette config:', error);
       alert('Error al guardar la configuración: ' + (error?.message || 'Error desconocido'));

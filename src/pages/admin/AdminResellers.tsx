@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getResellers, createReseller, loadResellerBalance } from '../../services/marketplace';
-import { Users, UserPlus, DollarSign, Wallet, Phone, Percent, Activity, X, Loader } from 'lucide-react';
+import { adminFunctions } from '../../services/firebase';
+import { Users, UserPlus, DollarSign, Wallet, Phone, Percent, Activity, X, Loader, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface Reseller {
@@ -27,6 +28,7 @@ const AdminResellers = (): JSX.Element => {
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [showPass, setShowPass] = useState(false);
 
   const [loadModalOpen, setLoadModalOpen] = useState(false);
   const [loadingBalanceTarget, setLoadingBalanceTarget] = useState<Reseller | null>(null);
@@ -48,6 +50,7 @@ const AdminResellers = (): JSX.Element => {
     setError(null);
     try {
       const data = await getResellers(tenantId);
+      data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setResellers(data as Reseller[]);
     } catch (err) {
       console.error('Error loading resellers:', err);
@@ -75,7 +78,7 @@ const AdminResellers = (): JSX.Element => {
       commissionPercent: Number(formData.get('commissionPercent')) || 0,
     };
     try {
-      await createReseller(data);
+      await createReseller(data, adminFunctions);
       showToast('success', 'Subdistribuidor creado correctamente');
       setCreateModalOpen(false);
       form.reset();
@@ -106,7 +109,7 @@ const AdminResellers = (): JSX.Element => {
       const result = await loadResellerBalance({
         resellerId: loadingBalanceTarget.id,
         amount,
-      });
+      }, adminFunctions);
       showToast('success', `Saldo cargado correctamente. Nuevo saldo: $${result.newBalance.toLocaleString()}`);
       setLoadModalOpen(false);
       await loadResellers();
@@ -296,14 +299,23 @@ const AdminResellers = (): JSX.Element => {
               </div>
               <div>
                 <label className="block text-sm text-white/60 mb-1">Contraseña</label>
-                <input
-                  name="password"
-                  type="password"
-                  required
-                  minLength={6}
-                  className="input-field"
-                  placeholder="Mínimo 6 caracteres"
-                />
+                <div className="relative">
+                  <input
+                    name="password"
+                    type={showPass ? 'text' : 'password'}
+                    required
+                    minLength={6}
+                    className="input-field pr-10"
+                    placeholder="Mínimo 6 caracteres"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(!showPass)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                  >
+                    {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-sm text-white/60 mb-1">Nombre</label>

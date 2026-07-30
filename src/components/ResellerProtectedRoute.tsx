@@ -8,13 +8,13 @@ interface ResellerProtectedRouteProps {
 }
 
 const ResellerProtectedRoute = ({ children }: ResellerProtectedRouteProps): JSX.Element => {
-  const { user, role, loading, initialized } = useAuthStore();
+  const { adminUser, role, loading, initialized } = useAuthStore();
 
   if (!initialized || loading) {
     return <Loader />;
   }
 
-  if (!user || role !== 'reseller') {
+  if (!adminUser || role !== 'reseller') {
     return <Navigate to="/login" replace />;
   }
 

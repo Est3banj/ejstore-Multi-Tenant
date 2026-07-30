@@ -1,37 +1,67 @@
-// Integration tests for marketplace -- requires Firebase Emulator running
-// Run with: npm run test:integration
-// These tests connect to the local emulator, not mocking Firebase
+import { describe, it, expect, vi } from 'vitest';
 
-// To enable these tests, set the FIREBASE_EMULATOR env var
-// or uncomment the describe block below.
+vi.mock('firebase/firestore', () => ({
+  getFirestore: vi.fn(() => ({})),
+  collection: vi.fn(),
+  query: vi.fn(),
+  where: vi.fn(),
+  getDocs: vi.fn(() => Promise.resolve({ empty: true, docs: [], forEach: vi.fn() })),
+  getDoc: vi.fn(() => Promise.resolve({ exists: false, data: () => undefined, id: '' })),
+  doc: vi.fn(() => ({})),
+  addDoc: vi.fn(() => Promise.resolve({ id: 'mock-id' })),
+  updateDoc: vi.fn(() => Promise.resolve()),
+  deleteDoc: vi.fn(() => Promise.resolve()),
+  setDoc: vi.fn(() => Promise.resolve()),
+  Timestamp: { now: () => ({ toDate: () => new Date() }), fromDate: (d: Date) => d },
+}));
 
-/*
-import { describe, it, expect, beforeAll } from 'vitest';
+vi.mock('firebase/functions', () => ({
+  getFunctions: vi.fn(() => ({})),
+  httpsCallable: vi.fn(() => vi.fn(() => Promise.resolve({ data: {} }))),
+}));
 
-// This test suite connects to the Firebase Emulator
-// MAKE SURE EMULATORS ARE RUNNING before executing
+vi.mock('../../services/firebase', () => ({
+  db: {} as any,
+  adminDb: {} as any,
+  functions: {} as any,
+  adminFunctions: {} as any,
+}));
 
-describe('processPurchase Integration', () => {
-  beforeAll(() => {
-    // Firebase emulator connection
-    // ...setup...
+describe('Firestore Services', () => {
+  it('getServices is a function', async () => {
+    const { getServices } = await import('../../services/firestore');
+    expect(typeof getServices).toBe('function');
   });
 
-  it('should process a purchase successfully', async () => {
-    // 1. Create customer with balance
-    // 2. Create service with available account
-    // 3. Call processPurchase
-    // 4. Verify balance deducted
-    // 5. Verify account marked sold
-    // 6. Verify purchase created
+  it('getAllServices is a function', async () => {
+    const { getAllServices } = await import('../../services/firestore');
+    expect(typeof getAllServices).toBe('function');
   });
 
-  it('should reject purchase with insufficient balance', async () => {
-    // ...
+  it('createService is a function', async () => {
+    const { createService } = await import('../../services/firestore');
+    expect(typeof createService).toBe('function');
   });
 
-  it('should reject purchase when no accounts available', async () => {
-    // ...
+  it('updateService is a function', async () => {
+    const { updateService } = await import('../../services/firestore');
+    expect(typeof updateService).toBe('function');
+  });
+
+  it('deleteService is a function', async () => {
+    const { deleteService } = await import('../../services/firestore');
+    expect(typeof deleteService).toBe('function');
   });
 });
-*/
+
+describe('Marketplace Services', () => {
+  it('processPurchase is a function', async () => {
+    const { processPurchase } = await import('../../services/marketplace');
+    expect(typeof processPurchase).toBe('function');
+  });
+
+  it('processBulkPurchase is a function', async () => {
+    const { processBulkPurchase } = await import('../../services/marketplace');
+    expect(typeof processBulkPurchase).toBe('function');
+  });
+});

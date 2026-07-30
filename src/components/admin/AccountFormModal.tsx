@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Modal from '../Modal';
 import type { ServiceAccount } from '../../types';
-import { Loader, Plus, Trash2 } from 'lucide-react';
+import { Loader, Plus, Trash2, Eye, EyeOff } from 'lucide-react';
 import { collection, getDocs, query } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 
@@ -33,6 +33,7 @@ const AccountFormModal = ({ isOpen, onClose, onSave, serviceId, account }: Accou
     status: 'available',
   });
   const [saving, setSaving] = useState(false);
+  const [showPass, setShowPass] = useState(false);
   const [profiles, setProfiles] = useState<Array<{ name: string; pin: string; _id?: string; status?: string }>>([
     { name: 'Perfil 1', pin: '' }
   ]);
@@ -158,14 +159,23 @@ const AccountFormModal = ({ isOpen, onClose, onSave, serviceId, account }: Accou
           <label className="block text-sm text-white/60 mb-1">
             Contrasena <span className="text-red-400">*</span>
           </label>
-          <input
-            type="password"
-            value={formData.password}
-            onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-            required={!isEditing}
-            className="w-full bg-white/10 border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-primary-500"
-            placeholder={isEditing ? 'Dejar vacio para mantener' : '********'}
-          />
+          <div className="relative">
+            <input
+              type={showPass ? 'text' : 'password'}
+              value={formData.password}
+              onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+              required={!isEditing}
+              className="w-full bg-white/10 border border-white/20 text-white rounded-lg px-4 py-3 pr-10 focus:outline-none focus:border-primary-500"
+              placeholder={isEditing ? 'Dejar vacio para mantener' : '********'}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPass(!showPass)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+            >
+              {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
         </div>
 
         <div>

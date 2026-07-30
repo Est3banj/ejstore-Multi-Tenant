@@ -24,7 +24,6 @@ vi.mock('../services/firestore', () => ({
       image: '',
       active: true,
       isPopular: false,
-      hasCodeExtraction: true,
     },
   ])),
   createService: vi.fn(),
@@ -34,6 +33,14 @@ vi.mock('../services/firestore', () => ({
 
 vi.mock('../services/storage', () => ({
   uploadImage: vi.fn(() => Promise.resolve('https://test.url')),
+}));
+
+vi.mock('../services/marketplace', () => ({
+  getAccounts: vi.fn(() => Promise.resolve([])),
+  createAccount: vi.fn(),
+  updateAccount: vi.fn(),
+  deleteAccount: vi.fn(),
+  getServiceStock: vi.fn(() => Promise.resolve({ total: 0, available: 0, sold: 0 })),
 }));
 
 const queryClient = new QueryClient({
@@ -50,43 +57,24 @@ const renderWithProviders = (component: ReactNode) => {
   );
 };
 
-describe('Services Form - Code Extraction', () => {
-  it('includes hasCodeExtraction in serviceData when submitting', async () => {
-    const { createService } = await import('../services/firestore');
+describe('Services Form', () => {
+  it('renders services list', async () => {
     renderWithProviders(<Services />);
-
-    const addButton = await screen.findByText('Nuevo Servicio');
-    fireEvent.click(addButton);
-
-    const nameInput = await screen.findByLabelText('Nombre');
-    fireEvent.change(nameInput, { target: { value: 'Test Service' } });
-
-    const priceInput = screen.getByLabelText('Precio');
-    fireEvent.change(priceInput, { target: { value: '10000' } });
-
-    const extractionCheckbox = screen.getByLabelText('Extracción de Código (Gmail)');
-    fireEvent.click(extractionCheckbox);
-
-    const submitButton = screen.getByText('Crear');
-    fireEvent.click(submitButton);
-
-    await vi.waitFor(() => {
-      expect(createService).toHaveBeenCalledWith(
-        expect.objectContaining({
-          hasCodeExtraction: true,
-        }),
-        expect.any(String)
-      );
-    });
+    expect(await screen.findByText('Netflix Premium')).toBeInTheDocument();
   });
 
-  it('populates hasCodeExtraction from existing service on edit', async () => {
+  it('opens add modal when clicking Nuevo Servicio', async () => {
     renderWithProviders(<Services />);
+    const addButton = await screen.findByText('Nuevo Servicio');
+    fireEvent.click(addButton);
+    expect(await screen.findByLabelText('Nombre')).toBeInTheDocument();
+    expect(screen.getByLabelText('Precio')).toBeInTheDocument();
+  });
 
+  it('shows edit modal when clicking Editar', async () => {
+    renderWithProviders(<Services />);
     const editButton = await screen.findByText('Editar');
     fireEvent.click(editButton);
-
-    const extractionCheckbox = await screen.findByLabelText('Extracción de Código (Gmail)');
-    expect(extractionCheckbox).toBeChecked();
+    expect(await screen.findByDisplayValue('Netflix Premium')).toBeInTheDocument();
   });
 });

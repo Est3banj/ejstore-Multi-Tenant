@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../../store/authStore';
 import { collection, query, where, orderBy, getDocs, doc, getDoc } from 'firebase/firestore';
-import { db } from '../../services/firebase';
+import { adminDb } from '../../services/firebase';
 import { updateTicket } from '../../services/marketplace';
 import {
   MessageSquare,
@@ -40,8 +40,8 @@ const STATUS_CONFIG: Record<string, { className: string; label: string; icon: ty
 };
 
 const MisReportes = (): JSX.Element => {
-  const { user } = useAuthStore();
-  const uid = user?.uid || '';
+  const { adminUser } = useAuthStore();
+  const uid = adminUser?.uid || '';
   const [tickets, setTickets] = useState<TicketData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<TicketData | null>(null);
@@ -54,7 +54,7 @@ const MisReportes = (): JSX.Element => {
       setLoading(true);
       try {
         const q = query(
-          collection(db, 'tickets'),
+          collection(adminDb, 'tickets'),
           where('userId', '==', uid),
           orderBy('createdAt', 'desc')
         );
@@ -89,7 +89,7 @@ const MisReportes = (): JSX.Element => {
 
   const loadWhatsApp = async (tenantId: string) => {
     try {
-      const tenantSnap = await getDoc(doc(db, 'tenants', tenantId));
+      const tenantSnap = await getDoc(doc(adminDb, 'tenants', tenantId));
       if (tenantSnap.exists()) {
         const num = tenantSnap.data().whatsappNumber || '';
         setWhatsappNumber(num);
@@ -146,7 +146,14 @@ const MisReportes = (): JSX.Element => {
     });
 
   if (loading) {
-    return <div className="p-6 text-center text-gray-400">Cargando reportes...</div>;
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-sky-500/30 border-t-sky-500 rounded-full animate-spin" />
+          <p className="text-gray-400 text-sm">Cargando reportes...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

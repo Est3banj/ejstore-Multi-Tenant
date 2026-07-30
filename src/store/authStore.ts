@@ -1,10 +1,11 @@
 import { create } from 'zustand';
-import { onAuthChange, checkUserRole, getCustomerData } from '../services/auth';
+import { onAuthChange, onAdminAuthChange, checkUserRole, checkAdminRole, getCustomerData } from '../services/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
 import type { CustomerUser } from '../services/auth';
 
 interface AuthState {
   user: FirebaseUser | null;
+  adminUser: FirebaseUser | null;
   userTenantId: string | null;
   customer: CustomerUser | null;
   isAdmin: boolean;
@@ -21,6 +22,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
+  adminUser: null,
   userTenantId: null,
   customer: null,
   isAdmin: false,
@@ -29,6 +31,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initialized: false,
 
   initialize: () => {
+    let authReady = false;
+    let adminReady = false;
+
+    const checkInitialized = () => {
+      if (authReady && adminReady) {
+        set({ loading: false, initialized: true });
+      }
+    };
+
     const unsubscribe = onAuthChange(async (currentUser) => {
       set({ user: currentUser, loading: true });
 
@@ -50,7 +61,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           }
         }
 
-        console.log('🔍 AuthStore: uid=', currentUser.uid, 'email=', currentUser.email, 'firestoreRole=', userData?.role, 'customRole=', role);
+
 
         const isAdminUser = role === 'admin' || role === 'superadmin';
 
@@ -84,13 +95,81 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           set({ customer: customerData });
         }
       } else {
-        set({ userTenantId: null, customer: null, isAdmin: false, role: null });
+        // Solo limpiar user/customer — si hay adminUser, preservar estado admin
+        const state = get();
+        set({ user: null, customer: null });
+        if (!state.adminUser) {
+          set({ userTenantId: null, isAdmin: false, role: null });
+        }
       }
 
-      set({ loading: false, initialized: true });
+      set({ loading: false });
+      authReady = true;
+      checkInitialized();
     });
 
-    return unsubscribe;
+    const unsubscribeAdmin = onAdminAuthChange(async (currentUser) => {
+      set({ adminUser: currentUser, loading: true });
+
+      if (currentUser) {
+        const userData = await checkAdminRole(currentUser.uid);
+
+        let role = userData?.role as string | null;
+        let tenantId = userData?.tenantId as string | null;
+
+        if (!role) {
+          try {
+            const idTokenResult = await currentUser.getIdTokenResult();
+            role = idTokenResult.claims.role as string || null;
+            tenantId = idTokenResult.claims.tenantId as string || null;
+          } catch (e) {
+            console.warn('Error reading admin claims:', e);
+          }
+        }
+
+        const isAdminUser = role === 'admin' || role === 'superadmin';
+
+        if (isAdminUser) {
+          set({
+            userTenantId: tenantId,
+            isAdmin: true,
+            role: role as 'admin' | 'superadmin',
+            customer: null
+          });
+          if (tenantId) {
+            const { useTenantStore } = await import('./tenantStore');
+            useTenantStore.getState().loadTenantFromAuth(tenantId);
+          }
+        } else if (role === 'reseller') {
+          set({
+            userTenantId: tenantId,
+            isAdmin: false,
+            role: 'reseller',
+            customer: null,
+          });
+          if (tenantId) {
+            const { useTenantStore } = await import('./tenantStore');
+            useTenantStore.getState().loadTenantFromAuth(tenantId);
+          }
+        }
+      } else {
+        // Solo limpiar adminUser — si hay usuario regular, preservar su estado
+        const state = get();
+        set({ adminUser: null });
+        if (!state.user) {
+          set({ userTenantId: null, isAdmin: false, role: null });
+        }
+      }
+
+      set({ loading: false });
+      adminReady = true;
+      checkInitialized();
+    });
+
+    return () => {
+      unsubscribe();
+      unsubscribeAdmin();
+    };
   },
 
   setUserTenantId: (tenantId) => {
@@ -110,12 +189,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
-    const { logout: authLogout } = await import('../services/auth');
-    await authLogout();
+    const { logout: authLogout, adminLogout } = await import('../services/auth');
+    await Promise.all([authLogout(), adminLogout()]);
 
     localStorage.removeItem('ejstore_roulette_data');
     localStorage.removeItem('roulette_dont_ask');
 
-    set({ user: null, userTenantId: null, customer: null, isAdmin: false, role: null });
+    set({ user: null, adminUser: null, userTenantId: null, customer: null, isAdmin: false, role: null });
   }
 }));

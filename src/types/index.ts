@@ -139,6 +139,7 @@ export interface Recharge {
   processedAt?: Date;
   processedBy?: string;
   rejectionReason?: string;
+  emailUid?: string;
 }
 
 export type {

@@ -6,6 +6,7 @@ interface PurchaseConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => Promise<void>;
+  onRecharge?: () => void;
   serviceName: string;
   price: number;
   currentBalance: number;
@@ -18,6 +19,7 @@ const PurchaseConfirmModal = ({
   isOpen,
   onClose,
   onConfirm,
+  onRecharge,
   serviceName,
   price,
   currentBalance,
@@ -84,27 +86,31 @@ const PurchaseConfirmModal = ({
           >
             Cancelar
           </button>
-          <button
-            onClick={onConfirm}
-            disabled={loading || insufficient}
-            className="flex-1 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-            style={{
-              background: insufficient
-                ? 'linear-gradient(135deg, #6b7280, #4b5563)'
-                : 'linear-gradient(135deg, #10b981, #059669)',
-            }}
-          >
-            {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <Loader size={18} className="animate-spin" />
-                Procesando...
-              </span>
-            ) : insufficient ? (
-              'Saldo insuficiente'
-            ) : (
-              'Confirmar compra'
-            )}
-          </button>
+          {insufficient ? (
+            <button
+              onClick={onRecharge || onClose}
+              className="flex-1 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105"
+              style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
+            >
+              Recargar Saldo
+            </button>
+          ) : (
+            <button
+              onClick={onConfirm}
+              disabled={loading}
+              className="flex-1 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader size={18} className="animate-spin" />
+                  Procesando...
+                </span>
+              ) : (
+                'Confirmar compra'
+              )}
+            </button>
+          )}
         </div>
       </div>
     </Modal>

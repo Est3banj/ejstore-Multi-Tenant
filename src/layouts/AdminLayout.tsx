@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { logout } from '../services/auth';
-import { Menu, X, LayoutDashboard, Package, Image, FileText, Settings, LogOut, LucideIcon, Gift, Wallet, Users, Store, Database, Ticket, Mail } from 'lucide-react';
+import { adminLogout } from '../services/auth';
+import { Menu, X, LayoutDashboard, Package, Image, FileText, Settings, LogOut, LucideIcon, Gift, Wallet, Users, Store, Ticket, Mail, UserCheck } from 'lucide-react';
 
 interface MenuItem {
   path: string;
@@ -11,7 +11,7 @@ interface MenuItem {
 }
 
 const AdminLayout = (): JSX.Element => {
-  const { user, role } = useAuthStore();
+  const { adminUser, role } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -19,7 +19,7 @@ const AdminLayout = (): JSX.Element => {
 
   const handleLogout = async (): Promise<void> => {
     try {
-      await logout();
+      await adminLogout();
       navigate('/login');
     } catch (error) {
       console.error('Error logging out:', error);
@@ -33,6 +33,7 @@ const AdminLayout = (): JSX.Element => {
 
   const menuItems: MenuItem[] = [
     { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/admin/clientes', label: 'Clientes', icon: UserCheck },
     { path: '/admin/services', label: 'Servicios', icon: Package },
     { path: '/admin/banners', label: 'Banners', icon: Image },
     { path: '/admin/roulette', label: 'Ruleta', icon: Gift },
@@ -51,7 +52,7 @@ const AdminLayout = (): JSX.Element => {
 
   const isSuperadmin = role === 'superadmin';
 
-  if (!user) {
+  if (!adminUser) {
     return <></>;
   }
 
@@ -90,7 +91,7 @@ const AdminLayout = (): JSX.Element => {
       >
         <div className="p-6 border-b border-white/10 flex-shrink-0">
           <h2 className="text-2xl font-bold gradient-text">Panel Admin</h2>
-          <p className="text-white/50 text-sm mt-1 truncate">{user.email}</p>
+          <p className="text-white/50 text-sm mt-1 truncate">{adminUser.email}</p>
         </div>
 
         <nav className="flex-1 overflow-y-auto p-4 space-y-1">
@@ -155,7 +156,6 @@ const AdminLayout = (): JSX.Element => {
       <main 
         ref={mainRef}
         className="flex-1 min-h-screen overflow-y-auto pointer-events-auto"
-        style={{ position: 'relative', zIndex: 0 }}
       >
         <div className="md:pt-0 pt-16">
           <Outlet />

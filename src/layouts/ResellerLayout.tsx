@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { logout } from '../services/auth';
 import { getResellerById } from '../services/marketplace';
 import {
   Menu,
@@ -16,6 +15,7 @@ import {
   Wallet,
   Flag,
   Search,
+  History,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -25,7 +25,7 @@ interface MenuItem {
 }
 
 const ResellerLayout = (): JSX.Element => {
-  const { user, role: _role } = useAuthStore();
+  const { adminUser, role: _role, logout: storeLogout } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -37,7 +37,7 @@ const ResellerLayout = (): JSX.Element => {
 
   const handleLogout = async (): Promise<void> => {
     try {
-      await logout();
+      await storeLogout();
       navigate('/login');
     } catch (error) {
       console.error('Error logging out:', error);
@@ -49,19 +49,19 @@ const ResellerLayout = (): JSX.Element => {
   }, [location.pathname]);
 
   useEffect(() => {
-    if (user) {
-      getResellerById(user.uid)
+    if (adminUser) {
+      getResellerById(adminUser.uid)
         .then((data) => {
           if (data) {
             setResellerData({
-              name: data.name || user.email || '',
+              name: data.name || adminUser.email || '',
               balance: data.balance || 0,
             });
           }
         })
         .catch(console.error);
     }
-  }, [user]);
+  }, [adminUser]);
 
   const menuItems: MenuItem[] = [
     { path: '/r/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -70,10 +70,11 @@ const ResellerLayout = (): JSX.Element => {
     { path: '/r/consultar-codigo', label: 'Consultar Códigos', icon: Search },
     { path: '/r/reportar', label: 'Reportar', icon: Flag },
     { path: '/r/mis-reportes', label: 'Mis Reportes', icon: MessageSquare },
+    { path: '/r/historial-recargas', label: 'Historial Recargas', icon: History },
     { path: '/r/perfil', label: 'Perfil', icon: Settings },
   ];
 
-  if (!user) {
+  if (!adminUser) {
     return <></>;
   }
 
@@ -110,7 +111,7 @@ const ResellerLayout = (): JSX.Element => {
         <div className="p-6 border-b border-white/10 flex-shrink-0">
           <h2 className="text-2xl font-bold gradient-text">Subdistribuidor</h2>
           <p className="text-white/50 text-sm mt-1 truncate">
-            {resellerData?.name || user.email}
+            {resellerData?.name || adminUser.email}
           </p>
           {resellerData && (
             <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-yellow-500/10 rounded-lg">
@@ -156,7 +157,6 @@ const ResellerLayout = (): JSX.Element => {
       <main
         ref={mainRef}
         className="flex-1 min-h-screen overflow-y-auto pointer-events-auto"
-        style={{ position: 'relative', zIndex: 0 }}
       >
         <div className="md:pt-0 pt-16">
           <Outlet />

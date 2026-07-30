@@ -7,7 +7,7 @@ import { useTenantStore } from '../../store/tenantStore';
 import { createTicket } from '../../services/marketplace';
 import { uploadImage } from '../../services/storage';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import { db } from '../../services/firebase';
+import { adminDb } from '../../services/firebase';
 
 interface BulkPurchase {
   id: string;         // purchase doc ID
@@ -29,10 +29,10 @@ const DOMINIOS = [
 ];
 
 const ResellerReportar = (): JSX.Element => {
-  const { user, userTenantId } = useAuthStore();
+  const { adminUser, userTenantId } = useAuthStore();
   const { tenant } = useTenantStore();
   const tenantId = tenant?.id || userTenantId;
-  const uid = user?.uid || '';
+  const uid = adminUser?.uid || '';
   const [searchParams] = useSearchParams();
 
   // Si viene desde MisClientes, pre-cargar datos
@@ -43,9 +43,8 @@ const ResellerReportar = (): JSX.Element => {
 
   const [purchases, setPurchases] = useState<BulkPurchase[]>([]);
   const [selectedPurchaseId, setSelectedPurchaseId] = useState(tktParam || '');
-  const [purchaseDocId] = useState(pidParam);
-  const [accountIndex] = useState(idxParam ? parseInt(idxParam) : undefined);
   const [serviceId, setServiceId] = useState('');
+  const [serviceName, setServiceName] = useState('');
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -68,7 +67,7 @@ const ResellerReportar = (): JSX.Element => {
       if (!uid) return;
       try {
         const q = query(
-          collection(db, 'purchases'),
+          collection(adminDb, 'purchases'),
           where('customerId', '==', uid),
           where('type', '==', 'bulk'),
           orderBy('createdAt', 'desc'),
@@ -106,7 +105,7 @@ const ResellerReportar = (): JSX.Element => {
       setSearchingEmail(true);
       try {
         const q = query(
-          collection(db, 'purchases'),
+          collection(adminDb, 'purchases'),
           where('resellerId', '==', uid),
           orderBy('createdAt', 'desc'),
           limit(100)
@@ -155,7 +154,7 @@ const ResellerReportar = (): JSX.Element => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !tenantId) return;
+    if (!adminUser || !tenantId) return;
 
     const emailFinal = selectedEmail || searchEmail.trim();
     if (!emailFinal || !selectedPurchaseId.trim() || !subject || !description) {
@@ -178,19 +177,19 @@ const ResellerReportar = (): JSX.Element => {
         }
       }
 
-      const svcName = purchases.find((p) => p.serviceId === serviceId)?.serviceName || '';
       await createTicket({
         tenantId,
         userId: uid,
+        userEmail: adminUser?.email || '',
         userType: 'reseller',
         serviceId,
-        serviceName: svcName,
+        serviceName: serviceName || purchases.find((p) => p.serviceId === serviceId)?.serviceName || '',
         subject,
         description,
         customerEmail: emailFinal,
-        purchaseId: selectedPurchaseId || undefined,
-        purchaseDocId: purchaseDocId || undefined,
-        accountIndex: accountIndex,
+        purchaseId: selectedPurchaseId,
+        purchaseDocId: pidParam || undefined,
+        accountIndex: idxParam ? parseInt(idxParam) : undefined,
         imageUrl,
         status: 'open',
       });
@@ -395,7 +394,11 @@ const ResellerReportar = (): JSX.Element => {
             ) : (
               <select
                 value={serviceId}
-                onChange={(e) => setServiceId(e.target.value)}
+                onChange={(e) => {
+                  setServiceId(e.target.value);
+                  const found = purchases.find(p => p.serviceId === e.target.value);
+                  setServiceName(found?.serviceName || '');
+                }}
                 className="input-field"
                 required
               >

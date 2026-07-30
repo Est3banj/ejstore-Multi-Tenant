@@ -4,7 +4,7 @@ import { Search, Loader, Copy, CheckCircle2, AlertCircle, Mail, X } from 'lucide
 import { useAuthStore } from '../../store/authStore';
 import { extraerCodigo } from '../../services/marketplace';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import { db } from '../../services/firebase';
+import { adminDb } from '../../services/firebase';
 
 interface CodeResult {
   success: boolean;
@@ -41,8 +41,8 @@ const DOMINIOS = [
 ];
 
 const ConsultarCodigo = (): JSX.Element => {
-  const { user } = useAuthStore();
-  const uid = user?.uid || '';
+  const { adminUser } = useAuthStore();
+  const uid = adminUser?.uid || '';
 
   // Form
   const [correo, setCorreo] = useState('');
@@ -91,7 +91,7 @@ const ConsultarCodigo = (): JSX.Element => {
       setSearchingEmail(true);
       try {
         const q = query(
-          collection(db, 'purchases'),
+          collection(adminDb, 'purchases'),
           where('resellerId', '==', uid),
           orderBy('createdAt', 'desc'),
           limit(100)
@@ -156,7 +156,7 @@ const ConsultarCodigo = (): JSX.Element => {
       }
 
       const q = query(
-        collection(db, 'purchases'),
+        collection(adminDb, 'purchases'),
         where('resellerId', '==', uid),
         orderBy('createdAt', 'desc'),
         limit(50)

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
-import { getTickets, updateTicket, updateTicketCredentials } from '../../services/marketplace';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../../services/firebase';
+import { getTickets, updateTicketCredentials, adminUpdateTicket } from '../../services/marketplace';
+import { doc, getDoc, query, collection, where, getDocs } from 'firebase/firestore';
+import { adminDb as db, adminFunctions } from '../../services/firebase';
 import type { Ticket } from '../../types/marketplace';
-import { Ticket as TicketIcon, HelpCircle, CheckCircle, XCircle, Loader, Eye, X, Save } from 'lucide-react';
+import { Ticket as TicketIcon, HelpCircle, CheckCircle, Loader, Eye, EyeOff, X, Save, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 type FilterTab = 'todos' | 'open' | 'resolved' | 'closed';
@@ -37,6 +37,8 @@ const AdminTickets = (): JSX.Element => {
   const [newProfileName, setNewProfileName] = useState('');
   const [newProfilePin, setNewProfilePin] = useState('');
   const [savingCreds, setSavingCreds] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (tenantId) loadTickets();
@@ -55,9 +57,18 @@ const AdminTickets = (): JSX.Element => {
     }
   };
 
-  const filteredTickets = activeTab === 'todos'
+  const filteredTickets = (activeTab === 'todos'
     ? tickets
-    : tickets.filter((t) => t.status === activeTab);
+    : tickets.filter((t) => t.status === activeTab)
+  ).filter((t) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (t.serviceName?.toLowerCase() || '').includes(q)
+      || (t.subject?.toLowerCase() || '').includes(q)
+      || (t.customerEmail?.toLowerCase() || '').includes(q)
+      || (t.userEmail?.toLowerCase() || '').includes(q)
+      || (t.purchaseId?.toLowerCase() || '').includes(q);
+  });
 
   const openCount = tickets.filter((t) => t.status === 'open').length;
   const resolvedToday = tickets.filter((t) => {
@@ -74,30 +85,65 @@ const AdminTickets = (): JSX.Element => {
   const openTicket = async (ticket: Ticket) => {
     setSelectedTicket(ticket);
     setAdminNotes(ticket.adminNotes || '');
-    setNewEmail('');
-    setNewPassword('');
     setNewProfileName('');
     setNewProfilePin('');
 
-    // Si tiene purchaseDocId, cargar credenciales actuales de la compra
     if (ticket.purchaseDocId && ticket.accountIndex !== undefined) {
       try {
         const purchaseSnap = await getDoc(doc(db, 'purchases', ticket.purchaseDocId));
         if (purchaseSnap.exists()) {
           const data = purchaseSnap.data();
+
+          // Bulk (subdistribuidor): profiles[] con credenciales
           const profiles = data.profiles || [];
-          const profile = profiles[ticket.accountIndex];
-          if (profile) {
-            setNewEmail(profile.credential?.email || '');
-            setNewPassword(profile.credential?.password || '');
+          let profile = profiles[ticket.accountIndex];
+          if (profile?.credential) {
+            setNewEmail(profile.credential.email || '');
+            setNewPassword(profile.credential.password || '');
             setNewProfileName(profile.profileName || '');
             setNewProfilePin(profile.profilePin || '');
+            return;
+          }
+
+          // Single (cliente): buscar cuenta en services/{serviceId}/accounts/{accountId}
+          if (data.accountId && data.serviceId) {
+            const acctSnap = await getDoc(doc(db, 'services', data.serviceId, 'accounts', data.accountId));
+            if (acctSnap.exists()) {
+              const acct = acctSnap.data();
+              const cred = acct.credential || {};
+              setNewEmail(cred.email || ticket.customerEmail || '');
+              setNewPassword(cred.password || '');
+              setNewProfileName(data.profileName || '');
+              setNewProfilePin(data.profilePin || '');
+              return;
+            }
           }
         }
       } catch (err) {
         console.error('Error loading purchase credentials:', err);
       }
     }
+    // Sin purchaseDocId: buscar cuenta por email del servicio
+    if (!ticket.purchaseDocId && ticket.serviceId && ticket.customerEmail) {
+      try {
+        const accountsSnap = await getDocs(query(
+          collection(db, 'services', ticket.serviceId, 'accounts'),
+          where('credential.email', '==', ticket.customerEmail)
+        ));
+        if (!accountsSnap.empty) {
+          const acct = accountsSnap.docs[0].data();
+          const cred = acct.credential || {};
+          setNewEmail(cred.email || ticket.customerEmail);
+          setNewPassword(cred.password || '');
+        }
+      } catch (err) {
+        console.error('Error loading account by email:', err);
+      }
+    }
+    setNewEmail(ticket.customerEmail || '');
+    setNewPassword(ticket.newCredentials?.password || '');
+    if (ticket.newCredentials?.profileName) setNewProfileName(ticket.newCredentials.profileName);
+    if (ticket.newCredentials?.profilePin) setNewProfilePin(ticket.newCredentials.profilePin);
   };
 
   const closeDetail = () => {
@@ -110,22 +156,21 @@ const AdminTickets = (): JSX.Element => {
   };
 
   const handleSaveCredentials = async () => {
-    if (!selectedTicket || !selectedTicket.purchaseDocId || selectedTicket.accountIndex === undefined) return;
+    if (!selectedTicket) return;
     setSavingCreds(true);
     try {
       await updateTicketCredentials({
         ticketId: selectedTicket.id,
-        purchaseDocId: selectedTicket.purchaseDocId,
-        accountIndex: selectedTicket.accountIndex,
+        purchaseDocId: selectedTicket.purchaseDocId || undefined,
+        accountIndex: selectedTicket.accountIndex !== undefined ? selectedTicket.accountIndex : undefined,
         newEmail: newEmail || undefined,
         newPassword: newPassword || undefined,
         newProfileName: newProfileName || undefined,
         newProfilePin: newProfilePin || undefined,
-      });
+      }, adminFunctions);
       await loadTickets();
       setSelectedTicket((prev) => prev ? {
         ...prev,
-        status: 'resolved',
         newCredentials: { email: newEmail, password: newPassword, profileName: newProfileName, profilePin: newProfilePin },
       } : null);
     } catch (err) {
@@ -139,24 +184,12 @@ const AdminTickets = (): JSX.Element => {
     if (!selectedTicket) return;
     setSaving(true);
     try {
-      await updateTicket(selectedTicket.id, { status, adminNotes });
+      await adminUpdateTicket({ ticketId: selectedTicket.id, status, adminNotes });
       await loadTickets();
-      setSelectedTicket((prev) => prev ? { ...prev, status, adminNotes: adminNotes || prev.adminNotes } : null);
+      if (status === 'resolved') closeDetail();
+      else setSelectedTicket((prev) => prev ? { ...prev, status, adminNotes: adminNotes || prev.adminNotes } : null);
     } catch (err) {
       console.error('Error updating ticket:', err);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSaveNotes = async () => {
-    if (!selectedTicket) return;
-    setSaving(true);
-    try {
-      await updateTicket(selectedTicket.id, { adminNotes });
-      await loadTickets();
-    } catch (err) {
-      console.error('Error saving notes:', err);
     } finally {
       setSaving(false);
     }
@@ -246,6 +279,20 @@ const AdminTickets = (): JSX.Element => {
         </div>
       </div>
 
+      {/* Search */}
+      <div className="mb-4">
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar por servicio, asunto, email..."
+            className="input-field pl-10 text-sm"
+          />
+        </div>
+      </div>
+
       {/* Table */}
       {filteredTickets.length === 0 ? (
         <div className="bg-gray-800 rounded-xl border border-gray-700 p-12 text-center">
@@ -260,6 +307,9 @@ const AdminTickets = (): JSX.Element => {
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Fecha</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Tipo</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Servicio</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Código</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Email Servicio</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Email Reportó</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Asunto</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Estado</th>
                   <th className="text-center px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Acciones</th>
@@ -276,7 +326,13 @@ const AdminTickets = (): JSX.Element => {
                     <td className="px-4 py-3 text-white/50 text-sm whitespace-nowrap">{formatDate(ticket.createdAt)}</td>
                     <td className="px-4 py-3">{userTypeBadge(ticket.userType)}</td>
                     <td className="px-4 py-3 text-white/70 text-sm">{ticket.serviceName}</td>
-                    <td className="px-4 py-3 text-white text-sm max-w-[200px] truncate">{ticket.subject}</td>
+                    <td className="px-4 py-3 text-primary-400 text-sm font-mono">{(() => {
+                      const raw = ticket.purchaseId || ticket.id;
+                      return raw?.startsWith?.('TKT-') ? raw : `TKT-${(raw || '').slice(0, 6).toUpperCase()}-?`;
+                    })()}</td>
+                    <td className="px-4 py-3 text-white/50 text-sm font-mono max-w-[150px] truncate">{ticket.customerEmail || '—'}</td>
+                    <td className="px-4 py-3 text-white/50 text-sm font-mono max-w-[150px] truncate">{ticket.userEmail || '—'}</td>
+                    <td className="px-4 py-3 text-white text-sm max-w-[150px] truncate">{ticket.subject}</td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_BADGES[ticket.status].className}`}>
                         {STATUS_BADGES[ticket.status].label}
@@ -369,8 +425,8 @@ const AdminTickets = (): JSX.Element => {
                 </div>
               )}
 
-              {/* Actualizar credenciales (solo si el ticket tiene purchaseDocId) */}
-              {selectedTicket.purchaseDocId && selectedTicket.status === 'open' && (
+              {/* Actualizar credenciales (solo si el ticket está abierto) */}
+              {selectedTicket.status === 'open' && (
                 <div className="border border-primary-500/30 rounded-xl p-4 bg-primary-500/5">
                   <p className="text-primary-400 text-xs uppercase tracking-wider mb-3 font-medium flex items-center gap-1.5">
                     <CheckCircle size={12} />
@@ -389,13 +445,22 @@ const AdminTickets = (): JSX.Element => {
                     </div>
                     <div>
                       <label className="text-gray-400 text-xs mb-1 block">Nueva contraseña</label>
-                      <input
-                        type="text"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        className="input-field text-sm"
-                        placeholder="••••••••"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="input-field text-sm pr-10"
+                          placeholder="••••••••"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                        >
+                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="text-gray-400 text-xs mb-1 block">Nuevo perfil</label>
@@ -426,7 +491,7 @@ const AdminTickets = (): JSX.Element => {
                     {savingCreds ? (
                       <><Loader size={14} className="animate-spin" /> Guardando...</>
                     ) : (
-                      <><Save size={14} /> Guardar y resolver ticket</>
+                      <><Save size={14} /> Guardar credenciales</>
                     )}
                   </button>
                 </div>
@@ -446,46 +511,16 @@ const AdminTickets = (): JSX.Element => {
               {/* Actions */}
               <div className="flex flex-wrap gap-2 pt-2">
                 {selectedTicket.status === 'open' && (
-                  <>
-                    <button
-                      onClick={() => handleStatusChange('resolved')}
-                      disabled={saving}
-                      className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50"
-                    >
-                      {saving ? <Loader className="w-4 h-4 animate-spin" /> : <CheckCircle size={16} />}
-                      Resolver
-                    </button>
-                    <button
-                      onClick={() => handleStatusChange('closed')}
-                      disabled={saving}
-                      className="btn-secondary flex items-center gap-2 text-sm disabled:opacity-50"
-                    >
-                      <XCircle size={16} />
-                      Cerrar
-                    </button>
-                  </>
+                  <button
+                    onClick={() => handleStatusChange('resolved')}
+                    disabled={saving}
+                    className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50"
+                  >
+                    {saving ? <Loader className="w-4 h-4 animate-spin" /> : <CheckCircle size={16} />}
+                    Resolver
+                  </button>
                 )}
-                {selectedTicket.status === 'resolved' && (
-                  <>
-                    <button
-                      onClick={() => handleStatusChange('open')}
-                      disabled={saving}
-                      className="btn-secondary flex items-center gap-2 text-sm disabled:opacity-50"
-                    >
-                      <HelpCircle size={16} />
-                      Reabrir
-                    </button>
-                    <button
-                      onClick={() => handleStatusChange('closed')}
-                      disabled={saving}
-                      className="btn-secondary flex items-center gap-2 text-sm disabled:opacity-50"
-                    >
-                      <XCircle size={16} />
-                      Cerrar
-                    </button>
-                  </>
-                )}
-                {selectedTicket.status === 'closed' && (
+                {(selectedTicket.status === 'resolved' || selectedTicket.status === 'closed') && (
                   <button
                     onClick={() => handleStatusChange('open')}
                     disabled={saving}
@@ -495,14 +530,6 @@ const AdminTickets = (): JSX.Element => {
                     Reabrir
                   </button>
                 )}
-                <button
-                  onClick={handleSaveNotes}
-                  disabled={saving}
-                  className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50 ml-auto"
-                >
-                  {saving ? <Loader className="w-4 h-4 animate-spin" /> : null}
-                  Guardar Notas
-                </button>
               </div>
             </div>
           </div>

@@ -8,6 +8,7 @@ import { PLANS } from '../utils/constants';
 import { generateWhatsAppMessage } from '../utils/whatsapp';
 import Modal from '../components/Modal';
 import PurchaseConfirmModal from '../components/PurchaseConfirmModal';
+import { RechargeModal } from '../components/RechargeModal';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Check, Wallet, MessageCircle } from 'lucide-react';
 
@@ -24,6 +25,7 @@ const Product = () => {
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [purchaseLoading, setPurchaseLoading] = useState(false);
   const [purchaseError, setPurchaseError] = useState(null);
+  const [showRechargeModal, setShowRechargeModal] = useState(false);
   const customer = useAuthStore((state) => state.customer);
 
   useEffect(() => {
@@ -128,8 +130,12 @@ const Product = () => {
           credential: result.account.credential,
           serviceName: result.account.serviceName,
           newBalance: result.newBalance,
+          profileName: result.account.profileName,
+          profilePin: result.account.profilePin,
           linkToken: result.linkToken || null,
           hasCodeExtraction: result.hasCodeExtraction || false,
+          purchaseId: result.purchaseId,
+          durationDays: result.durationDays || 30,
         }
       });
     } catch (error) {
@@ -389,6 +395,10 @@ const Product = () => {
           setPurchaseError(null);
         }}
         onConfirm={handleDirectPurchase}
+        onRecharge={() => {
+          setShowPurchaseModal(false);
+          setShowRechargeModal(true);
+        }}
         serviceName={service?.name || ''}
         price={planPrice}
         currentBalance={customer?.balance || 0}
@@ -396,6 +406,10 @@ const Product = () => {
         error={purchaseError}
         terms={service?.terms}
       />
+
+      {showRechargeModal && (
+        <RechargeModal onClose={() => setShowRechargeModal(false)} />
+      )}
     </div>
   );
 };

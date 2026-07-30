@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { db } from '../../services/firebase';
+import { adminDb as db } from '../../services/firebase';
 import { Loader2, Crown, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
 

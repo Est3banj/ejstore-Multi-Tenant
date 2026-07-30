@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ShoppingCart } from 'lucide-react';
 import type { Service } from '../types';
 import { useApp } from '../context/AppContext';
+import { useAuthStore } from '../store/authStore';
 
 interface ServiceCardProps {
   service: Service;
@@ -13,6 +14,8 @@ interface ServiceCardProps {
 const ServiceCard = ({ service, index, stock }: ServiceCardProps): JSX.Element => {
   const hasPromo = service.promotionalPrice && service.promotionalPrice < service.price;
   const { settings } = useApp();
+  const { user } = useAuthStore();
+  const showStock = stock !== undefined && !!user; // Solo mostrar stock si el usuario está logueado
   const primaryColor = settings?.primaryColor || '#E50914';
   
   // Generar color de sombra basado en el color primario del tenant
@@ -72,7 +75,7 @@ const ServiceCard = ({ service, index, stock }: ServiceCardProps): JSX.Element =
                 </p>
               )}
             </div>
-            {stock !== undefined && (
+            {showStock && (
               <div className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 ${
                 stock === 0
                   ? 'bg-red-500/15 border-red-500/30 text-red-400'

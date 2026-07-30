@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../services/firebase';
+import { adminLogin } from '../../services/auth';
 import { useAuthStore, useTenantStore } from '../../store';
 import { motion } from 'framer-motion';
 import { Lock, Mail, Eye, EyeOff } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { settings } = useTenantStore();
+  const { tenant: settings } = useTenantStore();
   const storeRole = useAuthStore((s) => s.role);
   const storeInitialized = useAuthStore((s) => s.initialized);
   const [email, setEmail] = useState('');
@@ -58,14 +57,14 @@ const Login = () => {
     }
   }, [storeRole, storeInitialized, loading, navigate]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     loginAttempted.current = true;
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await adminLogin(email, password);
       // No navegamos acá — el useEffect de arriba lo hace
       // cuando el authStore termine de inicializar con el role
     } catch (err: any) {

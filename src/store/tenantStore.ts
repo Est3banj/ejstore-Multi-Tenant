@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { detectTenantFromUrl, getTenantById } from '../services/tenant';
 import { TENANT_DEFAULTS, type Tenant } from '../types';
+import { useAuthStore } from './authStore';
 
 interface TenantState {
   tenant: Tenant | null;
@@ -20,13 +21,36 @@ export const useTenantStore = create<TenantState>((set, get) => ({
   error: null,
 
   initialize: () => {
-    // 1. Intentar desde la URL (?v= o ?tenant= o subdominio)
-    const tenantId = detectTenantFromUrl();
-    if (tenantId) {
-      get().loadTenant(tenantId);
-    } else {
-      set({ error: 'No tenant especificado en la URL', loading: false });
-    }
+    const tryLoad = () => {
+      // 1. Intentar desde la URL (?v= o ?tenant= o subdominio)
+      const urlTenant = detectTenantFromUrl();
+      if (urlTenant) {
+        get().loadTenant(urlTenant);
+        return true;
+      }
+
+      // 2. Intentar desde sesión (admin/reseller logueado)
+      const state = useAuthStore.getState();
+      if (state.adminUser && state.userTenantId) {
+        get().loadTenant(state.userTenantId);
+        return true;
+      }
+
+      return false;
+    };
+
+    // Intentar cargar ahora
+    if (tryLoad()) return;
+
+    // Si falló, esperar a que auth se inicialice y reintentar
+    const unsub = useAuthStore.subscribe((s) => {
+      if (s.initialized) {
+        unsub();
+        if (!tryLoad()) {
+          set({ error: 'No tenant especificado en la URL', loading: false });
+        }
+      }
+    });
   },
 
   // Cargar tenant desde auth (admin/reseller autenticados)

@@ -12,6 +12,10 @@ import type { Purchase } from '../../types/marketplace';
 interface ReportarProps {
   purchases: Purchase[];
   selectedServiceId?: string | null;
+  selectedEmail?: string;
+  selectedPurchaseId?: string;
+  selectedPurchaseDocId?: string;
+  selectedAccountIndex?: number;
 }
 
 const DOMINIOS = [
@@ -19,7 +23,7 @@ const DOMINIOS = [
   '@icloud.com', '@live.com', '@msn.com', '@yahoo.es', '@hotmail.es',
 ];
 
-const Reportar = ({ purchases, selectedServiceId }: ReportarProps) => {
+const Reportar = ({ purchases, selectedServiceId, selectedEmail: initialEmail, selectedPurchaseId: initialPurchaseId, selectedPurchaseDocId: initialPurchaseDocId, selectedAccountIndex: initialAccountIndex }: ReportarProps) => {
   const { customer } = useAuthStore();
   const { userTenantId, tenant } = useApp();
   const tenantId = tenant?.id || userTenantId;
@@ -35,12 +39,12 @@ const Reportar = ({ purchases, selectedServiceId }: ReportarProps) => {
   const [error, setError] = useState('');
 
   // Email + ID Ticket (igual que el distribuidor)
-  const [searchEmail, setSearchEmail] = useState('');
+  const [searchEmail, setSearchEmail] = useState(initialEmail || '');
   const [foundEmails, setFoundEmails] = useState<string[]>([]);
-  const [selectedEmail, setSelectedEmail] = useState('');
+  const [selectedEmail, setSelectedEmail] = useState(initialEmail || '');
   const [showResults, setShowResults] = useState(false);
   const [searchingEmail, setSearchingEmail] = useState(false);
-  const [purchaseId, setPurchaseId] = useState('');
+  const [purchaseId, setPurchaseId] = useState(initialPurchaseId || '');
   const searchRef = useRef<HTMLDivElement>(null);
 
   const activePurchases = purchases.filter((p) => p.status === 'active');
@@ -114,6 +118,7 @@ const Reportar = ({ purchases, selectedServiceId }: ReportarProps) => {
       await createTicket({
         tenantId,
         userId: uid,
+        userEmail: customer?.email || '',
         userType: 'customer',
         serviceId,
         serviceName,
@@ -121,6 +126,8 @@ const Reportar = ({ purchases, selectedServiceId }: ReportarProps) => {
         description,
         customerEmail: emailFinal,
         purchaseId: purchaseId || undefined,
+        purchaseDocId: initialPurchaseDocId || undefined,
+        accountIndex: initialAccountIndex !== undefined ? initialAccountIndex : undefined,
         imageUrl,
         status: 'open',
       });

@@ -10,9 +10,10 @@ import {
   query,
   where,
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  type Firestore
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, adminDb } from './firebase';
 import type { Service, Banner, Settings, Tenant } from '../types';
 
 // Helper para convertir timestamp de Firestore a Date
@@ -26,11 +27,12 @@ const convertTimestamp = (timestamp: unknown): Date | undefined => {
   return undefined;
 };
 
-export const getServices = async (tenantId: string): Promise<Service[]> => {
+export const getServices = async (tenantId: string, _db?: Firestore): Promise<Service[]> => {
+  const dbInstance = _db || db;
   if (!tenantId) throw new Error('tenantId required');
   try {
     const q = query(
-      collection(db, 'services'),
+      collection(dbInstance, 'services'),
       where('tenantId', '==', tenantId)
     );
     const querySnapshot = await getDocs(q);
@@ -67,11 +69,12 @@ export const getServices = async (tenantId: string): Promise<Service[]> => {
   }
 };
 
-export const getAllServices = async (tenantId: string): Promise<Service[]> => {
+export const getAllServices = async (tenantId: string, _db?: Firestore): Promise<Service[]> => {
+  const dbInstance = _db || db;
   if (!tenantId) throw new Error('tenantId required');
   try {
     const q = query(
-      collection(db, 'services'),
+      collection(dbInstance, 'services'),
       where('tenantId', '==', tenantId)
     );
     const querySnapshot = await getDocs(q);
@@ -106,10 +109,11 @@ export const getAllServices = async (tenantId: string): Promise<Service[]> => {
   }
 };
 
-export const getServiceById = async (id: string, tenantId: string): Promise<Service | null> => {
+export const getServiceById = async (id: string, tenantId: string, _db?: Firestore): Promise<Service | null> => {
+  const dbInstance = _db || db;
   if (!tenantId) throw new Error('tenantId required');
   try {
-    const docRef = doc(db, 'services', id);
+    const docRef = doc(dbInstance, 'services', id);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       const data = docSnap.data();
@@ -152,10 +156,11 @@ interface ServiceInput {
   plans?: Service['plans'];
 }
 
-export const createService = async (serviceData: ServiceInput, tenantId: string): Promise<string> => {
+export const createService = async (serviceData: ServiceInput, tenantId: string, _db?: Firestore): Promise<string> => {
+  const dbInstance = _db || db;
   if (!tenantId) throw new Error('tenantId required');
   try {
-    const docRef = await addDoc(collection(db, 'services'), {
+    const docRef = await addDoc(collection(dbInstance, 'services'), {
       ...serviceData,
       tenantId,
       createdAt: serverTimestamp(),
@@ -168,10 +173,11 @@ export const createService = async (serviceData: ServiceInput, tenantId: string)
   }
 };
 
-export const updateService = async (id: string, serviceData: Partial<ServiceInput>, tenantId: string): Promise<void> => {
+export const updateService = async (id: string, serviceData: Partial<ServiceInput>, tenantId: string, _db?: Firestore): Promise<void> => {
+  const dbInstance = _db || db;
   if (!tenantId) throw new Error('tenantId required');
   try {
-    const docRef = doc(db, 'services', id);
+    const docRef = doc(dbInstance, 'services', id);
     await updateDoc(docRef, {
       ...serviceData,
       updatedAt: serverTimestamp()
@@ -182,9 +188,10 @@ export const updateService = async (id: string, serviceData: Partial<ServiceInpu
   }
 };
 
-export const deleteService = async (id: string, _tenantId: string): Promise<void> => {
+export const deleteService = async (id: string, _tenantId: string, _db?: Firestore): Promise<void> => {
+  const dbInstance = _db || db;
   try {
-    const docRef = doc(db, 'services', id);
+    const docRef = doc(dbInstance, 'services', id);
     await deleteDoc(docRef);
   } catch (error) {
     console.error('Error deleting service:', error);
@@ -192,10 +199,11 @@ export const deleteService = async (id: string, _tenantId: string): Promise<void
   }
 };
 
-export const getTerms = async (tenantId: string): Promise<string> => {
+export const getTerms = async (tenantId: string, _db?: Firestore): Promise<string> => {
+  const dbInstance = _db || db;
   if (!tenantId) throw new Error('tenantId required');
   try {
-    const docRef = doc(db, 'tenants', tenantId);
+    const docRef = doc(dbInstance, 'tenants', tenantId);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       return docSnap.data().terms || '';
@@ -207,10 +215,11 @@ export const getTerms = async (tenantId: string): Promise<string> => {
   }
 };
 
-export const updateTerms = async (tenantId: string, content: string): Promise<void> => {
+export const updateTerms = async (tenantId: string, content: string, _db?: Firestore): Promise<void> => {
+  const dbInstance = _db || db;
   if (!tenantId) throw new Error('tenantId required');
   try {
-    const docRef = doc(db, 'tenants', tenantId);
+    const docRef = doc(dbInstance, 'tenants', tenantId);
     await updateDoc(docRef, {
       terms: content,
       termsUpdatedAt: serverTimestamp()
@@ -221,11 +230,12 @@ export const updateTerms = async (tenantId: string, content: string): Promise<vo
   }
 };
 
-export const getBanners = async (tenantId: string): Promise<Banner[]> => {
+export const getBanners = async (tenantId: string, _db?: Firestore): Promise<Banner[]> => {
+  const dbInstance = _db || db;
   if (!tenantId) throw new Error('tenantId required');
   try {
     const q = query(
-      collection(db, 'banners'),
+      collection(dbInstance, 'banners'),
       where('tenantId', '==', tenantId)
     );
     const querySnapshot = await getDocs(q);
@@ -252,11 +262,12 @@ export const getBanners = async (tenantId: string): Promise<Banner[]> => {
   }
 };
 
-export const getAllBanners = async (tenantId: string): Promise<Banner[]> => {
+export const getAllBanners = async (tenantId: string, _db?: Firestore): Promise<Banner[]> => {
+  const dbInstance = _db || db;
   if (!tenantId) throw new Error('tenantId required');
   try {
     const q = query(
-      collection(db, 'banners'),
+      collection(dbInstance, 'banners'),
       where('tenantId', '==', tenantId)
     );
     const querySnapshot = await getDocs(q);
@@ -289,10 +300,11 @@ interface BannerInput {
   isActive: boolean;
 }
 
-export const createBanner = async (bannerData: BannerInput, tenantId: string): Promise<string> => {
+export const createBanner = async (bannerData: BannerInput, tenantId: string, _db?: Firestore): Promise<string> => {
+  const dbInstance = _db || db;
   if (!tenantId) throw new Error('tenantId required');
   try {
-    const docRef = await addDoc(collection(db, 'banners'), {
+    const docRef = await addDoc(collection(dbInstance, 'banners'), {
       ...bannerData,
       tenantId,
       createdAt: serverTimestamp(),
@@ -305,10 +317,11 @@ export const createBanner = async (bannerData: BannerInput, tenantId: string): P
   }
 };
 
-export const updateBanner = async (id: string, bannerData: Partial<BannerInput>, tenantId: string): Promise<void> => {
+export const updateBanner = async (id: string, bannerData: Partial<BannerInput>, tenantId: string, _db?: Firestore): Promise<void> => {
+  const dbInstance = _db || db;
   if (!tenantId) throw new Error('tenantId required');
   try {
-    const docRef = doc(db, 'banners', id);
+    const docRef = doc(dbInstance, 'banners', id);
     await updateDoc(docRef, {
       ...bannerData,
       updatedAt: serverTimestamp()
@@ -319,9 +332,10 @@ export const updateBanner = async (id: string, bannerData: Partial<BannerInput>,
   }
 };
 
-export const deleteBanner = async (id: string, _tenantId: string): Promise<void> => {
+export const deleteBanner = async (id: string, _tenantId: string, _db?: Firestore): Promise<void> => {
+  const dbInstance = _db || db;
   try {
-    const docRef = doc(db, 'banners', id);
+    const docRef = doc(dbInstance, 'banners', id);
     await deleteDoc(docRef);
   } catch (error) {
     console.error('Error deleting banner:', error);
@@ -338,10 +352,11 @@ interface SettingsOutput extends Settings {
   discordWebhookUrl?: string;
 }
 
-export const getSettings = async (tenantId: string): Promise<SettingsOutput | null> => {
+export const getSettings = async (tenantId: string, _db?: Firestore): Promise<SettingsOutput | null> => {
+  const dbInstance = _db || db;
   if (!tenantId) throw new Error('tenantId required');
   try {
-    const docRef = doc(db, 'tenants', tenantId);
+    const docRef = doc(dbInstance, 'tenants', tenantId);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       const data = docSnap.data();
@@ -379,10 +394,11 @@ interface SettingsInput {
   discordWebhookUrl?: string;
 }
 
-export const updateSettings = async (tenantId: string, settings: SettingsInput): Promise<void> => {
+export const updateSettings = async (tenantId: string, settings: SettingsInput, _db?: Firestore): Promise<void> => {
+  const dbInstance = _db || db;
   if (!tenantId) throw new Error('tenantId required');
   try {
-    const docRef = doc(db, 'tenants', tenantId);
+    const docRef = doc(dbInstance, 'tenants', tenantId);
     const firestoreData = {
       name: settings.siteName,
       logoUrl: settings.logo,
@@ -406,7 +422,7 @@ export const updateSettings = async (tenantId: string, settings: SettingsInput):
 export const updateTenant = async (tenantId: string, data: Partial<Tenant>): Promise<void> => {
   if (!tenantId) throw new Error('tenantId required');
   try {
-    const docRef = doc(db, 'tenants', tenantId);
+    const docRef = doc(adminDb, 'tenants', tenantId);
     await setDoc(docRef, {
       ...data,
       updatedAt: serverTimestamp()
@@ -422,7 +438,7 @@ import type { Recharge } from '../types';
 
 export const createRechargeRequest = async (recharge: Omit<Recharge, 'id' | 'createdAt' | 'status'>): Promise<string> => {
   try {
-    const docRef = await addDoc(collection(db, 'recharges'), {
+    const docRef = await addDoc(collection(adminDb, 'recharges'), {
       ...recharge,
       status: 'pending',
       createdAt: serverTimestamp()
@@ -438,7 +454,7 @@ export const getRecharges = async (tenantId: string): Promise<Recharge[]> => {
   if (!tenantId) throw new Error('tenantId required');
   try {
     const q = query(
-      collection(db, 'recharges'),
+      collection(adminDb, 'recharges'),
       where('tenantId', '==', tenantId)
     );
     const snapshot = await getDocs(q);
@@ -455,7 +471,7 @@ export const getRecharges = async (tenantId: string): Promise<Recharge[]> => {
 
 export const approveRecharge = async (rechargeId: string, adminId: string): Promise<void> => {
   try {
-    const docRef = doc(db, 'recharges', rechargeId);
+    const docRef = doc(adminDb, 'recharges', rechargeId);
     await updateDoc(docRef, {
       status: 'approved',
       processedAt: serverTimestamp(),
@@ -469,7 +485,7 @@ export const approveRecharge = async (rechargeId: string, adminId: string): Prom
 
 export const rejectRecharge = async (rechargeId: string, adminId: string, reason?: string): Promise<void> => {
   try {
-    const docRef = doc(db, 'recharges', rechargeId);
+    const docRef = doc(adminDb, 'recharges', rechargeId);
     await updateDoc(docRef, {
       status: 'rejected',
       processedAt: serverTimestamp(),
@@ -502,7 +518,7 @@ export interface RouletteConfigData {
 export const getRouletteConfig = async (tenantId: string): Promise<RouletteConfigData | null> => {
   if (!tenantId) return null;
   try {
-    const docRef = doc(db, 'rouletteConfig', tenantId);
+    const docRef = doc(adminDb, 'rouletteConfig', tenantId);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       const data = docSnap.data();
@@ -525,7 +541,7 @@ export const getRouletteConfig = async (tenantId: string): Promise<RouletteConfi
 export const saveRouletteConfig = async (config: Omit<RouletteConfigData, 'updatedAt'>): Promise<void> => {
   if (!config.tenantId) throw new Error('tenantId required');
   try {
-    const docRef = doc(db, 'rouletteConfig', config.tenantId);
+    const docRef = doc(adminDb, 'rouletteConfig', config.tenantId);
     await setDoc(docRef, {
       ...config,
       updatedAt: serverTimestamp()

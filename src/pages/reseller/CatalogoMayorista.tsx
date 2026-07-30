@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useEffectiveTenantId } from '../../store';
 import { getServices } from '../../services/firestore';
 import { getAvailableServiceStock, getResellerById, processBulkPurchase } from '../../services/marketplace';
+import { adminDb, adminFunctions } from '../../services/firebase';
 import ResellerPurchaseSuccessModal from './ResellerPurchaseSuccessModal';
 import ResellerPurchaseConfirmModal from './ResellerPurchaseConfirmModal';
 import { CATEGORIES } from '../../utils/constants';
@@ -34,8 +35,8 @@ interface ServiceWithPrice {
 }
 
 const CatalogoMayorista = (): JSX.Element => {
-  const { user } = useAuthStore();
-  const uid = user?.uid || '';
+  const { adminUser } = useAuthStore();
+  const uid = adminUser?.uid || '';
   const tenantId = useEffectiveTenantId();
   const [services, setServices] = useState<ServiceWithPrice[]>([]);
   const [balance, setBalance] = useState(0);
@@ -75,7 +76,7 @@ const CatalogoMayorista = (): JSX.Element => {
           svcs.map(async (svc) => {
             let stock = 0;
             try {
-              stock = await getAvailableServiceStock(svc.id);
+              stock = await getAvailableServiceStock(svc.id, adminDb);
             } catch (e) {
               console.error(`Stock error for ${svc.id}:`, e);
             }
@@ -142,7 +143,7 @@ const CatalogoMayorista = (): JSX.Element => {
         tenantId,
         quantity: confirmService.quantity,
         customerName,
-      });
+      }, adminFunctions);
 
       setBalance(result.newBalance);
       setConfirmService(null);
@@ -211,7 +212,12 @@ const CatalogoMayorista = (): JSX.Element => {
   // ─── Loading ───────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="p-6 text-center text-gray-400">Cargando catálogo...</div>
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-sky-500/30 border-t-sky-500 rounded-full animate-spin" />
+          <p className="text-gray-400 text-sm">Cargando catálogo...</p>
+        </div>
+      </div>
     );
   }
 

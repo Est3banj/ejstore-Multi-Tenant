@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../../store/authStore';
 import { getResellerById } from '../../services/marketplace';
+import { RechargeModal } from '../../components/RechargeModal';
 import {
   collection,
   query,
@@ -10,7 +11,7 @@ import {
   limit,
   getDocs,
 } from 'firebase/firestore';
-import { db } from '../../services/firebase';
+import { adminDb } from '../../services/firebase';
 import {
   Wallet,
   ShoppingCart,
@@ -55,12 +56,13 @@ interface AccountInfo {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const ResellerDashboard = (): JSX.Element => {
-  const { user } = useAuthStore();
-  const uid = user?.uid || '';
+  const { adminUser } = useAuthStore();
+  const uid = adminUser?.uid || '';
   const [balance, setBalance] = useState(0);
   const [resellerName, setResellerName] = useState('');
   const [purchases, setPurchases] = useState<PurchaseData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showRecharge, setShowRecharge] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -74,7 +76,7 @@ const ResellerDashboard = (): JSX.Element => {
         }
 
         const q = query(
-          collection(db, 'purchases'),
+          collection(adminDb, 'purchases'),
           where('customerId', '==', uid),
           where('type', '==', 'bulk'),
           orderBy('createdAt', 'desc'),
@@ -177,7 +179,7 @@ const ResellerDashboard = (): JSX.Element => {
       icon: PlusCircle,
       gradient: 'from-sky-500 to-blue-600',
       loading: false,
-      badge: 'Próximamente',
+      action: () => setShowRecharge(true),
     },
     {
       title: 'Cuentas Activas',
@@ -208,7 +210,12 @@ const ResellerDashboard = (): JSX.Element => {
 
   if (loading) {
     return (
-      <div className="p-6 text-center text-gray-400">Cargando dashboard...</div>
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-sky-500/30 border-t-sky-500 rounded-full animate-spin" />
+          <p className="text-gray-400 text-sm">Cargando dashboard...</p>
+        </div>
+      </div>
     );
   }
 
@@ -235,39 +242,35 @@ const ResellerDashboard = (): JSX.Element => {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {statsCards.map((stat, index) => {
           const Icon = stat.icon;
-          const isPlaceholder = !!(stat as any).badge;
+          const hasAction = !!(stat as any).action;
           return (
             <motion.div
               key={stat.title}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
+              onClick={(stat as any).action}
               className={
-                isPlaceholder
-                  ? 'rounded-xl p-4 border-2 border-dashed border-gray-600/60 bg-gray-800/50'
+                hasAction
+                  ? 'rounded-xl p-4 border-2 border-dashed border-sky-500/40 bg-gray-800/50 cursor-pointer hover:border-sky-500/70 hover:bg-gray-800/70 transition-all'
                   : 'bg-gray-800 rounded-xl p-4 border border-gray-700'
               }
             >
               <div className="flex items-center justify-between mb-3">
                 <p className={
-                  isPlaceholder
-                    ? 'text-gray-500 text-xs uppercase tracking-wider font-medium'
+                  hasAction
+                    ? 'text-sky-400 text-xs uppercase tracking-wider font-medium'
                     : 'text-gray-400 text-xs uppercase tracking-wider font-medium'
                 }>
                   {stat.title}
                 </p>
-                <div className={`p-2 rounded-lg bg-gradient-to-br ${stat.gradient} ${isPlaceholder ? 'opacity-60' : ''}`}>
-                  <Icon className={`w-4 h-4 text-white ${isPlaceholder ? 'opacity-60' : ''}`} />
+                <div className={`p-2 rounded-lg bg-gradient-to-br ${stat.gradient}`}>
+                  <Icon className="w-4 h-4 text-white" />
                 </div>
               </div>
               <p className="text-xl font-bold text-white">
                 {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
               </p>
-              {(stat as any).badge && (
-                <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-700/50 text-gray-500 border border-gray-600/50">
-                  {(stat as any).badge}
-                </span>
-              )}
             </motion.div>
           );
         })}
@@ -473,6 +476,13 @@ const ResellerDashboard = (): JSX.Element => {
           </div>
         )}
       </motion.div>
+
+      {/* Modal de recarga — mismo flujo que la página de usuario final */}
+      <AnimatePresence>
+        {showRecharge && (
+          <RechargeModal onClose={() => setShowRecharge(false)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -12,6 +12,7 @@ import NoTenantPage from './components/NoTenantPage';
 const Home = lazy(() => import('./pages/Home'));
 const Product = lazy(() => import('./pages/Product'));
 const Login = lazy(() => import('./pages/admin/Login'));
+const Clientes = lazy(() => import('./pages/admin/Clientes'));
 const Dashboard = lazy(() => import('./pages/admin/Dashboard'));
 const Services = lazy(() => import('./pages/admin/Services'));
 const Banners = lazy(() => import('./pages/admin/Banners'));
@@ -33,6 +34,7 @@ const ConsultarCodigo = lazy(() => import('./pages/reseller/ConsultarCodigo'));
 const MisReportes = lazy(() => import('./pages/reseller/MisReportes'));
 const Perfil = lazy(() => import('./pages/reseller/Perfil'));
 const ResellerReportar = lazy(() => import('./pages/reseller/ResellerReportar'));
+const HistorialRecargas = lazy(() => import('./pages/recargas/HistorialRecargas'));
 const VerCuenta = lazy(() => import('./pages/public/VerCuenta'));
 
 // Hook que combina loading states
@@ -55,6 +57,11 @@ const PublicRoutes = () => {
   }
 
   if (!hasTenant) {
+    // Si no hay nadie logueado, redirigir al login en vez de mostrar error
+    // (útil para resellers que acceden directo a /r/dashboard sin tenant en URL)
+    if (!role) {
+      return <Navigate to="/login" replace />;
+    }
     return <NoTenantPage />;
   }
 
@@ -74,6 +81,7 @@ const PublicRoutes = () => {
             <Route path="mis-reportes" element={<MisReportes />} />
             <Route path="perfil" element={<Perfil />} />
             <Route path="reportar" element={<ResellerReportar />} />
+            <Route path="historial-recargas" element={<HistorialRecargas />} />
           </Route>
           <Route path="*" element={<Navigate to="/r/dashboard" replace />} />
         </>
@@ -84,6 +92,7 @@ const PublicRoutes = () => {
             <Route path="servicio/:id" element={<Product />} />
             <Route path="compra-exitosa/:purchaseId" element={<PurchaseResult />} />
             <Route path="mis-servicios" element={<MisServicios />} />
+            <Route path="historial-recargas" element={<HistorialRecargas />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </>
@@ -104,6 +113,7 @@ const AdminRoutes = () => {
         }
       >
         <Route path="dashboard" element={<Dashboard />} />
+        <Route path="clientes" element={<Clientes />} />
         <Route path="services" element={<Services />} />
         <Route path="banners" element={<Banners />} />
         <Route path="terms" element={<Terms />} />

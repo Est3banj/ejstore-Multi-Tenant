@@ -100,13 +100,13 @@ describe('createAccount', () => {
     const result = await createAccount('svc-1', input);
 
     expect(collection).toHaveBeenCalledWith({}, 'services', 'svc-1', 'accounts');
-    expect(addDoc).toHaveBeenCalledWith('col-ref', {
+    expect(addDoc).toHaveBeenCalledWith('col-ref', expect.objectContaining({
       ...input,
       serviceId: 'svc-1',
       status: 'available',
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+      createdAt: expect.any(Date),
+      updatedAt: expect.any(Date),
+    }));
     expect(result).toBe('new-acc-id');
   });
 

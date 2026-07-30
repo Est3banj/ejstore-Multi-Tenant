@@ -13,7 +13,7 @@ import {
   setDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { db } from "../../services/firebase";
+import { adminDb } from "../../services/firebase";
 import {
   ShoppingBag,
   Search,
@@ -115,8 +115,8 @@ const generateToken = (): string => {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const MisClientes = (): JSX.Element => {
-  const { user } = useAuthStore();
-  const uid = user?.uid || "";
+  const { adminUser } = useAuthStore();
+  const uid = adminUser?.uid || "";
   const navigate = useNavigate();
   const [rows, setRows] = useState<AccountRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -242,7 +242,7 @@ const MisClientes = (): JSX.Element => {
   const loadPurchases = async (): Promise<Purchase[]> => {
     try {
       const purchasesQuery = query(
-        collection(db, "purchases"),
+        collection(adminDb, "purchases"),
         where("customerId", "==", uid),
         orderBy("createdAt", "desc"),
         limit(50),
@@ -269,7 +269,7 @@ const MisClientes = (): JSX.Element => {
       });
     } catch {
       const fallbackQuery = query(
-        collection(db, "purchases"),
+        collection(adminDb, "purchases"),
         where("customerId", "==", uid),
       );
       const snapshot = await getDocs(fallbackQuery);
@@ -309,7 +309,7 @@ const MisClientes = (): JSX.Element => {
       const now = new Date();
       const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-      await setDoc(doc(db, "public_links", token), {
+      await setDoc(doc(adminDb, "public_links", token), {
         token,
         resellerId: uid,
         accountId: row.purchase.accountIds[row.idx] || "",
@@ -350,7 +350,14 @@ const MisClientes = (): JSX.Element => {
 
   // ─── Render ─────────────────────────────────────────────────────────────
   if (loading) {
-    return <div className="p-6 text-center text-gray-400">Cargando...</div>;
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-sky-500/30 border-t-sky-500 rounded-full animate-spin" />
+          <p className="text-gray-400 text-sm">Cargando...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

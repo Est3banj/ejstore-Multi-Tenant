@@ -93,6 +93,7 @@ export interface Ticket {
   description: string;
   imageUrl?: string;
   customerEmail: string;
+  userEmail?: string;
   purchaseId?: string;
   purchaseDocId?: string;
   accountIndex?: number;
@@ -186,4 +187,102 @@ export interface CreateAccountWithProfilesResponse {
   accountsCreated: number;
   profilesCreated: number;
   failed: Array<{ line: string; error: string }>;
+}
+
+// ===== Cloud Function Response Types =====
+
+export interface CreateResellerResponse {
+  success: boolean;
+  uid: string;
+  email: string;
+  message: string;
+}
+
+export interface LoadResellerBalanceResponse {
+  success: boolean;
+  newBalance: number;
+}
+
+export interface ProcessBulkPurchaseResponse {
+  success: boolean;
+  purchaseId: string;
+  credentials: Array<{ email: string; password: string; extra?: Record<string, string> }>;
+  profiles?: Array<{ name: string; pin: string }>;
+  serviceName: string;
+  quantity: number;
+  newBalance: number;
+  message: string;
+  linkTokens?: string[];
+}
+
+export interface SaveEmailConfigResponse {
+  success: boolean;
+}
+
+export interface GetEmailConfigResponse {
+  config: { email: string; host: string; port: number; hasPassword: boolean } | null;
+}
+
+export interface CheckEmailStatusResponse {
+  connected: boolean;
+  message: string;
+  reason?: string;
+}
+
+export interface GenerateTelegramTokenResponse {
+  success: boolean;
+  token: string;
+  botUsername: string;
+  expiresIn: number;
+}
+
+export interface CheckTelegramStatusResponse {
+  linked: boolean;
+  role: string | null;
+}
+
+export interface UpdateTicketCredentialsResponse {
+  success: boolean;
+}
+
+export interface CheckRechargePaymentResponse {
+  found: boolean;
+  processed: boolean;
+  status?: string;
+  message?: string;
+}
+
+export interface TestEmailConnectionResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface RechargeRecord {
+  id: string;
+  userId: string;
+  customerName: string;
+  customerPhone?: string;
+  amount: number;
+  status: string;
+  tenantId: string;
+  transferProof?: string;
+  processedAt: string | null;
+  createdAt: string | null;
+  rejectedReason?: string | null;
+  emailUid?: string | null;
+}
+
+export interface GetRechargeHistoryResponse {
+  success: boolean;
+  recharges: RechargeRecord[];
+}
+
+// ===== SMTP =====
+
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  user: string;
+  pass: string;
+  from?: string;
 }

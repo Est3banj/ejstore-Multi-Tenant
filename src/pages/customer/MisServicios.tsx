@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Server, Copy, Loader, MoreVertical, Ticket, Flag, X, Search,
-  ShoppingBag, Clock, MessageSquare,
+  ShoppingBag, Clock, MessageSquare, User,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { getPurchases } from '../../services/marketplace';
@@ -11,6 +11,7 @@ import Movimientos from './Movimientos';
 import Reportar from './Reportar';
 import Codigos from './Codigos';
 import MisReportesCliente from './MisReportesCliente';
+import PerfilTab from './PerfilTab';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,10 +70,14 @@ const MisServicios = (): JSX.Element => {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'servicios' | 'movimientos' | 'codigos' | 'reportar' | 'mis-reportes'>('servicios');
+  const [activeTab, setActiveTab] = useState<'servicios' | 'movimientos' | 'codigos' | 'reportar' | 'mis-reportes' | 'perfil'>('servicios');
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [modalRow, setModalRow] = useState<AccountRow | null>(null);
   const [reportServiceId, setReportServiceId] = useState<string | null>(null);
+  const [reportEmail, setReportEmail] = useState('');
+  const [reportPurchaseId, setReportPurchaseId] = useState('');
+  const [reportPurchaseDocId, setReportPurchaseDocId] = useState('');
+  const [reportAccountIndex, setReportAccountIndex] = useState<number | undefined>(undefined);
   const [toast, setToast] = useState<{ msg: string; type: 'error' | 'success' } | null>(null);
   const [copiedTemplate, setCopiedTemplate] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -242,6 +247,7 @@ const MisServicios = (): JSX.Element => {
     { key: 'codigos' as const, label: 'Códigos', icon: Search },
     { key: 'reportar' as const, label: 'Reportar', icon: Flag },
     { key: 'mis-reportes' as const, label: 'Mis Reportes', icon: MessageSquare },
+    { key: 'perfil' as const, label: 'Mi Perfil', icon: User },
   ];
 
   // ─── Render ───────────────────────────────────────────────────────────
@@ -420,6 +426,10 @@ const MisServicios = (): JSX.Element => {
                                       onClick={() => {
                                         setOpenMenu(null);
                                         setReportServiceId(row.purchase.serviceId);
+                                        setReportEmail(row.correo);
+                                        setReportPurchaseId(row.purchaseId);
+                                        setReportPurchaseDocId(row.purchaseId);
+                                        setReportAccountIndex(row.idx);
                                         setActiveTab('reportar');
                                       }}
                                       className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-gray-200 hover:bg-gray-600 transition-colors text-xs"
@@ -451,10 +461,13 @@ const MisServicios = (): JSX.Element => {
 
       {/* ─── TAB: REPORTAR ───────────────────────────────────────────────── */}
       {activeTab === 'reportar' && (
-        <Reportar purchases={purchases} selectedServiceId={reportServiceId} />
+        <Reportar purchases={purchases} selectedServiceId={reportServiceId} selectedEmail={reportEmail} selectedPurchaseId={reportPurchaseId} selectedPurchaseDocId={reportPurchaseDocId} selectedAccountIndex={reportAccountIndex} />
       )}
 
       {activeTab === 'mis-reportes' && <MisReportesCliente />}
+
+      {/* ─── TAB: PERFIL ──────────────────────────────────────────────────── */}
+      {activeTab === 'perfil' && <PerfilTab />}
 
       {/* ─── Modal de Ticket ──────────────────────────────────────────────── */}
       <AnimatePresence>

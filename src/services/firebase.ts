@@ -16,11 +16,17 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
+// Second Firebase app for admin sessions (isolated from user auth)
+const adminApp = initializeApp(firebaseConfig, 'admin');
+
 // Initialize services
 export const auth = getAuth(app);
+export const adminAuth = getAuth(adminApp);
+export const adminDb = getFirestore(adminApp);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app, 'us-central1');
+export const adminFunctions = getFunctions(adminApp, 'us-central1');
 
 // Modo producción directo — sin emuladores
 

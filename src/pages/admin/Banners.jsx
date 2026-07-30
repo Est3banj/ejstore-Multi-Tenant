@@ -6,6 +6,7 @@ import {
   updateBanner,
   deleteBanner
 } from '../../services/firestore';
+import { adminDb } from '../../services/firebase';
 import { uploadImage } from '../../services/storage';
 import { validateImageUrl } from '../../utils/validation';
 import Modal from '../../components/Modal';
@@ -41,7 +42,7 @@ const Banners = () => {
   const loadBanners = async () => {
     if (!tenantId) return;
     try {
-      const data = await getAllBanners(tenantId);
+      const data = await getAllBanners(tenantId, adminDb);
       setBanners(data);
     } catch (error) {
       console.error('Error loading banners:', error);
@@ -134,9 +135,9 @@ const Banners = () => {
       };
 
       if (editingBanner) {
-        await updateBanner(editingBanner.id, bannerData, tenantId);
+        await updateBanner(editingBanner.id, bannerData, tenantId, adminDb);
       } else {
-        await createBanner(bannerData, tenantId);
+        await createBanner(bannerData, tenantId, adminDb);
       }
 
       await loadBanners();
@@ -153,7 +154,7 @@ const Banners = () => {
   const handleDelete = async (id) => {
     if (window.confirm('¿Estás seguro de eliminar este banner?')) {
       try {
-        await deleteBanner(id, tenantId);
+        await deleteBanner(id, tenantId, adminDb);
         await loadBanners();
         await refreshBanners();
       } catch (error) {
@@ -165,7 +166,7 @@ const Banners = () => {
 
   const toggleActive = async (banner) => {
     try {
-      await updateBanner(banner.id, { active: !banner.active }, tenantId);
+      await updateBanner(banner.id, { active: !banner.active }, tenantId, adminDb);
       await loadBanners();
       await refreshBanners();
     } catch (error) {
