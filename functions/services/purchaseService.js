@@ -34,6 +34,11 @@ async function processPurchase({ serviceId, tenantId, customerId, customerEmail,
     if (!serviceData) {
       throw new Error('SERVICE_NOT_FOUND');
     }
+    // P0-3: el recurso comprado debe pertenecer al tenant declarado (paridad
+    // con createDiamondOrder DD8 y con getStockAvailability).
+    if (serviceData.tenantId !== tenantId) {
+      throw new Error('PERMISSION_DENIED');
+    }
     if ((serviceData.serviceType || 'subscription') === 'diamond') {
       throw new Error('DIAMOND_NOT_PURCHASABLE');
     }
@@ -66,6 +71,11 @@ async function processPurchase({ serviceId, tenantId, customerId, customerEmail,
       const serviceDoc = await transaction.get(serviceRef);
       if (!serviceDoc.exists) {
         throw new Error('SERVICE_NOT_FOUND');
+      }
+      // P0-3: check autoritativo DENTRO de la transacción que debita (lectura
+      // fresca; el pre-check de arriba es sólo early-exit).
+      if (serviceDoc.data().tenantId !== tenantId) {
+        throw new Error('PERMISSION_DENIED');
       }
 
       const rawBalance = customerData.balance ?? 0;
@@ -220,6 +230,11 @@ async function processBulkPurchase({ serviceId, tenantId, resellerId, resellerEm
     }
 
     const serviceData = serviceDoc.data();
+    // P0-3: servicio comprado debe ser del tenant declarado (paridad con
+    // processPurchase y con createDiamondOrder DD8).
+    if (serviceData.tenantId !== tenantId) {
+      throw new Error('PERMISSION_DENIED');
+    }
     // Guard diamond (spec:diamond-services#distributor-exclusion, design:DD1/DD8):
     // el canal mayorista NUNCA vende diamantes — antes de tocar stock/balance.
     if ((serviceData.serviceType || 'subscription') === 'diamond') {
@@ -238,6 +253,12 @@ async function processBulkPurchase({ serviceId, tenantId, resellerId, resellerEm
       throw new Error('RESELLER_NOT_FOUND');
     }
     const resellerData = resellerDoc.data();
+    // P0-3: en bulk el único ancla de tenant del actor es el doc del reseller
+    // (no hay customer en el flujo) — sin este gate, un reseller del tenant A
+    // compraría stock del tenant B debitando su propio saldo.
+    if (resellerData.tenantId !== tenantId) {
+      throw new Error('PERMISSION_DENIED');
+    }
     if (!resellerData.isActive) {
       throw new Error('RESELLER_INACTIVE');
     }

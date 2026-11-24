@@ -147,12 +147,18 @@ async function createReseller(data, context) {
   }
 }
 
-// TEMPORAL: eliminar distribuidor por email para recrearlo
+// TEMPORAL: eliminar distribuidor por email para recrearlo.
+// P0-4: retiro del registry (EXCLUDED_ROUTES → 404) por no tener consumidores;
+// además el handler queda acotado como defensa en profundidad por si se remonta:
+//   - destino debe ser rol 'reseller' (ni admin/superadmin/customer)
+//   - tenant del destino debe coincidir con el del caller (salvo superadmin)
+//   - borrado en secuencia docs → Auth: un fallo parcial deja Auth intacto
+//     (reintentable e idempotente) o al reseller sin docs (fail-closed).
 async function adminDeleteResellerByEmail(data, context) {
   if (!context.auth) {
     throw new HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
-  const { role } = await getUserRole(context.auth.uid);
+  const { role, tenantId: callerTenantId } = await getUserRole(context.auth.uid);
   if (role !== 'superadmin' && role !== 'admin') {
     throw new HttpsError('permission-denied', 'No tiene permisos de admin');
   }
@@ -160,18 +166,43 @@ async function adminDeleteResellerByEmail(data, context) {
   if (!email) {
     throw new HttpsError('invalid-argument', 'Email requerido');
   }
+
+  let user;
   try {
-    const user = await admin.auth().getUserByEmail(email);
-    const uid = user.uid;
-    await Promise.allSettled([
-      admin.auth().deleteUser(uid),
-      db.collection('resellers').doc(uid).delete(),
-      db.collection('users').doc(uid).delete(),
-    ]);
-    return { success: true, message: `Distribuidor ${email} eliminado` };
+    user = await admin.auth().getUserByEmail(email);
   } catch (e) {
     throw new HttpsError('not-found', 'Usuario no encontrado');
   }
+  const uid = user.uid;
+  const claims = user.customClaims || {};
+
+  const usersDoc = await db.collection('users').doc(uid).get();
+  const usersData = usersDoc.exists ? usersDoc.data() : {};
+  const resellersDoc = await db.collection('resellers').doc(uid).get();
+  const resellersData = resellersDoc.exists ? resellersDoc.data() : {};
+
+  const targetRole = claims.role || usersData.role || null;
+  if (targetRole !== 'reseller') {
+    throw new HttpsError('permission-denied', 'El destino no es un subdistribuidor', { code: 'DESTINO_NO_RESELLER' });
+  }
+
+  if (role !== 'superadmin') {
+    const targetTenant = claims.tenantId || resellersData.tenantId || usersData.tenantId || null;
+    if (!targetTenant || targetTenant !== callerTenantId) {
+      throw new HttpsError('permission-denied', 'No tiene acceso a este subdistribuidor', { code: 'TENANT_DESTINO_NO_COINCIDE' });
+    }
+  }
+
+  try {
+    await db.collection('resellers').doc(uid).delete();
+    await db.collection('users').doc(uid).delete();
+    await admin.auth().deleteUser(uid);
+  } catch (e) {
+    console.error('Error deleting reseller:', e);
+    throw new HttpsError('internal', 'No se pudo completar la eliminación; revisá el estado antes de reintentar', { code: 'ELIMINACION_INCOMPLETA' });
+  }
+
+  return { success: true, message: `Distribuidor ${email} eliminado` };
 }
 
 async function loadResellerBalance(data, context) {

@@ -149,6 +149,7 @@ async function processBulkPurchaseHandler(data, context) {
     const errorMap = {
       'INVALID_QUANTITY': { code: 'invalid-argument', msg: 'La cantidad debe ser entre 1 y 50' },
       'SERVICE_NOT_FOUND': { code: 'not-found', msg: 'Servicio no encontrado' },
+      'PERMISSION_DENIED': { code: 'permission-denied', msg: 'No tiene acceso a este servicio' },
       'RESELLER_NOT_FOUND': { code: 'not-found', msg: 'Subdistribuidor no encontrado' },
       'RESELLER_INACTIVE': { code: 'permission-denied', msg: 'Subdistribuidor inactivo' },
       'INSUFFICIENT_BALANCE': { code: 'failed-precondition', msg: 'Saldo insuficiente', details: { code: 'SALDO_INSUFICIENTE' } },

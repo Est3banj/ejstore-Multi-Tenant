@@ -271,7 +271,7 @@ async function saveEmailConfig(data, context) {
     throw new HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
 
-  const { tenantId, email, password, host, port, docId } = data;
+  const { tenantId, email, password, host, port, docId, allowedSenders } = data;
   if (!tenantId || !email || !password || !host || !port) {
     throw new HttpsError('invalid-argument', 'Todos los campos son requeridos');
   }
@@ -285,6 +285,24 @@ async function saveEmailConfig(data, context) {
     throw new HttpsError('permission-denied', 'No tienes permisos para esta acción');
   }
 
+  // P0-2: allowlist de remitentes del buzón de pagos (opcional; si se envía,
+  // debe ser válida). Cada entrada: email exacto o dominio '@ejemplo.com'.
+  let normalizedSenders;
+  if (allowedSenders !== undefined && allowedSenders !== null) {
+    if (!Array.isArray(allowedSenders) || allowedSenders.length > 20) {
+      throw new HttpsError('invalid-argument', 'allowedSenders debe ser una lista de hasta 20 remitentes', { code: 'LISTA_REMITENTES_INVALIDA' });
+    }
+    normalizedSenders = allowedSenders.map((entry) => {
+      const value = String(entry ?? '').trim().toLowerCase();
+      const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
+      const isDomain = /^@[^\s@]+\.[^\s@]{2,}$/.test(value);
+      if (!isEmail && !isDomain) {
+        throw new HttpsError('invalid-argument', 'Cada remitente debe ser un email o un dominio tipo @ejemplo.com', { code: 'LISTA_REMITENTES_INVALIDA' });
+      }
+      return value;
+    });
+  }
+
   const configDocId = resolveDocId(docId, EMAIL_CONFIG_DOC);
   const config = {
     email,
@@ -293,6 +311,7 @@ async function saveEmailConfig(data, context) {
     port: parseInt(port),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedBy: context.auth.uid,
+    ...(normalizedSenders !== undefined ? { allowedSenders: normalizedSenders } : {}),
   };
   const docPath = `tenants/${tenantId}/secrets/${configDocId}`;
   await db.collection('tenants').doc(tenantId).collection('secrets').doc(configDocId).set(config, { merge: true });

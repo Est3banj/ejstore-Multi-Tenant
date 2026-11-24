@@ -8,7 +8,6 @@ const { getUserRoleHandler, createAdmin } = require('../../functions/auth');
 const {
   loadCustomerBalance,
   createReseller,
-  adminDeleteResellerByEmail,
   loadResellerBalance,
 } = require('../../functions/admin');
 const {
@@ -57,6 +56,9 @@ const {
 
 const EXCLUDED_ROUTES = {
   migrateCustomersTenantId: 'Operación no disponible',
+  // P0-4: retirado — sin consumidores en el frontend y el handler no validaba
+  // tenant/rol del destino. Si vuelve, exponer sólo con las guardas de admin.js.
+  adminDeleteResellerByEmail: 'Operación no disponible',
 };
 
 const FN_REGISTRY = {
@@ -71,7 +73,6 @@ const FN_REGISTRY = {
   adminUpdateTicket: { auth: 'bearer', handler: adminUpdateTicket },
   loadCustomerBalance: { auth: 'bearer', handler: loadCustomerBalance },
   createReseller: { auth: 'bearer', handler: createReseller },
-  adminDeleteResellerByEmail: { auth: 'bearer', handler: adminDeleteResellerByEmail },
   loadResellerBalance: { auth: 'bearer', handler: loadResellerBalance },
   extraerCodigo: { auth: 'bearer', handler: extraerCodigo },
   saveEmailConfig: { auth: 'bearer', handler: saveEmailConfig },

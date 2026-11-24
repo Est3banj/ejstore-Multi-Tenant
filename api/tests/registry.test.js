@@ -19,7 +19,6 @@ const SPEC_ROUTES = [
   { name: 'adminUpdateTicket', auth: 'bearer' },
   { name: 'loadCustomerBalance', auth: 'bearer' },
   { name: 'createReseller', auth: 'bearer' },
-  { name: 'adminDeleteResellerByEmail', auth: 'bearer' },
   { name: 'loadResellerBalance', auth: 'bearer' },
   { name: 'extraerCodigo', auth: 'bearer' },
   { name: 'saveEmailConfig', auth: 'bearer' },
@@ -57,9 +56,10 @@ const SPEC_ROUTES = [
 ];
 
 describe('registry estructura', () => {
-  it('EXCLUDED_ROUTES contiene migrateCustomersTenantId con message propio', () => {
+  it('EXCLUDED_ROUTES contiene migrateCustomersTenantId y adminDeleteResellerByEmail (P0-4 retirado)', () => {
     expect(EXCLUDED_ROUTES).toEqual({
       migrateCustomersTenantId: 'Operación no disponible',
+      adminDeleteResellerByEmail: 'Operación no disponible',
     });
   });
 
@@ -73,11 +73,11 @@ describe('registry estructura', () => {
     }
   });
 
-  it('registry contiene exactamente las 46 rutas (44 previas + stock público + recovery privado, sin excluded)', () => {
+  it('registry contiene exactamente las 45 rutas (46 previas menos adminDeleteResellerByEmail retirado en P0-4)', () => {
     const registryNames = Object.keys(FN_REGISTRY).sort();
     const specNames = SPEC_ROUTES.map((r) => r.name).sort();
     expect(registryNames).toEqual(specNames);
-    expect(SPEC_ROUTES).toHaveLength(46);
+    expect(SPEC_ROUTES).toHaveLength(45);
   });
 
   it('auth-class de cada ruta coincide con la tabla del spec', () => {
@@ -124,6 +124,21 @@ describe('rutas 404 del dispatch', () => {
       .post('/api/migrateCustomersTenantId')
       .set('Authorization', 'Bearer superadmin')
       .send({ data: {} });
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({
+      error: {
+        code: 'not-found',
+        status: 'NOT_FOUND',
+        message: 'Operación no disponible',
+      },
+    });
+  });
+
+  it('POST /api/adminDeleteResellerByEmail → 404 Operación no disponible (retirado en P0-4)', async () => {
+    const res = await request(app)
+      .post('/api/adminDeleteResellerByEmail')
+      .set('Authorization', 'Bearer admin')
+      .send({ data: { email: 'victim@example.invalid' } });
     expect(res.status).toBe(404);
     expect(res.body).toEqual({
       error: {

@@ -144,8 +144,122 @@ function matchPayment(body, customerName, amount) {
   const nameParts = customerName.toLowerCase().split(/\s+/).filter(Boolean);
   const emailNameParts = emailName.split(/\s+/).filter(Boolean);
   const nameOk = nameParts.some(p => emailNameParts.some(ep => ep.includes(p) || p.includes(ep)));
-  const amountOk = !isNaN(emailAmount) && Math.abs(emailAmount - amount) <= 200;
+  // P0-2: monto EXACTO. La tolerancia ±200 permitía auto-aprobar pagando de
+  // menos. Nota: el parser sólo normaliza coma como separador de miles; un
+  // email con punto ("$50.000") no matchea → queda pending (fail-closed).
+  const amountOk = !isNaN(emailAmount) && emailAmount === amount;
   return { nameOk, amountOk, emailName, emailAmount, matchedName: matchResult.name };
+}
+
+// ── P0-2: remitente autorizado + consumo de UID ──────────────────────────────
+const PAYMENT_EMAIL_CONSUMPTIONS = 'recharge_payment_consumptions';
+
+function parseFromAddress(source) {
+  const match = source.match(/^From:\s*(.+)$/im);
+  if (!match) return '';
+  const addr = match[1].match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/);
+  return addr ? addr[0].toLowerCase() : '';
+}
+
+// allowedSenders admite email exacto ('pagos@banco.com') o dominio '@banco.com'.
+function isSenderAllowed(fromAddress, allowedSenders) {
+  if (!fromAddress || !Array.isArray(allowedSenders)) return false;
+  return allowedSenders.some((raw) => {
+    const entry = String(raw ?? '').trim().toLowerCase();
+    if (!entry) return false;
+    if (entry.startsWith('@')) {
+      const at = fromAddress.indexOf('@');
+      return at !== -1 && fromAddress.slice(at) === entry;
+    }
+    return fromAddress === entry;
+  });
+}
+
+// ── P0-1: liquidación transaccional única de una recarga ─────────────────────
+// guard status=='pending' + transición de estado + acreditación + ledger +
+// (opcional) consumo del UID del email de pago + limpieza del lock de dedupe,
+// TODO en UNA runTransaction. Lecturas antes de escrituras (regla Firestore).
+// Idempotente: reintentos/aprobaciones concurrentes = exactamente 1 crédito.
+async function settleRechargeTransaction({ rechargeRef, action, processedBy, reason, paymentEmail }) {
+  return db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(rechargeRef);
+    if (!snap.exists) {
+      throw new HttpsError('not-found', 'Recarga no encontrada');
+    }
+    const data = snap.data();
+
+    if (data.status !== 'pending') {
+      throw new HttpsError('failed-precondition', 'La recarga ya fue procesada', { code: 'RECARGA_YA_PROCESADA' });
+    }
+
+    if (action === 'approve' && !isValidRechargeAmount(data.amount)) {
+      throw invalidAmountError();
+    }
+
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    // Consumo del email de pago en la MISMA transacción: dos recargas nunca
+    // pueden acreditarse con el mismo UID/UIDVALIDITY.
+    let consumptionRef = null;
+    if (paymentEmail && paymentEmail.uid != null) {
+      consumptionRef = db.collection(PAYMENT_EMAIL_CONSUMPTIONS)
+        .doc(`${data.tenantId || 'sin-tenant'}__${paymentEmail.uidValidity ?? 0}__${paymentEmail.uid}`);
+      const consumptionSnap = await transaction.get(consumptionRef);
+      if (consumptionSnap.exists) {
+        throw new HttpsError('failed-precondition', 'El email de pago ya fue utilizado', { code: 'EMAIL_YA_CONSUMIDO' });
+      }
+    }
+
+    // Beneficiario: auto-recarga de un reseller (resellers/{uid} existe) acredita
+    // su saldo de compra; si no, el customer dueño de la recarga.
+    const resellerRef = db.collection('resellers').doc(data.userId);
+    const resellerSnap = action === 'approve' ? await transaction.get(resellerRef) : null;
+    const beneficiaryRef = action === 'approve'
+      ? (resellerSnap.exists ? resellerRef : db.collection('customers').doc(data.userId))
+      : null;
+
+    // ── Escrituras (todas las lecturas ya se hicieron) ──
+    if (consumptionRef) {
+      transaction.set(consumptionRef, {
+        tenantId: data.tenantId || null,
+        emailUid: String(paymentEmail.uid),
+        uidValidity: paymentEmail.uidValidity ?? 0,
+        rechargeId: rechargeRef.id,
+        userId: data.userId,
+        consumedAt: now,
+      });
+    }
+
+    const updateData = {
+      status: action === 'approve' ? 'approved' : 'rejected',
+      processedAt: now,
+    };
+    if (processedBy) updateData.processedBy = processedBy;
+    if (paymentEmail && paymentEmail.uid != null) updateData.emailUid = String(paymentEmail.uid);
+    if (action === 'reject' && reason) updateData.rejectedReason = reason;
+    transaction.update(rechargeRef, updateData);
+
+    if (action === 'approve') {
+      transaction.update(beneficiaryRef, {
+        balance: admin.firestore.FieldValue.increment(data.amount),
+      });
+      // Ledger contable atómico (doc-id determinista por recarga → 1 máximo).
+      transaction.set(db.collection('balanceTransactions').doc(rechargeRef.id), {
+        customerId: data.userId,
+        amount: data.amount,
+        type: 'recharge',
+        description: 'Recarga aprobada',
+        rechargeId: rechargeRef.id,
+        tenantId: data.tenantId || null,
+        processedBy: processedBy || null,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    transaction.delete(db.collection('recharge_locks').doc(data.userId));
+
+    return { data, newStatus: updateData.status, beneficiaryPath: beneficiaryRef ? beneficiaryRef.path : null };
+  });
 }
 
 async function createRechargeRequest(data, context) {
@@ -375,9 +489,16 @@ async function processRecharge(data, context) {
 
   const rechargeData = rechargeDoc.data();
 
+  // Tenant gate: manda el tenant de la recarga (lo fijó createRechargeRequest
+  // con el doc del customer como verdad de servidor); fallback al doc del
+  // customer sólo para docs legacy sin tenantId.
   if (role !== 'superadmin') {
-    const customerSnap = await db.collection('customers').doc(rechargeData.userId).get();
-    if (!customerSnap.exists || userTenantId !== customerSnap.data().tenantId) {
+    let rechargeTenant = rechargeData.tenantId || null;
+    if (!rechargeTenant) {
+      const customerSnap = await db.collection('customers').doc(rechargeData.userId).get();
+      rechargeTenant = customerSnap.exists ? customerSnap.data().tenantId || null : null;
+    }
+    if (!rechargeTenant || userTenantId !== rechargeTenant) {
       childLog.warn({ rechargeTenantId: rechargeData.tenantId, userTenantId }, 'Tenant mismatch for recharge');
       throw new HttpsError('permission-denied', 'No tiene acceso a esta recarga');
     }
@@ -391,28 +512,21 @@ async function processRecharge(data, context) {
   const newStatus = action === 'approve' ? 'approved' : 'rejected';
   childLog.info({ rechargeId, action, newStatus }, 'Processing recharge');
 
-  const updateData = {
-    status: newStatus,
-    processedAt: admin.firestore.FieldValue.serverTimestamp(),
+  // P0-1: guard 'pending' + transición + acreditación + ledger en UNA
+  // transacción. Segunda aprobación (replay, doble click, concurrente) →
+  // RECARGA_YA_PROCESADA sin tocar saldo.
+  const settled = await settleRechargeTransaction({
+    rechargeRef,
+    action,
     processedBy: uid,
-  };
-  if (action === 'reject' && reason) {
-    updateData.rejectedReason = reason;
-  }
-  await rechargeRef.update(updateData);
-
-  // Lock de dedupe (L1): el doc verdad es la recarga; limpiar el puntero
-  // mantiene `recharge_locks` acorde. Best-effort: el create re-verifica
-  // el estado real del doc apuntado (self-healing) si el delete falla.
-  await db.collection('recharge_locks').doc(rechargeData.userId).delete().catch((err) => {
-    childLog.warn({ err }, 'Recharge lock cleanup failed (non-fatal)');
+    reason: action === 'reject' ? reason : null,
   });
+  childLog.info(
+    { rechargeId, newStatus: settled.newStatus, beneficiary: settled.beneficiaryPath },
+    'Recharge settled transactionally'
+  );
 
   if (action === 'approve') {
-    const customerRef = db.collection('customers').doc(rechargeData.userId);
-    await customerRef.update({
-      balance: admin.firestore.FieldValue.increment(rechargeData.amount)
-    });
     childLog.info({ userId: rechargeData.userId, amount: rechargeData.amount }, 'Balance updated for approved recharge');
   }
 
@@ -446,7 +560,7 @@ async function processRecharge(data, context) {
       const emailHtml = buildRechargeApprovedEmail({ amount: rechargeData.amount, newBalance });
       sendEmail(rechargeTenantId, customerEmail, 'Recarga Aprobada', emailHtml);
     } else {
-      const emailHtml = buildRechargeRejectedEmail({ amount: rechargeData.amount, reason: updateData.rejectedReason || '' });
+      const emailHtml = buildRechargeRejectedEmail({ amount: rechargeData.amount, reason: reason || '' });
       sendEmail(rechargeTenantId, customerEmail, 'Recarga Rechazada', emailHtml);
     }
     childLog.info({ customerEmail }, 'Email notification sent for processed recharge');
@@ -515,6 +629,24 @@ async function checkRechargePayment(data, context) {
         .collection('secrets').doc('emailConfigPayments').get();
       
       if (configDoc.exists) {
+        // P0-2 fail-closed: sin lista de remitentes configurada NO se
+        // auto-aprueba NADA (un email forjado al buzón no puede aprobar saldo).
+        // Requisito de configuración nuevo: allowedSenders en
+        // tenants/{tenantId}/secrets/emailConfigPayments.
+        const allowedSenders = configDoc.data().allowedSenders;
+        if (!Array.isArray(allowedSenders) || allowedSenders.length === 0) {
+          childLog.warn(
+            { tenantId, doc: 'tenants/' + tenantId + '/secrets/emailConfigPayments' },
+            'allowedSenders missing — IMAP auto-approve disabled (fail-closed)'
+          );
+          return {
+            found: true,
+            processed: false,
+            status: 'pending',
+            message: 'Recarga pendiente de aprobación.',
+          };
+        }
+
         let client = null;
         try {
           childLog.info('Getting IMAP connection from pool');
@@ -523,14 +655,24 @@ async function checkRechargePayment(data, context) {
           try {
             const since = new Date(Date.now() - 30 * 60 * 1000);
             const messages = await client.search({ since });
+            const uidValidity = client.mailbox?.uidValidity ?? 0;
             
             childLog.info({ messageCount: messages.length }, 'Emails found in IMAP search');
 
-            for (const uid of messages.slice(-10)) {
-              const msg = await client.fetchOne(uid, { source: true });
+            for (const emailUid of messages.slice(-10)) {
+              const msg = await client.fetchOne(emailUid, { source: true });
               if (!msg?.source?.toString()) continue;
               
               const source = msg.source.toString();
+
+              // P0-2: el remitente debe estar en la allowlist del tenant.
+              // El cuerpo del email es controlable por el atacante; el From no.
+              const fromAddress = parseFromAddress(source);
+              if (!isSenderAllowed(fromAddress, allowedSenders)) {
+                childLog.info({ emailUid, fromAddress }, 'Payment email from unlisted sender ignored');
+                continue;
+              }
+
               const body = extractEmailBody(source);
               const result = matchPayment(body, rechargeData.customerName || '', rechargeData.amount || 0);
               
@@ -540,22 +682,39 @@ async function checkRechargePayment(data, context) {
                   continue;
                 }
 
-                childLog.info({ emailUid: uid, matchedName: result.matchedName, emailAmount: result.emailAmount }, 'Payment matched in email');
+                childLog.info({ emailUid: emailUid, matchedName: result.matchedName, emailAmount: result.emailAmount }, 'Payment matched in email');
 
-                await rechargeRef.update({
-                  status: 'approved',
-                  emailUid: String(uid),
-                  processedAt: admin.firestore.FieldValue.serverTimestamp(),
-                });
-
-                await db.collection('recharge_locks').doc(rechargeData.userId).delete().catch((imapErr) => {
-                  childLog.warn({ err: imapErr }, 'Recharge lock cleanup failed after IMAP auto-approve (non-fatal)');
-                });
-
-                const customerRef = db.collection('customers').doc(rechargeData.userId);
-                await customerRef.update({
-                  balance: admin.firestore.FieldValue.increment(rechargeData.amount)
-                });
+                // P0-1+P0-2: guard 'pending' + consumo del UID + acreditación +
+                // ledger en UNA transacción (misma máquina que processRecharge).
+                let settled;
+                try {
+                  settled = await settleRechargeTransaction({
+                    rechargeRef,
+                    action: 'approve',
+                    processedBy: null,
+                    paymentEmail: { uid: emailUid, uidValidity },
+                  });
+                } catch (settleErr) {
+                  const settleCode = settleErr instanceof HttpsError ? settleErr.details?.code : null;
+                  if (settleCode === 'EMAIL_YA_CONSUMIDO') {
+                    childLog.info({ emailUid }, 'Payment email UID already consumed by another recharge — skipping');
+                    continue;
+                  }
+                  if (settleCode === 'RECARGA_YA_PROCESADA') {
+                    const freshSnap = await rechargeRef.get();
+                    const freshStatus = freshSnap.exists ? freshSnap.data().status : 'pending';
+                    childLog.info({ status: freshStatus }, 'Recharge processed concurrently during IMAP scan');
+                    return {
+                      found: true,
+                      processed: true,
+                      status: freshStatus,
+                      message: freshStatus === 'approved'
+                        ? 'Pago confirmado. Saldo actualizado.'
+                        : 'La recarga fue rechazada.',
+                    };
+                  }
+                  throw settleErr;
+                }
 
                 const msgTelegram = `✅ <b>Recarga Aprobada Automáticamente</b>\n\n👤 <b>Cliente:</b> ${rechargeData.customerName || 'N/A'}\n💵 <b>Monto:</b> $${(rechargeData.amount || 0).toLocaleString('es-CO')} COP\n📧 <b>Email detectado:</b> ${result.matchedName}`;
                 sendTelegramAdminNotification(tenantId, msgTelegram);
@@ -573,7 +732,7 @@ async function checkRechargePayment(data, context) {
                   })(),
                 ]);
 
-                childLog.info({ rechargeId, newStatus: 'approved' }, 'Recharge auto-approved via IMAP');
+                childLog.info({ rechargeId, newStatus: settled.newStatus, beneficiary: settled.beneficiaryPath }, 'Recharge auto-approved via IMAP');
 
                 return {
                   found: true,
