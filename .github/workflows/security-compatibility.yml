@@ -1,0 +1,91 @@
+name: Manual security and compatibility (no release)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manual-security-compatibility-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validation:
+    name: Isolated security and compatibility / Node 22
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    env:
+      CI: 'true'
+      FIREBASE_CLI_DISABLE_TELEMETRY: '1'
+      NO_UPDATE_NOTIFIER: '1'
+    steps:
+      - name: Checkout selected workflow ref
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java 21 for Firestore emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Record tested revision and release block
+        run: |
+          set -euo pipefail
+          test "$(node -p 'process.versions.node.split(".")[0]')" = 22
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          {
+            printf '## Manual validation — NO-GO release\n\n'
+            printf 'Checked-out commit: `%s`\n\n' "$(git rev-parse HEAD)"
+            printf 'Workflow ref: `%s`\n\n' "$GITHUB_WORKFLOW_REF"
+            printf 'Run: `%s`, attempt: `%s`\n\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
+            printf 'Node: `%s`; npm: `%s`\n\n' "$(node --version)" "$(npm --version)"
+            printf 'A successful run verifies source tests only. No verified release artifact exists here.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+          java -version
+
+      - name: Install locked isolated dependencies without lifecycle scripts
+        run: |
+          set -euo pipefail
+          npm ci --prefix tests/security-tools --ignore-scripts --no-audit --no-fund
+          npm ci --prefix tests/security-rules --ignore-scripts --no-audit --no-fund
+          npm ci --prefix tests/security-frontend --ignore-scripts --no-audit --no-fund
+          printf '%s\n' "$GITHUB_WORKSPACE/tests/security-tools/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Prepare official Firestore emulator runtime (download only)
+        run: |
+          set -euo pipefail
+          test "$(firebase --version)" = 15.15.0
+          firebase setup:emulators:firestore --project demo-ejstore-rules-stage1 --config firebase.security-rules.json --non-interactive
+          test -f "$HOME/.cache/firebase/emulators/cloud-firestore-emulator-v1.20.4.jar"
+
+      - name: Candidate rules gate (not historical baseline)
+        run: node tests/security-rules/manual-validation.mjs candidate
+
+      - name: Handler and exact registry gate
+        run: node tests/security-rules/manual-validation.mjs handlers
+
+      - name: Frontend compatibility gate
+        run: node tests/security-rules/manual-validation.mjs frontend
+
+      - name: Real Express HTTP runtime gate (synthetic Admin boundaries)
+        run: node tests/security-rules/manual-validation.mjs runtime
+
+      - name: Read-only readiness inspection (release remains blocked)
+        run: node tests/security-rules/manual-validation.mjs readiness
+
+      - name: Validation complete — release remains NO-GO
+        run: |
+          printf '\nCandidate, handlers/registry, frontend, HTTP runtime and readiness inspection passed.\n' >> "$GITHUB_STEP_SUMMARY"
+          printf 'Baseline characterization was not run as a security gate.\n' >> "$GITHUB_STEP_SUMMARY"
+          printf 'NO-GO: API/frontend artifacts, provenance, staging/domain matrix, legacy and historical compatibility still require separate verification and authorization.\n' >> "$GITHUB_STEP_SUMMARY"
