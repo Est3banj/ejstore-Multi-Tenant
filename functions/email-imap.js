@@ -1,5 +1,27 @@
-const { functions, admin, db, ImapFlow } = require('./config');
+const { admin, db, ImapFlow } = require('./config');
+const { HttpsError } = require('./services/httpsError');
 const { getUserRole } = require('./auth');
+const { setSecret } = require('./services/secretManager');
+const {
+  getMailConfig,
+  isValidMailDocId,
+  invalidateMailConfigCache,
+} = require('./services/mailConfig');
+const { imapPool } = require('./services/connectionPool');
+
+// Config de correo por tienda: Firestore `tenants/{tenantId}/secrets/{docId}`
+// es la fuente de verdad (Secret Manager está muerto en Vercel: sin metadata
+// server + API deshabilitada en ejstore-web — ver apply-progress.md).
+// DocIds soportados: emailConfig (códigos), emailConfigPayments (pagos), smtp.
+const EMAIL_CONFIG_DOC = 'emailConfig';
+
+function resolveDocId(docId, fallback) {
+  const resolved = docId || fallback;
+  if (!isValidMailDocId(resolved)) {
+    throw new HttpsError('invalid-argument', 'Configuración de correo no válida', { code: 'DOC_ID_INVALIDO' });
+  }
+  return resolved;
+}
 
 // ========== HELPERS ==========
 
@@ -104,14 +126,14 @@ function extractCodeFromBody(body) {
 
 // ========== EXPORTED FUNCTIONS ==========
 
-const extraerCodigo = functions.https.onCall(async (data, context) => {
+async function extraerCodigo(data, context) {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+    throw new HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
 
   const { purchaseId } = data;
   if (!purchaseId) {
-    throw new functions.https.HttpsError('invalid-argument', 'purchaseId es requerido');
+    throw new HttpsError('invalid-argument', 'purchaseId es requerido');
   }
 
   try {
@@ -119,38 +141,39 @@ const extraerCodigo = functions.https.onCall(async (data, context) => {
 
     const purchaseDoc = await db.collection('purchases').doc(purchaseId).get();
     if (!purchaseDoc.exists) {
-      throw new functions.https.HttpsError('not-found', 'Compra no encontrada');
+      throw new HttpsError('not-found', 'Compra no encontrada');
     }
     const purchaseData = purchaseDoc.data();
+
+    const callerUid = context.auth.uid;
+    const isOwner = purchaseData.customerId === callerUid || purchaseData.resellerId === callerUid;
+    if (!isOwner) {
+      const { role, tenantId: callerTenantId } = await getUserRole(callerUid);
+      const isAdminOfTenant = role === 'admin' && !!callerTenantId && callerTenantId === purchaseData.tenantId;
+      if (role !== 'superadmin' && !isAdminOfTenant) {
+        console.warn(`[extraerCodigo] Unauthorized access: uid=${callerUid} purchase=${purchaseId}`);
+        throw new HttpsError('permission-denied', 'No autorizado para esta operación', { code: 'NO_AUTORIZADO' });
+      }
+    }
+
     const tenantId = purchaseData.tenantId;
     const serviceName = (purchaseData.serviceName || '').toLowerCase();
 
-    const configDoc = await db
-      .collection('tenants').doc(tenantId)
-      .collection('secrets').doc('emailConfig').get();
+    const config = await getMailConfig(tenantId, EMAIL_CONFIG_DOC);
 
-    if (!configDoc.exists) {
-      throw new functions.https.HttpsError(
+    if (!config) {
+      throw new HttpsError(
         'failed-precondition',
         'El administrador aún no configuró el Correo Madre para esta tienda'
       );
     }
 
-    const config = configDoc.data();
     let client;
     try {
-      client = new ImapFlow({
-        host: config.host || 'imap.gmail.com',
-        port: config.port || 993,
-        secure: true,
-        auth: { user: config.email, pass: config.password },
-        logger: false,
-        timeout: 15000,
-      });
-      await client.connect();
+      client = await imapPool.getConnection(tenantId, EMAIL_CONFIG_DOC);
     } catch (connErr) {
       console.error('IMAP connection error:', connErr.message);
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         'internal',
         'No se pudo conectar al correo. Verificá la configuración del Correo Madre.'
       );
@@ -211,7 +234,7 @@ const extraerCodigo = functions.https.onCall(async (data, context) => {
     } catch (searchErr) {
       console.error('IMAP search error:', searchErr.message);
     } finally {
-      try { await client.logout(); } catch {}
+      imapPool.releaseConnection(tenantId, client);
     }
 
     if (!foundEmail) {
@@ -236,21 +259,21 @@ const extraerCodigo = functions.https.onCall(async (data, context) => {
   } catch (error) {
     console.error('Error en extraerCodigo:', error);
 
-    if (error instanceof functions.https.HttpsError) {
+    if (error instanceof HttpsError) {
       throw error;
     }
-    throw new functions.https.HttpsError('internal', 'Error al extraer el código');
+    throw new HttpsError('internal', 'Error al extraer el código');
   }
-});
+}
 
-const saveEmailConfig = functions.https.onCall(async (data, context) => {
+async function saveEmailConfig(data, context) {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+    throw new HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
 
   const { tenantId, email, password, host, port, docId } = data;
   if (!tenantId || !email || !password || !host || !port) {
-    throw new functions.https.HttpsError('invalid-argument', 'Todos los campos son requeridos');
+    throw new HttpsError('invalid-argument', 'Todos los campos son requeridos');
   }
 
   const userDoc = await db.collection('users').doc(context.auth.uid).get();
@@ -259,30 +282,43 @@ const saveEmailConfig = functions.https.onCall(async (data, context) => {
   const userTenantId = userData?.tenantId;
 
   if (role !== 'superadmin' && (role !== 'admin' || userTenantId !== tenantId)) {
-    throw new functions.https.HttpsError('permission-denied', 'No tienes permisos para esta acción');
+    throw new HttpsError('permission-denied', 'No tienes permisos para esta acción');
   }
 
-  const configDocId = docId || 'emailConfig';
-  await db.collection('tenants').doc(tenantId).collection('secrets').doc(configDocId).set({
+  const configDocId = resolveDocId(docId, EMAIL_CONFIG_DOC);
+  const config = {
     email,
     password,
     host,
     port: parseInt(port),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedBy: context.auth.uid,
-  }, { merge: true });
+  };
+  const docPath = `tenants/${tenantId}/secrets/${configDocId}`;
+  await db.collection('tenants').doc(tenantId).collection('secrets').doc(configDocId).set(config, { merge: true });
+  invalidateMailConfigCache(tenantId, configDocId);
+
+  // Secret Manager es un dead-end en Vercel (sin credenciales + API
+  // deshabilitada). Firestore YA es la fuente de verdad; el setSecret legacy
+  // es best-effort y NUNCA debe tirar abajo el guardado.
+  try {
+    await setSecret(`imap-${tenantId}`, JSON.stringify(config));
+    console.log(`[email-imap] Legacy setSecret ok para ${docPath}`);
+  } catch (err) {
+    console.warn(`[email-imap] Legacy setSecret omitido para ${docPath} (Firestore guardado igual): ${err.message}`);
+  }
 
   return { success: true };
-});
+}
 
-const getEmailConfig = functions.https.onCall(async (data, context) => {
+async function getEmailConfig(data, context) {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+    throw new HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
 
   const { tenantId, docId } = data;
   if (!tenantId) {
-    throw new functions.https.HttpsError('invalid-argument', 'tenantId es requerido');
+    throw new HttpsError('invalid-argument', 'tenantId es requerido');
   }
 
   const userDoc = await db.collection('users').doc(context.auth.uid).get();
@@ -291,36 +327,34 @@ const getEmailConfig = functions.https.onCall(async (data, context) => {
   const userTenantId = userData?.tenantId;
 
   if (role !== 'superadmin' && (role !== 'admin' || userTenantId !== tenantId)) {
-    throw new functions.https.HttpsError('permission-denied', 'No tienes permisos');
+    throw new HttpsError('permission-denied', 'No tienes permisos');
   }
 
-  const configDocId = docId || 'emailConfig';
-  const configDoc = await db.collection('tenants').doc(tenantId).collection('secrets').doc(configDocId).get();
+  const configDocId = resolveDocId(docId, EMAIL_CONFIG_DOC);
+  const config = await getMailConfig(tenantId, configDocId);
 
-  if (!configDoc.exists) {
+  if (!config) {
     return { config: null };
   }
 
-  const config = configDoc.data();
   return {
     config: {
       email: config.email,
       host: config.host,
       port: config.port,
-      updatedAt: config.updatedAt,
       hasPassword: !!config.password,
     },
   };
-});
+}
 
-const testEmailConnection = functions.https.onCall(async (data, context) => {
+async function testEmailConnection(data, context) {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+    throw new HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
 
   const { email, password, host, port } = data;
   if (!email || !password || !host || !port) {
-    throw new functions.https.HttpsError('invalid-argument', 'Faltan campos requeridos');
+    throw new HttpsError('invalid-argument', 'Faltan campos requeridos');
   }
 
   let client = null;
@@ -332,11 +366,16 @@ const testEmailConnection = functions.https.onCall(async (data, context) => {
       auth: { user: email, pass: password },
       logger: false,
       timeout: 10000,
+      tls: {
+        minVersion: 'TLSv1.2',
+        rejectUnauthorized: true,
+      },
     });
 
     await client.connect();
     await client.mailboxOpen('INBOX');
     await client.logout();
+    client = null;
 
     return { success: true, message: 'Conexión exitosa' };
   } catch (err) {
@@ -348,48 +387,48 @@ const testEmailConnection = functions.https.onCall(async (data, context) => {
       message: err.message || 'Error de conexión IMAP',
     };
   }
-});
+}
 
-const checkEmailStatus = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
-  const { role, tenantId } = await getUserRole(context.auth.uid);
+async function checkEmailStatus(data, context) {
+  if (!context.auth) throw new HttpsError('unauthenticated', 'Debe iniciar sesión');
+  const { role, tenantId: claimsTenantId } = await getUserRole(context.auth.uid);
   if (role !== 'superadmin' && role !== 'admin') {
-    throw new functions.https.HttpsError('permission-denied', 'No tiene permisos de admin');
+    throw new HttpsError('permission-denied', 'No tiene permisos de admin');
   }
-  const { docId } = data;
-  const configDoc = await db.collection('tenants').doc(tenantId).collection('secrets').doc(docId || 'emailConfigPayments').get();
-  if (!configDoc.exists) {
+
+  const { docId, tenantId } = data;
+  const targetTenantId = tenantId || claimsTenantId;
+  if (role !== 'superadmin' && targetTenantId !== claimsTenantId) {
+    throw new HttpsError('permission-denied', 'No tienes permisos para esta acción', { code: 'TENANT_INVALIDO' });
+  }
+
+  const configDocId = resolveDocId(docId, EMAIL_CONFIG_DOC);
+  const config = await getMailConfig(targetTenantId, configDocId);
+
+  if (!config) {
     return { connected: false, message: 'No hay configuración de correo' };
   }
 
-  const config = configDoc.data();
   const { email: cfgEmail, password: cfgPass, host: cfgHost, port: cfgPort } = config;
 
   if (!cfgEmail || !cfgPass || !cfgHost) {
     return { connected: false, message: 'Configuración incompleta (falta email, password o host)' };
   }
 
-  // Probar conexión IMAP real
+  // Probar conexión IMAP real usando pool
   let client = null;
   try {
-    client = new ImapFlow({
-      host: cfgHost,
-      port: cfgPort || 993,
-      secure: true,
-      auth: { user: cfgEmail, pass: cfgPass },
-      logger: false,
-      timeout: 10000,
-    });
-    await client.connect();
+    client = await imapPool.getConnection(targetTenantId, configDocId);
     await client.mailboxOpen('INBOX');
-    await client.logout();
+    imapPool.releaseConnection(targetTenantId, client);
+    client = null;
     return { connected: true, message: 'Conectado IMAP exitosamente' };
   } catch (err) {
     if (client) {
-      try { await client.logout(); } catch {}
+      try { imapPool.releaseConnection(targetTenantId, client); } catch {}
     }
     return { connected: false, message: err.message || 'Error de conexión IMAP' };
   }
-});
+}
 
 module.exports = { extraerCodigo, saveEmailConfig, getEmailConfig, testEmailConnection, checkEmailStatus };

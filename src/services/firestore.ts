@@ -47,6 +47,7 @@ export const getServices = async (tenantId: string, _db?: Firestore): Promise<Se
         promotionalPrice: data.promotionalPrice,
         wholesalePrice: data.wholesalePrice,
         category: data.category,
+        serviceType: data.serviceType,
         images: data.images || [],
         image: data.image || data.images?.[0] || '',
         isActive: data.active !== false,
@@ -89,6 +90,7 @@ export const getAllServices = async (tenantId: string, _db?: Firestore): Promise
         promotionalPrice: data.promotionalPrice,
         wholesalePrice: data.wholesalePrice,
         category: data.category,
+        serviceType: data.serviceType,
         images: data.images || [],
         image: data.image || data.images?.[0] || '',
         isActive: data.active !== false,
@@ -127,6 +129,7 @@ export const getServiceById = async (id: string, tenantId: string, _db?: Firesto
         promotionalPrice: data.promotionalPrice,
         wholesalePrice: data.wholesalePrice,
         category: data.category,
+        serviceType: data.serviceType,
           images: data.images || [],
           image: data.image || data.images?.[0] || '',
           isActive: data.active !== false,
@@ -153,8 +156,14 @@ interface ServiceInput {
   isActive: boolean;
   isPopular?: boolean;
   terms?: string;
+  serviceType?: 'diamond' | 'subscription';
   plans?: Service['plans'];
 }
+
+export const getWholesaleServices = async (tenantId: string, _db?: Firestore): Promise<Service[]> => {
+  const services = await getServices(tenantId, _db);
+  return services.filter((s) => (s.serviceType || 'subscription') !== 'diamond');
+};
 
 export const createService = async (serviceData: ServiceInput, tenantId: string, _db?: Firestore): Promise<string> => {
   const dbInstance = _db || db;

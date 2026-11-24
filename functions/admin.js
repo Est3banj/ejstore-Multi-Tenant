@@ -1,39 +1,49 @@
-const { functions, admin, db } = require('./config');
-const { sendTelegramAdminNotification, sendTelegramResellerNotification } = require('./telegram');
-const { sendEmail, buildTicketResponseEmail } = require('./email');
+const { admin, db } = require('./config');
+const { HttpsError } = require('./services/httpsError');
+const { sendTelegramAdminNotification } = require('./telegram');
 const { getUserRole } = require('./auth');
 
-const loadCustomerBalance = functions.https.onCall(async (data, context) => {
+function parseStrictInteger(value) {
+  const asString = typeof value === 'string' ? value.trim() : String(value);
+  if (!/^-?\d+$/.test(asString)) return null;
+  const parsed = Number(asString);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+async function loadCustomerBalance(data, context) {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+    throw new HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
 
-  const { role, tenantId: adminTenantId } = await getUserRole(context.auth.uid, context.auth.token);
+  const { role, tenantId: adminTenantId } = await getUserRole(context.auth.uid);
   if (role !== 'superadmin' && role !== 'admin') {
-    throw new functions.https.HttpsError('permission-denied', 'No tiene permisos de admin');
+    throw new HttpsError('permission-denied', 'No tiene permisos de admin');
   }
 
   const { customerId, amount } = data;
 
   if (!customerId || !amount) {
-    throw new functions.https.HttpsError('invalid-argument', 'customerId y amount son requeridos');
+    throw new HttpsError('invalid-argument', 'customerId y amount son requeridos');
   }
 
-  const parsedAmount = parseInt(amount);
-  if (isNaN(parsedAmount) || parsedAmount < 1000) {
-    throw new functions.https.HttpsError('invalid-argument', 'El monto mínimo es $1,000 COP');
+  const parsedAmount = parseStrictInteger(amount);
+  if (parsedAmount === null) {
+    throw new HttpsError('invalid-argument', 'Monto inválido; debe ser un número entero', { code: 'MONTO_INVALIDO' });
+  }
+  if (parsedAmount < 1000) {
+    throw new HttpsError('invalid-argument', 'El monto mínimo es $1,000 COP', { code: 'MONTO_INVALIDO' });
   }
 
   const customerRef = db.collection('customers').doc(customerId);
   const customerDoc = await customerRef.get();
 
   if (!customerDoc.exists) {
-    throw new functions.https.HttpsError('not-found', 'Cliente no encontrado');
+    throw new HttpsError('not-found', 'Cliente no encontrado');
   }
 
   const customerData = customerDoc.data();
   if (role !== 'superadmin' && adminTenantId !== customerData.tenantId) {
-    throw new functions.https.HttpsError('permission-denied', 'No tiene acceso a este cliente');
+    throw new HttpsError('permission-denied', 'No tiene acceso a este cliente');
   }
 
   const now = new Date().toISOString();
@@ -59,22 +69,33 @@ const loadCustomerBalance = functions.https.onCall(async (data, context) => {
   }
 
   return { success: true, newAmount: parsedAmount };
-});
+}
 
-const createReseller = functions.https.onCall(async (data, context) => {
+async function createReseller(data, context) {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+    throw new HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
 
-  const { role, tenantId: adminTenantId } = await getUserRole(context.auth.uid, context.auth.token);
+  const { role, tenantId: adminTenantId } = await getUserRole(context.auth.uid);
   if (role !== 'superadmin' && role !== 'admin') {
-    throw new functions.https.HttpsError('permission-denied', 'No tiene permisos de admin');
+    throw new HttpsError('permission-denied', 'No tiene permisos de admin');
   }
 
   const { email, password, name, phone, commissionPercent } = data;
 
   if (!email || !password || !name) {
-    throw new functions.https.HttpsError('invalid-argument', 'email, password y name son requeridos');
+    throw new HttpsError('invalid-argument', 'email, password y name son requeridos');
+  }
+
+  if (typeof password !== 'string' || password.length < 8 || !/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
+    throw new HttpsError('invalid-argument', 'La contraseña debe tener mínimo 8 caracteres con letras y números', { code: 'PASSWORD_DEBIL' });
+  }
+
+  if (commissionPercent !== undefined && commissionPercent !== null && commissionPercent !== '') {
+    const commission = typeof commissionPercent === 'number' ? commissionPercent : Number(commissionPercent);
+    if (!Number.isFinite(commission) || commission < 0 || commission > 100) {
+      throw new HttpsError('invalid-argument', 'La comisión debe estar entre 0 y 100', { code: 'COMISION_INVALIDA' });
+    }
   }
 
   try {
@@ -120,24 +141,24 @@ const createReseller = functions.https.onCall(async (data, context) => {
   } catch (error) {
     console.error('Error creating reseller:', error);
     if (error.code === 'auth/email-already-exists') {
-      throw new functions.https.HttpsError('already-exists', 'El email ya está registrado');
+      throw new HttpsError('already-exists', 'El email ya está registrado');
     }
-    throw new functions.https.HttpsError('internal', 'Error al crear subdistribuidor');
+    throw new HttpsError('internal', 'Error al crear subdistribuidor');
   }
-});
+}
 
 // TEMPORAL: eliminar distribuidor por email para recrearlo
-const adminDeleteResellerByEmail = functions.https.onCall(async (data, context) => {
+async function adminDeleteResellerByEmail(data, context) {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+    throw new HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
-  const { role } = await getUserRole(context.auth.uid, context.auth.token);
+  const { role } = await getUserRole(context.auth.uid);
   if (role !== 'superadmin' && role !== 'admin') {
-    throw new functions.https.HttpsError('permission-denied', 'No tiene permisos de admin');
+    throw new HttpsError('permission-denied', 'No tiene permisos de admin');
   }
   const { email } = data;
   if (!email) {
-    throw new functions.https.HttpsError('invalid-argument', 'Email requerido');
+    throw new HttpsError('invalid-argument', 'Email requerido');
   }
   try {
     const user = await admin.auth().getUserByEmail(email);
@@ -149,29 +170,32 @@ const adminDeleteResellerByEmail = functions.https.onCall(async (data, context) 
     ]);
     return { success: true, message: `Distribuidor ${email} eliminado` };
   } catch (e) {
-    throw new functions.https.HttpsError('not-found', 'Usuario no encontrado');
+    throw new HttpsError('not-found', 'Usuario no encontrado');
   }
-});
+}
 
-const loadResellerBalance = functions.https.onCall(async (data, context) => {
+async function loadResellerBalance(data, context) {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+    throw new HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
 
-  const { role, tenantId: adminTenantId } = await getUserRole(context.auth.uid, context.auth.token);
+  const { role, tenantId: adminTenantId } = await getUserRole(context.auth.uid);
   if (role !== 'superadmin' && role !== 'admin') {
-    throw new functions.https.HttpsError('permission-denied', 'No tiene permisos de admin');
+    throw new HttpsError('permission-denied', 'No tiene permisos de admin');
   }
 
   const { resellerId, amount } = data;
 
   if (!resellerId || !amount) {
-    throw new functions.https.HttpsError('invalid-argument', 'resellerId y amount son requeridos');
+    throw new HttpsError('invalid-argument', 'resellerId y amount son requeridos');
   }
 
-  const parsedAmount = parseInt(amount);
-  if (isNaN(parsedAmount) || parsedAmount < 1000) {
-    throw new functions.https.HttpsError('invalid-argument', 'El monto mínimo es $1,000 COP');
+  const parsedAmount = parseStrictInteger(amount);
+  if (parsedAmount === null) {
+    throw new HttpsError('invalid-argument', 'Monto inválido; debe ser un número entero', { code: 'MONTO_INVALIDO' });
+  }
+  if (parsedAmount < 1000) {
+    throw new HttpsError('invalid-argument', 'El monto mínimo es $1,000 COP', { code: 'MONTO_INVALIDO' });
   }
 
   try {
@@ -179,12 +203,12 @@ const loadResellerBalance = functions.https.onCall(async (data, context) => {
     const resellerDoc = await resellerRef.get();
 
     if (!resellerDoc.exists) {
-      throw new functions.https.HttpsError('not-found', 'Subdistribuidor no encontrado');
+      throw new HttpsError('not-found', 'Subdistribuidor no encontrado');
     }
 
     const resellerData = resellerDoc.data();
     if (role !== 'superadmin' && adminTenantId !== resellerData.tenantId) {
-      throw new functions.https.HttpsError('permission-denied', 'No tiene acceso a este subdistribuidor');
+      throw new HttpsError('permission-denied', 'No tiene acceso a este subdistribuidor');
     }
 
     const now = new Date().toISOString();
@@ -205,63 +229,10 @@ const loadResellerBalance = functions.https.onCall(async (data, context) => {
 
     return { success: true, newBalance };
   } catch (error) {
-    if (error instanceof functions.https.HttpsError) throw error;
+    if (error instanceof HttpsError) throw error;
     console.error('Error loading reseller balance:', error);
-    throw new functions.https.HttpsError('internal', 'Error al cargar saldo');
+    throw new HttpsError('internal', 'Error al cargar saldo');
   }
-});
+}
 
-const onTicketCreated = functions.firestore
-  .document('tickets/{ticketId}')
-  .onCreate(async (snap, context) => {
-    const data = snap.data();
-    if (!data || !data.tenantId) return;
-
-    const userName = data.userName || data.userEmail || 'Desconocido';
-    const ticketCode = data.purchaseId?.startsWith?.('TKT-')
-      ? data.purchaseId
-      : `TKT-${(context.params.ticketId || '').slice(0, 6).toUpperCase()}-?`;
-    const userLabel = data.userType === 'reseller' ? 'Subdistribuidor' : 'Cliente';
-    const msg = `🎫 <b>Nuevo Reporte</b>\n\n👤 <b>${userLabel}:</b> ${userName}\n📧 <b>Email:</b> ${data.userEmail || '—'}\n🆔 <b>Ticket:</b> ${ticketCode}\n📋 <b>Asunto:</b> ${data.subject || 'Sin asunto'}\n📝 <b>Descripción:</b> ${(data.description || '').substring(0, 300)}\n📦 <b>Servicio:</b> ${data.serviceName || '—'}\n📧 <b>Email servicio:</b> ${data.customerEmail || '—'}`;
-    sendTelegramAdminNotification(data.tenantId, msg);
-  });
-
-const onTicketUpdated = functions.firestore
-  .document('tickets/{ticketId}')
-  .onUpdate(async (change, context) => {
-    const before = change.before.data();
-    const after = change.after.data();
-    if (!after || !before) return;
-
-    if (before.status === 'open' && after.status === 'resolved' && after.userId) {
-      const ticketCode = after.purchaseId?.startsWith?.('TKT-')
-        ? after.purchaseId
-        : `TKT-${(context.params.ticketId || '').slice(0, 6).toUpperCase()}-?`;
-      const msg = `✅ <b>Tu reporte fue respondido</b>\n\n🆔 <b>Ticket:</b> ${ticketCode}\n📋 <b>Asunto:</b> ${after.subject || 'Sin asunto'}\n📝 <b>Respuesta:</b> ${(after.adminNotes || '').substring(0, 300)}`;
-
-      if (after.userRole === 'reseller') {
-        sendTelegramResellerNotification(after.userId, msg);
-      }
-
-      if (after.tenantId) {
-        const userLabel = after.userRole === 'reseller' ? 'Subdistribuidor' : 'Cliente';
-        const adminMsg = `✅ <b>Reporte Resuelto</b>\n\n👤 <b>${userLabel}:</b> ${after.userName || after.userEmail || 'Desconocido'}\n🆔 <b>Ticket:</b> ${ticketCode}\n📋 <b>Asunto:</b> ${after.subject || 'Sin asunto'}\n📝 <b>Respuesta:</b> ${(after.adminNotes || '').substring(0, 200)}`;
-        sendTelegramAdminNotification(after.tenantId, adminMsg);
-      }
-
-      const ticketId = context.params.ticketId;
-      // purchaseId almacena el código TKT- que el usuario conoce (ej: TKT-ABC123-1)
-      const displayId = after.purchaseId || ticketId;
-      // userEmail = email del usuario que reportó (NO customerEmail que es el email del servicio)
-      const recipientEmail = after.userEmail || after.customerEmail;
-      if (recipientEmail) {
-        const emailHtml = buildTicketResponseEmail({
-          ticketId: displayId,
-          response: after.adminNotes || '',
-        });
-        sendEmail(after.tenantId, recipientEmail, 'Ticket Respondido - ' + displayId, emailHtml);
-      }
-    }
-  });
-
-module.exports = { loadCustomerBalance, createReseller, loadResellerBalance, onTicketCreated, onTicketUpdated, adminDeleteResellerByEmail };
+module.exports = { loadCustomerBalance, createReseller, loadResellerBalance, adminDeleteResellerByEmail };

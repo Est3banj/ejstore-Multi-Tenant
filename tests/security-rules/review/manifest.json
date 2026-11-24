@@ -1,0 +1,1877 @@
+{
+  "baseHead": "7c0d85e02d05e3884b9dff2ff44a9f8c3e428086",
+  "snapshot": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-xfp0y45q",
+  "status": "GO focused frontend integration/source review; NO-GO deployment/CONTRACT; no full-app browser/E2E evidence",
+  "selectionManifestSha256": "43ad37ea66f258cd2bf20716f2546531de1c41178cc0cb9fa6ad7839d139faef",
+  "dependencies": {
+    "A1-runtime-base": [],
+    "A2-consumer-base": [],
+    "B-expand": [
+      "A1-runtime-base"
+    ],
+    "C-consumers": [
+      "A2-consumer-base",
+      "B-expand (HTTP contract at runtime)"
+    ],
+    "D-manual-gates": [
+      "A1-runtime-base",
+      "A2-consumer-base",
+      "B-expand",
+      "C-consumers"
+    ]
+  },
+  "units": [
+    {
+      "unit": "A1-runtime-base",
+      "patch": "A1-runtime-base.patch",
+      "sha256": "5d3dfd1a7d616f69a4eb3634e74bebca86b29c2472848791180c57896fb27aee",
+      "patchBytes": 466470,
+      "fileCount": 45,
+      "files": [
+        {
+          "path": "api.cjs",
+          "before": null,
+          "after": "e6fdb43c6bd9a90a73666b694dcab13a7c7ee9a8391637ce34beac4ab15566eb",
+          "bytes": 414,
+          "hunks": [
+            "@@ -0,0 +1,6 @@"
+          ]
+        },
+        {
+          "path": "api/index.js",
+          "before": null,
+          "after": "f7d5ab2e016b5919a2fcf629f4499e00ae6973ad4c558ff9ad2ba60187f59d45",
+          "bytes": 141,
+          "hunks": [
+            "@@ -0,0 +1,6 @@"
+          ]
+        },
+        {
+          "path": "api/package-lock.json",
+          "before": null,
+          "after": "648eafd4285c94d71be3baf0aa71ab877f421957f76190351f13b5a3367964f4",
+          "bytes": 158188,
+          "hunks": [
+            "@@ -0,0 +1,4382 @@"
+          ]
+        },
+        {
+          "path": "api/package.json",
+          "before": null,
+          "after": "8150e46ca6f995689fb1ccf4d45561885b02170010087bf20fe9151427ab6b0f",
+          "bytes": 583,
+          "hunks": [
+            "@@ -0,0 +1,29 @@"
+          ]
+        },
+        {
+          "path": "api/src/app.js",
+          "before": null,
+          "after": "0ee339c886ffc39abf5c1b9b6bf89c2e482502dfd416226c810bfabdfe2700c3",
+          "bytes": 1987,
+          "hunks": [
+            "@@ -0,0 +1,73 @@"
+          ]
+        },
+        {
+          "path": "api/src/config.js",
+          "before": null,
+          "after": "bd35a6c98018d5492f2036358584a01088efbf2ffa9ac8f29aa3fa507fbe230b",
+          "bytes": 908,
+          "hunks": [
+            "@@ -0,0 +1,26 @@"
+          ]
+        },
+        {
+          "path": "api/src/errors.js",
+          "before": null,
+          "after": "60ff6c2a4b18ca7aadf6114bc5b05ba976e1eaecd0a4ab1d27c6f8cbde5e8c14",
+          "bytes": 1387,
+          "hunks": [
+            "@@ -0,0 +1,66 @@"
+          ]
+        },
+        {
+          "path": "api/src/firebaseAdmin.js",
+          "before": null,
+          "after": "90d03dbc22347b06c0adea46d3dc688e957d5f0985c8606737c9220262779f5a",
+          "bytes": 308,
+          "hunks": [
+            "@@ -0,0 +1,15 @@"
+          ]
+        },
+        {
+          "path": "api/src/middleware.js",
+          "before": null,
+          "after": "76815be244289f72d5d0bebc44ce5e4d0e9e3437b22db0f5c8255891f515ee09",
+          "bytes": 2398,
+          "hunks": [
+            "@@ -0,0 +1,78 @@"
+          ]
+        },
+        {
+          "path": "api/src/registry.js",
+          "before": null,
+          "after": "666c71e0c29050686be42076f39d5d769c2de1d243ea761a8c65088047d7d952",
+          "bytes": 4818,
+          "hunks": [
+            "@@ -0,0 +1,108 @@"
+          ]
+        },
+        {
+          "path": "api/tests/registry.test.js",
+          "before": null,
+          "after": "287bc0c0c3e1531fefddb96843b9c186b0a7f23fc485b4c3c111618a72c406c0",
+          "bytes": 8294,
+          "hunks": [
+            "@@ -0,0 +1,189 @@"
+          ]
+        },
+        {
+          "path": "functions/accounts.js",
+          "before": "63036e85eac505066c9f93d9a764f625023fa367bcf1a2ebd17d7e49e9f653e6",
+          "after": "7f11547bff4e8e2ef9e67ee67da183e30ce030ef97e05d70b2cd0b89aae30d9d",
+          "bytes": 15593,
+          "hunks": [
+            "@@ -1,16 +1,22 @@",
+            "@@ -29,7 +35,7 @@",
+            "@@ -127,7 +133,6 @@",
+            "@@ -141,32 +146,32 @@",
+            "@@ -236,23 +241,31 @@",
+            "@@ -261,16 +274,19 @@",
+            "@@ -335,25 +351,46 @@"
+          ]
+        },
+        {
+          "path": "functions/admin.js",
+          "before": "a63851b01e5b0c490e0582ea13d987a496b80b869b5e558ab5f85b1df8e5a6ec",
+          "after": "f7afbd7ce5e247c034aa1bdfa92fdb9a55b7bc5685d6d56833552f8344f8e83d",
+          "bytes": 8499,
+          "hunks": [
+            "@@ -1,39 +1,49 @@",
+            "@@ -59,22 +69,33 @@",
+            "@@ -120,24 +141,24 @@",
+            "@@ -149,29 +170,32 @@",
+            "@@ -179,12 +203,12 @@",
+            "@@ -205,63 +229,10 @@"
+          ]
+        },
+        {
+          "path": "functions/auth.js",
+          "before": "817b3d1b954fa91cf732768a4489d7c89251057f2203812b804fd973cac53fbd",
+          "after": "2b267ce1e0ef06922257a9892c782f55e4fb5c97e4594dd6963da2ec1f22d421",
+          "bytes": 4097,
+          "hunks": [
+            "@@ -1,22 +1,111 @@"
+          ]
+        },
+        {
+          "path": "functions/config.js",
+          "before": "30acd9e9e8eee126d46f7ef0aa38514c97fa61d1d970e5f2b50a8b2c3ef53e9f",
+          "after": "10ef3f68ec7670f3de2d6771bdcf6f92ec29a1754c446a40dd4e6a431b97921b",
+          "bytes": 5140,
+          "hunks": [
+            "@@ -1,13 +1,169 @@"
+          ]
+        },
+        {
+          "path": "functions/diamondOrders.js",
+          "before": null,
+          "after": "959199b118e4acf264f8348e49979f91cc74cca247a702465f8617ec5af4705c",
+          "bytes": 16921,
+          "hunks": [
+            "@@ -0,0 +1,431 @@"
+          ]
+        },
+        {
+          "path": "functions/email-imap.js",
+          "before": "a9198bfe2338f01d2fd32c7ba67825303a2a1bdd7f44019075fd3f1bb7049305",
+          "after": "7425a672d3f11e4625b27247e7c22fedfdce68cc0c85122b29912575b7e4404a",
+          "bytes": 14292,
+          "hunks": [
+            "@@ -1,5 +1,27 @@",
+            "@@ -104,14 +126,14 @@",
+            "@@ -119,38 +141,39 @@",
+            "@@ -211,7 +234,7 @@",
+            "@@ -236,21 +259,21 @@",
+            "@@ -259,30 +282,43 @@",
+            "@@ -291,36 +327,34 @@",
+            "@@ -332,11 +366,16 @@",
+            "@@ -348,48 +387,48 @@"
+          ]
+        },
+        {
+          "path": "functions/email.js",
+          "before": "019b8ffd732f67a163ac50385ad852b2bf81d81f96f583dc73e67e404f3a0e13",
+          "after": "49353c03b52b06a7ed997cb018ecb3b040bedd57384811adfb122eb0b25a3f85",
+          "bytes": 22763,
+          "hunks": [
+            "@@ -1,13 +1,13 @@",
+            "@@ -209,23 +209,172 @@",
+            "@@ -235,60 +384,67 @@",
+            "@@ -301,8 +457,8 @@"
+          ]
+        },
+        {
+          "path": "functions/otp.js",
+          "before": null,
+          "after": "71aff62d7ffc5747ae92d8ddfb5a9c284eab524ba7a572f0e3bc5bca6b0265d7",
+          "bytes": 7267,
+          "hunks": [
+            "@@ -0,0 +1,201 @@"
+          ]
+        },
+        {
+          "path": "functions/publicStats.js",
+          "before": null,
+          "after": "9b4e9166df6b5da1174218971d7e5294a31c7876c02027b725acb707b9475aa2",
+          "bytes": 3122,
+          "hunks": [
+            "@@ -0,0 +1,79 @@"
+          ]
+        },
+        {
+          "path": "functions/purchases.js",
+          "before": "ef743c64122cfa0d17ad11920ef91cf5ca69eff37897b6de7cc035f13c03c9e1",
+          "after": "7bab5085e8433d52a6b6dba0df5a2d4ac50d71c1983014f53a05109e51a06346",
+          "bytes": 7532,
+          "hunks": [
+            "@@ -1,272 +1,49 @@",
+            "@@ -278,332 +55,80 @@",
+            "@@ -613,18 +138,32 @@"
+          ]
+        },
+        {
+          "path": "functions/recharges.js",
+          "before": "05d76df7174621ede8303495beb20d2f0f162d52885d8afc3f968cf64734fa14",
+          "after": "7cc9893427b210da3b55960cf1d9ada9e2541e9d48ff2f6eafbca064ba4a65cf",
+          "bytes": 28379,
+          "hunks": [
+            "@@ -1,7 +1,61 @@",
+            "@@ -14,8 +68,8 @@",
+            "@@ -55,7 +109,7 @@",
+            "@@ -94,110 +148,229 @@",
+            "@@ -205,27 +378,42 @@",
+            "@@ -247,8 +435,9 @@",
+            "@@ -260,31 +449,52 @@",
+            "@@ -296,34 +506,26 @@",
+            "@@ -333,21 +535,45 @@",
+            "@@ -359,37 +585,47 @@",
+            "@@ -401,8 +637,8 @@",
+            "@@ -412,7 +648,6 @@",
+            "@@ -420,8 +655,6 @@",
+            "@@ -450,7 +683,8 @@"
+          ]
+        },
+        {
+          "path": "functions/roulette.js",
+          "before": "4e348b4cf16d82d3829052e71f0fc3174b10271ff0e58b8a3598e23ca49f6409",
+          "after": "beda768798259ec5e390c817dd0ca73ec93f1f66a7472ed3effe54bdacc1b531",
+          "bytes": 11717,
+          "hunks": [
+            "@@ -1,4 +1,5 @@",
+            "@@ -53,28 +54,28 @@",
+            "@@ -136,18 +137,18 @@",
+            "@@ -163,14 +164,19 @@",
+            "@@ -178,7 +184,7 @@",
+            "@@ -186,11 +192,11 @@",
+            "@@ -199,11 +205,12 @@",
+            "@@ -218,7 +225,7 @@",
+            "@@ -228,7 +235,7 @@",
+            "@@ -323,12 +330,12 @@"
+          ]
+        },
+        {
+          "path": "functions/services/adminInit.js",
+          "before": null,
+          "after": "6b97e8b3fd81c507e93382a41e002ea448d4b174d56ca50653cd674b681102df",
+          "bytes": 811,
+          "hunks": [
+            "@@ -0,0 +1,25 @@"
+          ]
+        },
+        {
+          "path": "functions/services/authVerification.js",
+          "before": null,
+          "after": "e6a08d3e73e7c25d7b7380d3a0a089af2fa35994bbc4a1334e08127129c9df96",
+          "bytes": 538,
+          "hunks": [
+            "@@ -0,0 +1,21 @@"
+          ]
+        },
+        {
+          "path": "functions/services/connectionPool.js",
+          "before": null,
+          "after": "462f60bbc88d597bfb1bf49686a6651249a49812aafac1511d9e41d1f7936667",
+          "bytes": 9927,
+          "hunks": [
+            "@@ -0,0 +1,364 @@"
+          ]
+        },
+        {
+          "path": "functions/services/errorCodes.js",
+          "before": null,
+          "after": "e318d0503190ab6ffeffa0a11aab552348f5be6f8762222b17f63c2e48882d8d",
+          "bytes": 7269,
+          "hunks": [
+            "@@ -0,0 +1,146 @@"
+          ]
+        },
+        {
+          "path": "functions/services/freefire.js",
+          "before": null,
+          "after": "45a0f689d67d56b09b43fcd24600abc58a3931b1d063063b41b869747a1680d3",
+          "bytes": 399,
+          "hunks": [
+            "@@ -0,0 +1,10 @@"
+          ]
+        },
+        {
+          "path": "functions/services/httpsError.js",
+          "before": null,
+          "after": "96eb51705cd98df799293da94fa85286fd3a1b01955d941d7b8436b76c029d97",
+          "bytes": 1707,
+          "hunks": [
+            "@@ -0,0 +1,43 @@"
+          ]
+        },
+        {
+          "path": "functions/services/idempotencyService.js",
+          "before": null,
+          "after": "69f6e8e9dd05111ff06ecbe0cbc767f9c38414578d1fc28226e365c74da8ea2c",
+          "bytes": 4350,
+          "hunks": [
+            "@@ -0,0 +1,133 @@"
+          ]
+        },
+        {
+          "path": "functions/services/inventoryService.js",
+          "before": null,
+          "after": "c9da11fedb5e1c2ba089785ff3d079cb7cf208a6a11b9398ebb84ea06b4ca825",
+          "bytes": 5106,
+          "hunks": [
+            "@@ -0,0 +1,157 @@"
+          ]
+        },
+        {
+          "path": "functions/services/mailConfig.js",
+          "before": null,
+          "after": "4360e656cd5bf246a103a0fce7378d18a542ebb2d0c89bf5248cdb2b4aef3175",
+          "bytes": 4211,
+          "hunks": [
+            "@@ -0,0 +1,121 @@"
+          ]
+        },
+        {
+          "path": "functions/services/monitoring.js",
+          "before": null,
+          "after": "85e50cfbf4c3427b43b0495f3964ef75488d9d6ca2ea4eab78dd6313f87fcbac",
+          "bytes": 14591,
+          "hunks": [
+            "@@ -0,0 +1,488 @@"
+          ]
+        },
+        {
+          "path": "functions/services/notificationService.js",
+          "before": null,
+          "after": "5e1700c342af6c748d41f1d3ecc3ba7888c5baf5233690211bb4bd760da6c8e1",
+          "bytes": 4920,
+          "hunks": [
+            "@@ -0,0 +1,86 @@"
+          ]
+        },
+        {
+          "path": "functions/services/notificationTriggers.js",
+          "before": null,
+          "after": "a47913e8efb45fcdd28e2017350779a9b406d4c97c0b837784825b6244206232",
+          "bytes": 7378,
+          "hunks": [
+            "@@ -0,0 +1,189 @@"
+          ]
+        },
+        {
+          "path": "functions/services/purchaseService.js",
+          "before": null,
+          "after": "73363f33cb7b06d4b5569010fce3295c10937ffba98c769033c89396b64a3059",
+          "bytes": 15546,
+          "hunks": [
+            "@@ -0,0 +1,480 @@"
+          ]
+        },
+        {
+          "path": "functions/services/rateLimiter.js",
+          "before": null,
+          "after": "453186ffac89c3be3dbcf2e3b1a650751411b19c495fa8aa04e2f14dc42dd49e",
+          "bytes": 7039,
+          "hunks": [
+            "@@ -0,0 +1,235 @@"
+          ]
+        },
+        {
+          "path": "functions/services/secretManager.js",
+          "before": null,
+          "after": "aeb1864a6f453245e700ad59482475c3e82b4b175f9ee9c58bd457b4607ea966",
+          "bytes": 6114,
+          "hunks": [
+            "@@ -0,0 +1,205 @@"
+          ]
+        },
+        {
+          "path": "functions/telegram.js",
+          "before": "7c5ea1e066b48a67416403d38637a11c4487e498592ec339ee940cbf19706470",
+          "after": "fc45501e7080aff70145384953569bb502fbf25f948f4d762c0a551abc1408af",
+          "bytes": 10424,
+          "hunks": [
+            "@@ -1,10 +1,18 @@",
+            "@@ -12,40 +20,57 @@",
+            "@@ -56,40 +81,82 @@",
+            "@@ -97,14 +164,14 @@",
+            "@@ -119,6 +186,7 @@",
+            "@@ -126,6 +194,7 @@",
+            "@@ -151,18 +220,31 @@",
+            "@@ -176,14 +258,17 @@",
+            "@@ -192,7 +277,8 @@"
+          ]
+        },
+        {
+          "path": "functions/tenants.js",
+          "before": "0123840d930f2d348978cf55334dabf80b14a24b79882f26cf065a333fab3224",
+          "after": "779ddfcae3a0679bb014ee26d1a7596a43c67304457373a5851ee0b097a041f1",
+          "bytes": 5437,
+          "hunks": [
+            "@@ -1,8 +1,13 @@",
+            "@@ -10,7 +15,7 @@",
+            "@@ -30,24 +35,24 @@",
+            "@@ -66,24 +71,24 @@",
+            "@@ -91,7 +96,7 @@",
+            "@@ -108,51 +113,38 @@",
+            "@@ -182,8 +174,8 @@"
+          ]
+        },
+        {
+          "path": "functions/utils/correlationId.js",
+          "before": null,
+          "after": "c4f837f819acfa55ae2172a70c5547415883284840a42bc411ecf2223ec4654a",
+          "bytes": 1348,
+          "hunks": [
+            "@@ -0,0 +1,61 @@"
+          ]
+        },
+        {
+          "path": "functions/utils/crypto.js",
+          "before": null,
+          "after": "d9e2e1e91e5e847d8d07fd0b30900c20eeef8f0487f7f96a20c215cd2a78732b",
+          "bytes": 1283,
+          "hunks": [
+            "@@ -0,0 +1,48 @@"
+          ]
+        },
+        {
+          "path": "functions/utils/logger.js",
+          "before": null,
+          "after": "49820c4ea591d7a4fd9d4a831385c25ec3f3ba9c1fcd0025bb4679309cac1a6b",
+          "bytes": 2243,
+          "hunks": [
+            "@@ -0,0 +1,102 @@"
+          ]
+        },
+        {
+          "path": "functions/verifyFreeFireId.js",
+          "before": null,
+          "after": "4a0b36c9c95bb8be05771d7e57663719198d1d790d65f250f72671450f9ddca7",
+          "bytes": 5756,
+          "hunks": [
+            "@@ -0,0 +1,165 @@"
+          ]
+        },
+        {
+          "path": "vercel.json",
+          "before": null,
+          "after": "449f2fb6037146f7e8dd44df94bf274727b764e60e4c4690a563a1fa5803d72b",
+          "bytes": 159,
+          "hunks": [
+            "@@ -0,0 +1,6 @@"
+          ]
+        }
+      ]
+    },
+    {
+      "unit": "A2-consumer-base",
+      "patch": "A2-consumer-base.patch",
+      "sha256": "4cfb9a4e8aed872fcb888dc6df81b985d98ded56d90e062212a134525a234dc5",
+      "patchBytes": 78776,
+      "fileCount": 18,
+      "files": [
+        {
+          "path": "src/components/PurchaseConfirmModal.tsx",
+          "before": "326dcc6b3dede32cbb23d7cc303e1a1bf98dfb724c68cacab7c195f479c53b11",
+          "after": "24092d53cb94b1fa426d05cb9cc44e6efa2eaa71fb0950d809864a9227f882f6",
+          "bytes": 7478,
+          "hunks": [
+            "@@ -1,6 +1,13 @@",
+            "@@ -13,6 +20,11 @@",
+            "@@ -26,9 +38,21 @@",
+            "@@ -55,6 +79,61 @@",
+            "@@ -97,7 +176,8 @@"
+          ]
+        },
+        {
+          "path": "src/components/ServiceCard.tsx",
+          "before": "2dc1422f7d88f0bb9ae8fea350e7998292d3a7ceed5ab5a37843d16026a3353d",
+          "after": "7843c457124dedd154ee512bbd71630271b209d7732331ec1890cca34fa1718b",
+          "bytes": 5138,
+          "hunks": [
+            "@@ -4,6 +4,7 @@",
+            "@@ -15,7 +16,21 @@",
+            "@@ -31,7 +46,7 @@",
+            "@@ -42,11 +57,21 @@",
+            "@@ -77,16 +102,14 @@"
+          ]
+        },
+        {
+          "path": "src/pages/Home.jsx",
+          "before": "4b087cdeb4ca7f271753e81a5b1ec7caf3e5a49f7da21197f105801309ecbb24",
+          "after": "8332dfdd85d9a50e303908ba9561e46dc86ed06e914738f3455c1f7c53a47a69",
+          "bytes": 6725,
+          "hunks": [
+            "@@ -10,17 +10,18 @@",
+            "@@ -31,7 +32,7 @@"
+          ]
+        },
+        {
+          "path": "src/pages/Product.jsx",
+          "before": "26ca4a4d52fb5c91fb60c04ab8644540f3688853b684c34805772e3f54ad80ce",
+          "after": "8734bd18ba6bd7272f4abba5c027068963b6bee2ceae966d8fa7399a2cd2ffd8",
+          "bytes": 28199,
+          "hunks": [
+            "@@ -1,21 +1,37 @@",
+            "@@ -26,7 +42,17 @@",
+            "@@ -39,6 +65,10 @@",
+            "@@ -100,7 +130,7 @@",
+            "@@ -125,7 +155,22 @@",
+            "@@ -145,6 +190,101 @@",
+            "@@ -158,7 +298,7 @@",
+            "@@ -170,22 +310,93 @@",
+            "@@ -218,7 +429,17 @@",
+            "@@ -226,18 +447,24 @@",
+            "@@ -312,53 +539,36 @@",
+            "@@ -372,7 +582,7 @@",
+            "@@ -390,22 +600,98 @@",
+            "@@ -415,4 +701,3 @@"
+          ]
+        },
+        {
+          "path": "src/pages/customer/PurchaseResult.tsx",
+          "before": "06871e3905f69e3a2fa3134f74d139acc3ec18bec822510fb0c3d95ff2c58b9e",
+          "after": "3ad35cf60ac4af577b4a37904565a397af282a6d6ca7c284f1b2bb6e7232a92f",
+          "bytes": 13837,
+          "hunks": [
+            "@@ -3,6 +3,7 @@",
+            "@@ -121,13 +122,13 @@",
+            "@@ -156,7 +157,7 @@",
+            "@@ -326,14 +327,14 @@"
+          ]
+        },
+        {
+          "path": "src/pages/reseller/CatalogoMayorista.tsx",
+          "before": "617648f4a3dced6673a30e83ec4cf117724ccd0223f8fd633096d8f668107ece",
+          "after": "0e2896d03890aee6defa4d0c923f2f9fb1865cf1a4cdea328a31e9822fc4b24c",
+          "bytes": 20055,
+          "hunks": [
+            "@@ -2,9 +2,9 @@",
+            "@@ -62,8 +62,8 @@",
+            "@@ -76,7 +76,7 @@",
+            "@@ -143,7 +143,7 @@"
+          ]
+        },
+        {
+          "path": "src/services/apiClient.ts",
+          "before": null,
+          "after": "497825e313d01a48a83c8b49902e2d2e658e0aa39a63d0cee0d354ba4bb4629c",
+          "bytes": 3556,
+          "hunks": [
+            "@@ -0,0 +1,72 @@"
+          ]
+        },
+        {
+          "path": "src/services/auth.ts",
+          "before": "5f38a217b801ae8c15f98a989be7632b02cc2477b7586b96d236b5d508dc9dad",
+          "after": "56637c1f11538bf16b3c8ff9aebcc19a825ee308a6c06a92eedf348df45d605e",
+          "bytes": 8976,
+          "hunks": [
+            "@@ -12,6 +12,8 @@",
+            "@@ -89,7 +91,7 @@"
+          ]
+        },
+        {
+          "path": "src/services/firebase.ts",
+          "before": "04b444636c449f1a1b7b5998b49fb88f0dbc00b79c0148c56151fd09a1272e87",
+          "after": "8705f4f633e6f433950be72bad5b71f40f7177c98be790249ff7958a91790038",
+          "bytes": 2105,
+          "hunks": [
+            "@@ -3,6 +3,12 @@",
+            "@@ -28,5 +34,28 @@"
+          ]
+        },
+        {
+          "path": "src/services/firestore.ts",
+          "before": "466c6a6938a06a487919f06198097832221ee0293c34b67ab4759c94e89dde7a",
+          "after": "a32bc7e73cfc83abd081a3aaad3a895d05a0aa7b406aadc02c5c52f647a00cdc",
+          "bytes": 16860,
+          "hunks": [
+            "@@ -47,6 +47,7 @@",
+            "@@ -89,6 +90,7 @@",
+            "@@ -127,6 +129,7 @@",
+            "@@ -153,8 +156,14 @@"
+          ]
+        },
+        {
+          "path": "src/services/marketplace.ts",
+          "before": "e7214b1697f7fd58ae12782770010f774089d2fce9122c3160ebdd006fb3363e",
+          "after": "a523a63098af6bc68e0a63359c76b1f6443ee78b02d8a141daa2a59cb390b73d",
+          "bytes": 23854,
+          "hunks": [
+            "@@ -9,13 +9,13 @@",
+            "@@ -39,6 +39,11 @@",
+            "@@ -269,8 +274,7 @@",
+            "@@ -280,12 +284,99 @@",
+            "@@ -338,6 +429,7 @@",
+            "@@ -348,7 +440,7 @@",
+            "@@ -380,6 +472,9 @@",
+            "@@ -455,28 +550,22 @@",
+            "@@ -485,26 +574,24 @@",
+            "@@ -519,38 +606,36 @@",
+            "@@ -562,22 +647,18 @@",
+            "@@ -586,38 +667,28 @@"
+          ]
+        },
+        {
+          "path": "src/store/authStore.ts",
+          "before": "e20e46f5ad8c6f36059ac40e3a33b2e7580e301f7cfd93816c605a3e65339b55",
+          "after": "28c6558cbf20b295fab0afffaaa047247d80ef4b164f3190a2db9cc2bef8e69b",
+          "bytes": 4674,
+          "hunks": [
+            "@@ -3,198 +3,106 @@"
+          ]
+        },
+        {
+          "path": "src/types/index.ts",
+          "before": "2a215244ac77f10cc2218414671bf4b045bb8ec55d173fc4b788a4a73c7c88a1",
+          "after": "8405afaa4c044875b7c6284631677e70f11ff02d286347b3da453ec003ddf614",
+          "bytes": 3692,
+          "hunks": [
+            "@@ -22,6 +22,7 @@"
+          ]
+        },
+        {
+          "path": "src/types/marketplace.ts",
+          "before": "e2a74dce853ddb1ed80f65366f0a30236fa3c249a78b01651a86117ce2fd8908",
+          "after": "98c14bd30caf75fdfcf5fed5d53c72beb68a7b19e361d2cda0e1f716185b1567",
+          "bytes": 6967,
+          "hunks": [
+            "@@ -69,6 +69,53 @@"
+          ]
+        },
+        {
+          "path": "src/utils/constants.js",
+          "before": "66c7b66a570aeae4bdb300f3e1796cdd17adba003bcf32ae9e0dc4ae79fa7576",
+          "after": "30d881c265c3f65cb3272fb656374de9f38ba1b889f56bfa340ae9d12632afc5",
+          "bytes": 809,
+          "hunks": [
+            "@@ -1,11 +1,12 @@",
+            "@@ -19,4 +20,3 @@"
+          ]
+        },
+        {
+          "path": "src/utils/freefire.ts",
+          "before": null,
+          "after": "5929cd909db1dfbe5e5aaeadb984c33f564e60300ea23516609ec9ce2ec50bbf",
+          "bytes": 122,
+          "hunks": [
+            "@@ -0,0 +1,3 @@"
+          ]
+        },
+        {
+          "path": "src/utils/tenantUrl.ts",
+          "before": null,
+          "after": "25cb12f06bbfa1893769dd43e8379e2cd3e30126e2bc247446b7587bd743da65",
+          "bytes": 1129,
+          "hunks": [
+            "@@ -0,0 +1,29 @@"
+          ]
+        },
+        {
+          "path": "src/vite-env.d.ts",
+          "before": "21d3a949d707a39f671b32132617470552ee67f11dd46dbfcf65d1eea477ca58",
+          "after": "8dcc4591a695433adece2471a9f5d41374ba957bfe1d0a93fa289ae419ba9a05",
+          "bytes": 485,
+          "hunks": [
+            "@@ -1,6 +1,8 @@"
+          ]
+        }
+      ]
+    },
+    {
+      "unit": "B-expand",
+      "patch": "B-expand.patch",
+      "sha256": "d56996e5d49ed625e7cf2b678c7bc951e68608e9ba72578551b6d87b8c3d5483",
+      "patchBytes": 111994,
+      "fileCount": 12,
+      "files": [
+        {
+          "path": "api/src/app.js",
+          "before": "0ee339c886ffc39abf5c1b9b6bf89c2e482502dfd416226c810bfabdfe2700c3",
+          "after": "ac65042b2e2ff18df2b21d0a1a036a1f11ec00a357d580ab7450af35701ca164",
+          "bytes": 2248,
+          "hunks": [
+            "@@ -8,6 +8,13 @@"
+          ]
+        },
+        {
+          "path": "api/src/middleware.js",
+          "before": "76815be244289f72d5d0bebc44ce5e4d0e9e3437b22db0f5c8255891f515ee09",
+          "after": "4c06f1f44076e64f0c71281a3a46772ecbe6a89144c8db80e4597e2457fbdff1",
+          "bytes": 2455,
+          "hunks": [
+            "@@ -5,6 +5,8 @@",
+            "@@ -13,7 +15,6 @@"
+          ]
+        },
+        {
+          "path": "api/src/registry.js",
+          "before": "666c71e0c29050686be42076f39d5d769c2de1d243ea761a8c65088047d7d952",
+          "after": "c063f8cdc038bf6418948e527e7b1c3c58e7a193b0a3b27a725327d0a2bc67dc",
+          "bytes": 5068,
+          "hunks": [
+            "@@ -28,6 +28,7 @@",
+            "@@ -63,6 +64,8 @@"
+          ]
+        },
+        {
+          "path": "api/tests/registry.test.js",
+          "before": "287bc0c0c3e1531fefddb96843b9c186b0a7f23fc485b4c3c111618a72c406c0",
+          "after": "c27e8b33ffc7bbb4bdfee38310e5d22ec07d3f0275da9dd67d1ddd87f0811c4f",
+          "bytes": 8438,
+          "hunks": [
+            "@@ -12,6 +12,8 @@",
+            "@@ -71,11 +73,11 @@"
+          ]
+        },
+        {
+          "path": "functions/availability.js",
+          "before": null,
+          "after": "9812f5860ce4ef84b9dcea1f550d6368d0e6e225c295a374617e1e7fca9f5322",
+          "bytes": 355,
+          "hunks": [
+            "@@ -0,0 +1,8 @@"
+          ]
+        },
+        {
+          "path": "functions/services/purchaseCredentials.js",
+          "before": null,
+          "after": "17f8a3f55e8a88ac61be79b2127c242db31604f7d96dfe38a6c752e975dc453e",
+          "bytes": 2657,
+          "hunks": [
+            "@@ -0,0 +1,48 @@"
+          ]
+        },
+        {
+          "path": "functions/services/stockAvailability.js",
+          "before": null,
+          "after": "291ec12b321b733715d7a6a75274e100998cd0ad74de92399bcc087af24db56c",
+          "bytes": 3012,
+          "hunks": [
+            "@@ -0,0 +1,60 @@"
+          ]
+        },
+        {
+          "path": "tests/security-rules/availability.test.cjs",
+          "before": null,
+          "after": "2efd7f86b8f36abb950b640af91bf99818390d4d3ce95dbacc12d3d3d2ef9a41",
+          "bytes": 10234,
+          "hunks": [
+            "@@ -0,0 +1,157 @@"
+          ]
+        },
+        {
+          "path": "tests/security-rules/loopback-only.cjs",
+          "before": null,
+          "after": "bff00b864d77d94f122bae5132e5bdda4af3f9f7c29e46949000a77b9b750fb1",
+          "bytes": 728,
+          "hunks": [
+            "@@ -0,0 +1,15 @@"
+          ]
+        },
+        {
+          "path": "tests/security-rules/package-lock.json",
+          "before": null,
+          "after": "0df0d4c61da688592f8f8b8486b0110d1cf6958a369ece455ae8d064ae7e6760",
+          "bytes": 74475,
+          "hunks": [
+            "@@ -0,0 +1,2072 @@"
+          ]
+        },
+        {
+          "path": "tests/security-rules/package.json",
+          "before": null,
+          "after": "8b98f4423c9f8e41c08393652e17b766dfb26ad8352f88cef5fcdb4979a16500",
+          "bytes": 616,
+          "hunks": [
+            "@@ -0,0 +1,21 @@"
+          ]
+        },
+        {
+          "path": "tests/security-rules/runtime.test.cjs",
+          "before": null,
+          "after": "8a3032ada6c5893bc98ca7612f3d313b00028c186c4cd76fa994d1a52e6ee346",
+          "bytes": 12356,
+          "hunks": [
+            "@@ -0,0 +1,245 @@"
+          ]
+        }
+      ]
+    },
+    {
+      "unit": "C-consumers",
+      "patch": "C-consumers.patch",
+      "sha256": "5b8e5bb6d492ab17a4090ded41970602ec3bb5855e7ddc4f993ee5c3177d7c90",
+      "patchBytes": 160083,
+      "fileCount": 18,
+      "files": [
+        {
+          "path": "src/components/ServiceCard.tsx",
+          "before": "7843c457124dedd154ee512bbd71630271b209d7732331ec1890cca34fa1718b",
+          "after": "7e7296ace73af056ca11168577dcc72691f33ef598f541d8adc674ff1d375292",
+          "bytes": 5133,
+          "hunks": [
+            "@@ -21,7 +21,7 @@"
+          ]
+        },
+        {
+          "path": "src/pages/Home.jsx",
+          "before": "8332dfdd85d9a50e303908ba9561e46dc86ed06e914738f3455c1f7c53a47a69",
+          "after": "c2a29d9b82c5a44855dd2272b577fc2c061119d816258895e93fe537fc3d947a",
+          "bytes": 6865,
+          "hunks": [
+            "@@ -18,20 +18,23 @@"
+          ]
+        },
+        {
+          "path": "src/pages/Product.jsx",
+          "before": "8734bd18ba6bd7272f4abba5c027068963b6bee2ceae966d8fa7399a2cd2ffd8",
+          "after": "b93234beedecaa08faba585fc412f3e6b5c77a26fb0ec2f5b56fbcef081b203b",
+          "bytes": 28618,
+          "hunks": [
+            "@@ -35,6 +35,7 @@",
+            "@@ -55,6 +56,11 @@",
+            "@@ -63,6 +69,7 @@",
+            "@@ -83,22 +90,23 @@",
+            "@@ -335,7 +343,7 @@",
+            "@@ -453,7 +461,7 @@"
+          ]
+        },
+        {
+          "path": "src/pages/customer/PurchaseResult.tsx",
+          "before": "3ad35cf60ac4af577b4a37904565a397af282a6d6ca7c284f1b2bb6e7232a92f",
+          "after": "3b55c20a3d01aff94c5b769700f86514b61414d7dd3a417d182db489f1174978",
+          "bytes": 14006,
+          "hunks": [
+            "@@ -3,6 +3,7 @@",
+            "@@ -82,6 +83,7 @@"
+          ]
+        },
+        {
+          "path": "src/pages/reseller/CatalogoMayorista.tsx",
+          "before": "0e2896d03890aee6defa4d0c923f2f9fb1865cf1a4cdea328a31e9822fc4b24c",
+          "after": "d730b0c86d508693fce727ff91536726451719f6948ba6eb34954c7aa0ce2c5b",
+          "bytes": 20091,
+          "hunks": [
+            "@@ -57,15 +57,19 @@",
+            "@@ -74,12 +78,7 @@",
+            "@@ -107,15 +106,16 @@"
+          ]
+        },
+        {
+          "path": "src/services/marketplace.test.ts",
+          "before": "a4515c97cea180b4c97cc2a939ffa148177e7bac520f78fd8d10c093bc02dec6",
+          "after": "39e8ab7c052a9067621202cafeb948ff4b338c053a20f3acfbafd23253efa4c8",
+          "bytes": 10760,
+          "hunks": [
+            "@@ -1,5 +1,6 @@",
+            "@@ -7,12 +8,14 @@",
+            "@@ -28,28 +31,6 @@",
+            "@@ -226,52 +207,65 @@"
+          ]
+        },
+        {
+          "path": "src/services/marketplace.ts",
+          "before": "a523a63098af6bc68e0a63359c76b1f6443ee78b02d8a141daa2a59cb390b73d",
+          "after": "adb56e5de051b1334657a3b025e6044b2c73adb9b8cc680100005bba065e8108",
+          "bytes": 22997,
+          "hunks": [
+            "@@ -241,22 +241,11 @@",
+            "@@ -510,36 +499,26 @@"
+          ]
+        },
+        {
+          "path": "src/test/DiamondAvailability.test.tsx",
+          "before": null,
+          "after": "19b798ac25f6c50937b3e9429edb7df3307c913a7b4c1215fe30a2afd96eb006",
+          "bytes": 5989,
+          "hunks": [
+            "@@ -0,0 +1,173 @@"
+          ]
+        },
+        {
+          "path": "src/test/PurchaseCredentialRecovery.test.tsx",
+          "before": null,
+          "after": "05ef557596c69f5e8db719b725c0ce859bcbcdbc1ab31049f1e1a3b9c441366d",
+          "bytes": 2872,
+          "hunks": [
+            "@@ -0,0 +1,42 @@"
+          ]
+        },
+        {
+          "path": "src/test/StockAvailability.test.tsx",
+          "before": null,
+          "after": "300ed3069274886344393e00abf4f43ce7515892263b5a53bd9a911755a164e8",
+          "bytes": 4639,
+          "hunks": [
+            "@@ -0,0 +1,72 @@"
+          ]
+        },
+        {
+          "path": "src/test/setup.ts",
+          "before": "b336bb16708ddcd3cdea65c6df28a93db52121491ee4011407ed848604dd3171",
+          "after": "958b977242922924f8e414953a7bc4d66c8c73c64298194b70d16f78754f9283",
+          "bytes": 2822,
+          "hunks": [
+            "@@ -27,6 +27,9 @@",
+            "@@ -38,6 +41,15 @@",
+            "@@ -67,3 +79,22 @@"
+          ]
+        },
+        {
+          "path": "tests/security-frontend/check-contracts.mjs",
+          "before": null,
+          "after": "563223e4f40ee6688879a70c522eec5f7ec9563d26c3fbc3f27578ba88a1bd8b",
+          "bytes": 3416,
+          "hunks": [
+            "@@ -0,0 +1,54 @@"
+          ]
+        },
+        {
+          "path": "tests/security-frontend/contracts.test.tsx",
+          "before": null,
+          "after": "eb90301b4c1815cd6756f6dd3d456d66f7d4a265cf23f3fdc686ee87b12c044b",
+          "bytes": 20464,
+          "hunks": [
+            "@@ -0,0 +1,298 @@"
+          ]
+        },
+        {
+          "path": "tests/security-frontend/package-lock.json",
+          "before": null,
+          "after": "45dbdbac283474b6551b05489c15ebedb5a053c372ee061d029988f6fb500ce1",
+          "bytes": 90076,
+          "hunks": [
+            "@@ -0,0 +1,2689 @@"
+          ]
+        },
+        {
+          "path": "tests/security-frontend/package.json",
+          "before": null,
+          "after": "1c327b65753defd39c344b5f682032e39aaf14f4c42431973f8319f558581f4f",
+          "bytes": 681,
+          "hunks": [
+            "@@ -0,0 +1,22 @@"
+          ]
+        },
+        {
+          "path": "tests/security-frontend/sdk-boundary.ts",
+          "before": null,
+          "after": "0c67965221cd21ee31129265d4954c5c495c8b57e755be76f2c07d012ca912a2",
+          "bytes": 2864,
+          "hunks": [
+            "@@ -0,0 +1,67 @@"
+          ]
+        },
+        {
+          "path": "tests/security-frontend/setup.ts",
+          "before": null,
+          "after": "2ba1bc0e4afe059af40236377ecfecfd16b16a77492e499f0eafb7d5c1fdc86f",
+          "bytes": 534,
+          "hunks": [
+            "@@ -0,0 +1,8 @@"
+          ]
+        },
+        {
+          "path": "tests/security-frontend/vitest.config.mjs",
+          "before": null,
+          "after": "52be97cf4f81d22e805e11593d840509792ffcd02d08a4a8fc63cd369e9e92da",
+          "bytes": 1520,
+          "hunks": [
+            "@@ -0,0 +1,26 @@"
+          ]
+        }
+      ]
+    },
+    {
+      "unit": "D-manual-gates",
+      "patch": "D-manual-gates.patch",
+      "sha256": "f844ab1b7813dcf5b314d094f85208b5863c6913a44a289365fe6663498a7215",
+      "patchBytes": 401947,
+      "fileCount": 14,
+      "files": [
+        {
+          "path": ".github/workflows/security-compatibility.yml",
+          "before": null,
+          "after": "fabbd511a8ec9fd7f4304b60d5a99b010f1901c733056bda01bb0fd419a503e8",
+          "bytes": 3723,
+          "hunks": [
+            "@@ -0,0 +1,91 @@"
+          ]
+        },
+        {
+          "path": "firebase.security-rules.json",
+          "before": null,
+          "after": "2a7cdc8473f6e8198470f67ddd153c115fd235e6ecedf7be1ac9df266726c6f1",
+          "bytes": 424,
+          "hunks": [
+            "@@ -0,0 +1,24 @@"
+          ]
+        },
+        {
+          "path": "tests/security-rules/accounts.test.mjs",
+          "before": null,
+          "after": "e110eb8af80603a849571893ab5054d90a65bac0f2cb12fd9d359834cb31812d",
+          "bytes": 5158,
+          "hunks": [
+            "@@ -0,0 +1,111 @@"
+          ]
+        },
+        {
+          "path": "tests/security-rules/baseline.mjs",
+          "before": null,
+          "after": "09d75e444a5c34494222d865a62e8a6d8c60bf5811b919dd0a70a978c837b2cb",
+          "bytes": 1217,
+          "hunks": [
+            "@@ -0,0 +1,26 @@"
+          ]
+        },
+        {
+          "path": "tests/security-rules/candidate.mjs",
+          "before": null,
+          "after": "ed8d9bf0bb3bd14fa46c745786839e4205363ee260450ca6724a469edcffeb82",
+          "bytes": 2689,
+          "hunks": [
+            "@@ -0,0 +1,43 @@"
+          ]
+        },
+        {
+          "path": "tests/security-rules/candidate.test.mjs",
+          "before": null,
+          "after": "9a15a4f6d55fc0e0e0afb4bac46923ffd2072c4be7ad9834c5c35b230a8dd5ae",
+          "bytes": 8853,
+          "hunks": [
+            "@@ -0,0 +1,147 @@"
+          ]
+        },
+        {
+          "path": "tests/security-rules/contract-dry-run.mjs",
+          "before": null,
+          "after": "3ee16b3a25c793d940cd14035c800f44e025fd07517143375c65b0bb16c92576",
+          "bytes": 1727,
+          "hunks": [
+            "@@ -0,0 +1,27 @@"
+          ]
+        },
+        {
+          "path": "tests/security-rules/expand-readiness.mjs",
+          "before": null,
+          "after": "5f84d7bfcfa617b668292a6d4592bd650a9f63c8b8037f6e5c0bf24957d93b26",
+          "bytes": 5438,
+          "hunks": [
+            "@@ -0,0 +1,84 @@"
+          ]
+        },
+        {
+          "path": "tests/security-rules/fixtures/audited-original.rules",
+          "before": null,
+          "after": "c24b7c5fb757eeba7ec67e22fc0c5e514332624ae608584a6261e99cc62e276c",
+          "bytes": 12623,
+          "hunks": [
+            "@@ -0,0 +1,333 @@"
+          ]
+        },
+        {
+          "path": "tests/security-rules/manual-validation.mjs",
+          "before": null,
+          "after": "e8a3bb665b2826b5a77cf2f0703c984589dfa5f5008ae384f7136010456bbbe9",
+          "bytes": 2812,
+          "hunks": [
+            "@@ -0,0 +1,61 @@"
+          ]
+        },
+        {
+          "path": "tests/security-rules/run.mjs",
+          "before": null,
+          "after": "64a9768ec9d149ce9234afe6d80026008d71b2834faff5af63f8d26aa01f3fc2",
+          "bytes": 3779,
+          "hunks": [
+            "@@ -0,0 +1,86 @@"
+          ]
+        },
+        {
+          "path": "tests/security-tools/check-workflow.py",
+          "before": null,
+          "after": "80ed7bb8f32940b8a9a43eb2d2b4ca45a28599d9eeeb8a5e8b81154965962047",
+          "bytes": 3354,
+          "hunks": [
+            "@@ -0,0 +1,59 @@"
+          ]
+        },
+        {
+          "path": "tests/security-tools/package-lock.json",
+          "before": null,
+          "after": "8c274b0b0f1511d77b519ed9eb5f46f90302964c4bf0d5ca9953f81a1a227879",
+          "bytes": 336687,
+          "hunks": [
+            "@@ -0,0 +1,9531 @@"
+          ]
+        },
+        {
+          "path": "tests/security-tools/package.json",
+          "before": null,
+          "after": "831c923b7fc71000dba008da8733c51b0e51805c9ef1f4b2322b2b5b258316bf",
+          "bytes": 178,
+          "hunks": [
+            "@@ -0,0 +1,7 @@"
+          ]
+        }
+      ]
+    }
+  ],
+  "changedFileCount": 97,
+  "finalSources": {
+    ".github/workflows/security-compatibility.yml": "fabbd511a8ec9fd7f4304b60d5a99b010f1901c733056bda01bb0fd419a503e8",
+    "api.cjs": "e6fdb43c6bd9a90a73666b694dcab13a7c7ee9a8391637ce34beac4ab15566eb",
+    "api/index.js": "f7d5ab2e016b5919a2fcf629f4499e00ae6973ad4c558ff9ad2ba60187f59d45",
+    "api/package-lock.json": "648eafd4285c94d71be3baf0aa71ab877f421957f76190351f13b5a3367964f4",
+    "api/package.json": "8150e46ca6f995689fb1ccf4d45561885b02170010087bf20fe9151427ab6b0f",
+    "api/src/app.js": "ac65042b2e2ff18df2b21d0a1a036a1f11ec00a357d580ab7450af35701ca164",
+    "api/src/config.js": "bd35a6c98018d5492f2036358584a01088efbf2ffa9ac8f29aa3fa507fbe230b",
+    "api/src/errors.js": "60ff6c2a4b18ca7aadf6114bc5b05ba976e1eaecd0a4ab1d27c6f8cbde5e8c14",
+    "api/src/firebaseAdmin.js": "90d03dbc22347b06c0adea46d3dc688e957d5f0985c8606737c9220262779f5a",
+    "api/src/middleware.js": "4c06f1f44076e64f0c71281a3a46772ecbe6a89144c8db80e4597e2457fbdff1",
+    "api/src/registry.js": "c063f8cdc038bf6418948e527e7b1c3c58e7a193b0a3b27a725327d0a2bc67dc",
+    "api/tests/registry.test.js": "c27e8b33ffc7bbb4bdfee38310e5d22ec07d3f0275da9dd67d1ddd87f0811c4f",
+    "firebase.security-rules.json": "2a7cdc8473f6e8198470f67ddd153c115fd235e6ecedf7be1ac9df266726c6f1",
+    "functions/accounts.js": "7f11547bff4e8e2ef9e67ee67da183e30ce030ef97e05d70b2cd0b89aae30d9d",
+    "functions/admin.js": "f7afbd7ce5e247c034aa1bdfa92fdb9a55b7bc5685d6d56833552f8344f8e83d",
+    "functions/auth.js": "2b267ce1e0ef06922257a9892c782f55e4fb5c97e4594dd6963da2ec1f22d421",
+    "functions/availability.js": "9812f5860ce4ef84b9dcea1f550d6368d0e6e225c295a374617e1e7fca9f5322",
+    "functions/config.js": "10ef3f68ec7670f3de2d6771bdcf6f92ec29a1754c446a40dd4e6a431b97921b",
+    "functions/diamondOrders.js": "959199b118e4acf264f8348e49979f91cc74cca247a702465f8617ec5af4705c",
+    "functions/email-imap.js": "7425a672d3f11e4625b27247e7c22fedfdce68cc0c85122b29912575b7e4404a",
+    "functions/email.js": "49353c03b52b06a7ed997cb018ecb3b040bedd57384811adfb122eb0b25a3f85",
+    "functions/otp.js": "71aff62d7ffc5747ae92d8ddfb5a9c284eab524ba7a572f0e3bc5bca6b0265d7",
+    "functions/publicStats.js": "9b4e9166df6b5da1174218971d7e5294a31c7876c02027b725acb707b9475aa2",
+    "functions/purchases.js": "7bab5085e8433d52a6b6dba0df5a2d4ac50d71c1983014f53a05109e51a06346",
+    "functions/recharges.js": "7cc9893427b210da3b55960cf1d9ada9e2541e9d48ff2f6eafbca064ba4a65cf",
+    "functions/roulette.js": "beda768798259ec5e390c817dd0ca73ec93f1f66a7472ed3effe54bdacc1b531",
+    "functions/services/adminInit.js": "6b97e8b3fd81c507e93382a41e002ea448d4b174d56ca50653cd674b681102df",
+    "functions/services/authVerification.js": "e6a08d3e73e7c25d7b7380d3a0a089af2fa35994bbc4a1334e08127129c9df96",
+    "functions/services/connectionPool.js": "462f60bbc88d597bfb1bf49686a6651249a49812aafac1511d9e41d1f7936667",
+    "functions/services/errorCodes.js": "e318d0503190ab6ffeffa0a11aab552348f5be6f8762222b17f63c2e48882d8d",
+    "functions/services/freefire.js": "45a0f689d67d56b09b43fcd24600abc58a3931b1d063063b41b869747a1680d3",
+    "functions/services/httpsError.js": "96eb51705cd98df799293da94fa85286fd3a1b01955d941d7b8436b76c029d97",
+    "functions/services/idempotencyService.js": "69f6e8e9dd05111ff06ecbe0cbc767f9c38414578d1fc28226e365c74da8ea2c",
+    "functions/services/inventoryService.js": "c9da11fedb5e1c2ba089785ff3d079cb7cf208a6a11b9398ebb84ea06b4ca825",
+    "functions/services/mailConfig.js": "4360e656cd5bf246a103a0fce7378d18a542ebb2d0c89bf5248cdb2b4aef3175",
+    "functions/services/monitoring.js": "85e50cfbf4c3427b43b0495f3964ef75488d9d6ca2ea4eab78dd6313f87fcbac",
+    "functions/services/notificationService.js": "5e1700c342af6c748d41f1d3ecc3ba7888c5baf5233690211bb4bd760da6c8e1",
+    "functions/services/notificationTriggers.js": "a47913e8efb45fcdd28e2017350779a9b406d4c97c0b837784825b6244206232",
+    "functions/services/purchaseCredentials.js": "17f8a3f55e8a88ac61be79b2127c242db31604f7d96dfe38a6c752e975dc453e",
+    "functions/services/purchaseService.js": "73363f33cb7b06d4b5569010fce3295c10937ffba98c769033c89396b64a3059",
+    "functions/services/rateLimiter.js": "453186ffac89c3be3dbcf2e3b1a650751411b19c495fa8aa04e2f14dc42dd49e",
+    "functions/services/secretManager.js": "aeb1864a6f453245e700ad59482475c3e82b4b175f9ee9c58bd457b4607ea966",
+    "functions/services/stockAvailability.js": "291ec12b321b733715d7a6a75274e100998cd0ad74de92399bcc087af24db56c",
+    "functions/telegram.js": "fc45501e7080aff70145384953569bb502fbf25f948f4d762c0a551abc1408af",
+    "functions/tenants.js": "779ddfcae3a0679bb014ee26d1a7596a43c67304457373a5851ee0b097a041f1",
+    "functions/utils/correlationId.js": "c4f837f819acfa55ae2172a70c5547415883284840a42bc411ecf2223ec4654a",
+    "functions/utils/crypto.js": "d9e2e1e91e5e847d8d07fd0b30900c20eeef8f0487f7f96a20c215cd2a78732b",
+    "functions/utils/logger.js": "49820c4ea591d7a4fd9d4a831385c25ec3f3ba9c1fcd0025bb4679309cac1a6b",
+    "functions/verifyFreeFireId.js": "4a0b36c9c95bb8be05771d7e57663719198d1d790d65f250f72671450f9ddca7",
+    "src/components/PurchaseConfirmModal.tsx": "24092d53cb94b1fa426d05cb9cc44e6efa2eaa71fb0950d809864a9227f882f6",
+    "src/components/ServiceCard.tsx": "7e7296ace73af056ca11168577dcc72691f33ef598f541d8adc674ff1d375292",
+    "src/pages/Home.jsx": "c2a29d9b82c5a44855dd2272b577fc2c061119d816258895e93fe537fc3d947a",
+    "src/pages/Product.jsx": "b93234beedecaa08faba585fc412f3e6b5c77a26fb0ec2f5b56fbcef081b203b",
+    "src/pages/customer/PurchaseResult.tsx": "3b55c20a3d01aff94c5b769700f86514b61414d7dd3a417d182db489f1174978",
+    "src/pages/reseller/CatalogoMayorista.tsx": "d730b0c86d508693fce727ff91536726451719f6948ba6eb34954c7aa0ce2c5b",
+    "src/services/apiClient.ts": "497825e313d01a48a83c8b49902e2d2e658e0aa39a63d0cee0d354ba4bb4629c",
+    "src/services/auth.ts": "56637c1f11538bf16b3c8ff9aebcc19a825ee308a6c06a92eedf348df45d605e",
+    "src/services/firebase.ts": "8705f4f633e6f433950be72bad5b71f40f7177c98be790249ff7958a91790038",
+    "src/services/firestore.ts": "a32bc7e73cfc83abd081a3aaad3a895d05a0aa7b406aadc02c5c52f647a00cdc",
+    "src/services/marketplace.test.ts": "39e8ab7c052a9067621202cafeb948ff4b338c053a20f3acfbafd23253efa4c8",
+    "src/services/marketplace.ts": "adb56e5de051b1334657a3b025e6044b2c73adb9b8cc680100005bba065e8108",
+    "src/store/authStore.ts": "28c6558cbf20b295fab0afffaaa047247d80ef4b164f3190a2db9cc2bef8e69b",
+    "src/test/DiamondAvailability.test.tsx": "19b798ac25f6c50937b3e9429edb7df3307c913a7b4c1215fe30a2afd96eb006",
+    "src/test/PurchaseCredentialRecovery.test.tsx": "05ef557596c69f5e8db719b725c0ce859bcbcdbc1ab31049f1e1a3b9c441366d",
+    "src/test/StockAvailability.test.tsx": "300ed3069274886344393e00abf4f43ce7515892263b5a53bd9a911755a164e8",
+    "src/test/setup.ts": "958b977242922924f8e414953a7bc4d66c8c73c64298194b70d16f78754f9283",
+    "src/types/index.ts": "8405afaa4c044875b7c6284631677e70f11ff02d286347b3da453ec003ddf614",
+    "src/types/marketplace.ts": "98c14bd30caf75fdfcf5fed5d53c72beb68a7b19e361d2cda0e1f716185b1567",
+    "src/utils/constants.js": "30d881c265c3f65cb3272fb656374de9f38ba1b889f56bfa340ae9d12632afc5",
+    "src/utils/freefire.ts": "5929cd909db1dfbe5e5aaeadb984c33f564e60300ea23516609ec9ce2ec50bbf",
+    "src/utils/tenantUrl.ts": "25cb12f06bbfa1893769dd43e8379e2cd3e30126e2bc247446b7587bd743da65",
+    "src/vite-env.d.ts": "8dcc4591a695433adece2471a9f5d41374ba957bfe1d0a93fa289ae419ba9a05",
+    "tests/security-frontend/check-contracts.mjs": "563223e4f40ee6688879a70c522eec5f7ec9563d26c3fbc3f27578ba88a1bd8b",
+    "tests/security-frontend/contracts.test.tsx": "eb90301b4c1815cd6756f6dd3d456d66f7d4a265cf23f3fdc686ee87b12c044b",
+    "tests/security-frontend/package-lock.json": "45dbdbac283474b6551b05489c15ebedb5a053c372ee061d029988f6fb500ce1",
+    "tests/security-frontend/package.json": "1c327b65753defd39c344b5f682032e39aaf14f4c42431973f8319f558581f4f",
+    "tests/security-frontend/sdk-boundary.ts": "0c67965221cd21ee31129265d4954c5c495c8b57e755be76f2c07d012ca912a2",
+    "tests/security-frontend/setup.ts": "2ba1bc0e4afe059af40236377ecfecfd16b16a77492e499f0eafb7d5c1fdc86f",
+    "tests/security-frontend/vitest.config.mjs": "52be97cf4f81d22e805e11593d840509792ffcd02d08a4a8fc63cd369e9e92da",
+    "tests/security-rules/accounts.test.mjs": "e110eb8af80603a849571893ab5054d90a65bac0f2cb12fd9d359834cb31812d",
+    "tests/security-rules/availability.test.cjs": "2efd7f86b8f36abb950b640af91bf99818390d4d3ce95dbacc12d3d3d2ef9a41",
+    "tests/security-rules/baseline.mjs": "09d75e444a5c34494222d865a62e8a6d8c60bf5811b919dd0a70a978c837b2cb",
+    "tests/security-rules/candidate.mjs": "ed8d9bf0bb3bd14fa46c745786839e4205363ee260450ca6724a469edcffeb82",
+    "tests/security-rules/candidate.test.mjs": "9a15a4f6d55fc0e0e0afb4bac46923ffd2072c4be7ad9834c5c35b230a8dd5ae",
+    "tests/security-rules/contract-dry-run.mjs": "3ee16b3a25c793d940cd14035c800f44e025fd07517143375c65b0bb16c92576",
+    "tests/security-rules/expand-readiness.mjs": "5f84d7bfcfa617b668292a6d4592bd650a9f63c8b8037f6e5c0bf24957d93b26",
+    "tests/security-rules/fixtures/audited-original.rules": "c24b7c5fb757eeba7ec67e22fc0c5e514332624ae608584a6261e99cc62e276c",
+    "tests/security-rules/loopback-only.cjs": "bff00b864d77d94f122bae5132e5bdda4af3f9f7c29e46949000a77b9b750fb1",
+    "tests/security-rules/manual-validation.mjs": "e8a3bb665b2826b5a77cf2f0703c984589dfa5f5008ae384f7136010456bbbe9",
+    "tests/security-rules/package-lock.json": "0df0d4c61da688592f8f8b8486b0110d1cf6958a369ece455ae8d064ae7e6760",
+    "tests/security-rules/package.json": "8b98f4423c9f8e41c08393652e17b766dfb26ad8352f88cef5fcdb4979a16500",
+    "tests/security-rules/run.mjs": "64a9768ec9d149ce9234afe6d80026008d71b2834faff5af63f8d26aa01f3fc2",
+    "tests/security-rules/runtime.test.cjs": "8a3032ada6c5893bc98ca7612f3d313b00028c186c4cd76fa994d1a52e6ee346",
+    "tests/security-tools/check-workflow.py": "80ed7bb8f32940b8a9a43eb2d2b4ca45a28599d9eeeb8a5e8b81154965962047",
+    "tests/security-tools/package-lock.json": "8c274b0b0f1511d77b519ed9eb5f46f90302964c4bf0d5ca9953f81a1a227879",
+    "tests/security-tools/package.json": "831c923b7fc71000dba008da8733c51b0e51805c9ef1f4b2322b2b5b258316bf",
+    "vercel.json": "449f2fb6037146f7e8dd44df94bf274727b764e60e4c4690a563a1fa5803d72b"
+  },
+  "finalSourcesSha256": "d5f2b34ac86527d71477a7831afb9cfb4e35092e3fbb760a410d6234acda7264",
+  "rules": {
+    "productionPath": "firestore.rules",
+    "snapshotSha256": "2fa9c04b0d1362f17dd7ef3952a584aeb8e588126f1c5e1231802bf98db2d149",
+    "untouchedWorkingTreeSha256": "c24b7c5fb757eeba7ec67e22fc0c5e514332624ae608584a6261e99cc62e276c",
+    "historicalFixturePath": "tests/security-rules/fixtures/audited-original.rules",
+    "historicalFixtureSha256": "c24b7c5fb757eeba7ec67e22fc0c5e514332624ae608584a6261e99cc62e276c",
+    "candidateSha256": "ad8ba4f6f946ecce5918d8a0c5da73653457e8f3772efe3f55c528a392154ec6",
+    "productionActivated": false
+  },
+  "omittedSelectionChanges": [
+    "firestore.rules",
+    "functions/package.json",
+    "src/pages/customer/MisServicios.tsx",
+    "tests/security-rules/MANUAL_VALIDATION.md",
+    "tests/security-rules/README.md",
+    "tests/security-rules/RESULTS.md",
+    "tests/security-rules/STAGE2.md",
+    "tests/security-rules/STAGE3.md",
+    "tests/security-rules/STAGE4.md",
+    "tests/security-tools/prepare-selection.py"
+  ],
+  "partiallySelected": [
+    "src/pages/Home.jsx",
+    "src/utils/constants.js"
+  ],
+  "trackedDiffSha256": "389e5081803785644620740d07ad6d2575e0f92f42e8bb04db554d16b873bda6",
+  "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "contractProvenance": {
+    "src/services/auth.ts": "369eae95741cf87e654a93b3506f07b8ee754f4db11036d758b45d1bc5e4a1c0",
+    "src/services/firebase.ts": "13720ab5c34e168e3180a9497efa31dadedee86aae56daecad2ef8f54d5893f9",
+    "src/services/firestore.ts": "719d2b0663f8ce1e61e5b7c3ca59b02a9f49b292b5b0275883bd5675b7623eb9",
+    "src/types/index.ts": "8405afaa4c044875b7c6284631677e70f11ff02d286347b3da453ec003ddf614",
+    "src/types/marketplace.ts": "98c14bd30caf75fdfcf5fed5d53c72beb68a7b19e361d2cda0e1f716185b1567",
+    "src/store/authStore.ts": "219d5801fcc977054fc48cd3f79f111e3d857d4b20ca18256e180396b5d88c1f"
+  },
+  "contractTemplatesSha256": {
+    "apiClient.ts": "497825e313d01a48a83c8b49902e2d2e658e0aa39a63d0cee0d354ba4bb4629c",
+    "authStore.ts": "28c6558cbf20b295fab0afffaaa047247d80ef4b164f3190a2db9cc2bef8e69b",
+    "check-contracts.mjs": "563223e4f40ee6688879a70c522eec5f7ec9563d26c3fbc3f27578ba88a1bd8b",
+    "contracts.test.tsx": "eb90301b4c1815cd6756f6dd3d456d66f7d4a265cf23f3fdc686ee87b12c044b",
+    "package-lock.json": "45dbdbac283474b6551b05489c15ebedb5a053c372ee061d029988f6fb500ce1",
+    "package.json": "1c327b65753defd39c344b5f682032e39aaf14f4c42431973f8319f558581f4f",
+    "sdk-boundary.ts": "0c67965221cd21ee31129265d4954c5c495c8b57e755be76f2c07d012ca912a2",
+    "vitest.config.mjs": "52be97cf4f81d22e805e11593d840509792ffcd02d08a4a8fc63cd369e9e92da"
+  },
+  "verification": {
+    "snapshot": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-verified-rvn1xo__",
+    "independentBackendSnapshot": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-independent-090_5f93",
+    "independentConsumerBaseSnapshot": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-consumer-base-y4t4iuva",
+    "logs": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7",
+    "results": [
+      {
+        "gate": "A1-runtime-base-check",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/A1-runtime-base-check.log"
+      },
+      {
+        "gate": "A1-runtime-base-apply",
+        "exitCode": 0,
+        "logSha256": "683703c58eb141cdb70a815a40de6c81f225df31503dda93a96daac9005767aa",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/A1-runtime-base-apply.log"
+      },
+      {
+        "gate": "syntax-api.cjs",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-api.cjs.log"
+      },
+      {
+        "gate": "syntax-api_index.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-api_index.js.log"
+      },
+      {
+        "gate": "syntax-api_src_app.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-api_src_app.js.log"
+      },
+      {
+        "gate": "syntax-api_src_config.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-api_src_config.js.log"
+      },
+      {
+        "gate": "syntax-api_src_errors.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-api_src_errors.js.log"
+      },
+      {
+        "gate": "syntax-api_src_firebaseAdmin.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-api_src_firebaseAdmin.js.log"
+      },
+      {
+        "gate": "syntax-api_src_middleware.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-api_src_middleware.js.log"
+      },
+      {
+        "gate": "syntax-api_src_registry.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-api_src_registry.js.log"
+      },
+      {
+        "gate": "syntax-functions_accounts.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_accounts.js.log"
+      },
+      {
+        "gate": "syntax-functions_admin.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_admin.js.log"
+      },
+      {
+        "gate": "syntax-functions_auth.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_auth.js.log"
+      },
+      {
+        "gate": "syntax-functions_config.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_config.js.log"
+      },
+      {
+        "gate": "syntax-functions_diamondOrders.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_diamondOrders.js.log"
+      },
+      {
+        "gate": "syntax-functions_email-imap.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_email-imap.js.log"
+      },
+      {
+        "gate": "syntax-functions_email.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_email.js.log"
+      },
+      {
+        "gate": "syntax-functions_otp.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_otp.js.log"
+      },
+      {
+        "gate": "syntax-functions_publicStats.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_publicStats.js.log"
+      },
+      {
+        "gate": "syntax-functions_purchases.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_purchases.js.log"
+      },
+      {
+        "gate": "syntax-functions_recharges.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_recharges.js.log"
+      },
+      {
+        "gate": "syntax-functions_roulette.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_roulette.js.log"
+      },
+      {
+        "gate": "syntax-functions_services_adminInit.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_services_adminInit.js.log"
+      },
+      {
+        "gate": "syntax-functions_services_authVerification.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_services_authVerification.js.log"
+      },
+      {
+        "gate": "syntax-functions_services_connectionPool.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_services_connectionPool.js.log"
+      },
+      {
+        "gate": "syntax-functions_services_errorCodes.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_services_errorCodes.js.log"
+      },
+      {
+        "gate": "syntax-functions_services_freefire.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_services_freefire.js.log"
+      },
+      {
+        "gate": "syntax-functions_services_httpsError.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_services_httpsError.js.log"
+      },
+      {
+        "gate": "syntax-functions_services_idempotencyService.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_services_idempotencyService.js.log"
+      },
+      {
+        "gate": "syntax-functions_services_inventoryService.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_services_inventoryService.js.log"
+      },
+      {
+        "gate": "syntax-functions_services_mailConfig.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_services_mailConfig.js.log"
+      },
+      {
+        "gate": "syntax-functions_services_monitoring.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_services_monitoring.js.log"
+      },
+      {
+        "gate": "syntax-functions_services_notificationService.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_services_notificationService.js.log"
+      },
+      {
+        "gate": "syntax-functions_services_notificationTriggers.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_services_notificationTriggers.js.log"
+      },
+      {
+        "gate": "syntax-functions_services_purchaseService.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_services_purchaseService.js.log"
+      },
+      {
+        "gate": "syntax-functions_services_rateLimiter.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_services_rateLimiter.js.log"
+      },
+      {
+        "gate": "syntax-functions_services_secretManager.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_services_secretManager.js.log"
+      },
+      {
+        "gate": "syntax-functions_telegram.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_telegram.js.log"
+      },
+      {
+        "gate": "syntax-functions_tenants.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_tenants.js.log"
+      },
+      {
+        "gate": "syntax-functions_utils_correlationId.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_utils_correlationId.js.log"
+      },
+      {
+        "gate": "syntax-functions_utils_crypto.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_utils_crypto.js.log"
+      },
+      {
+        "gate": "syntax-functions_utils_logger.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_utils_logger.js.log"
+      },
+      {
+        "gate": "syntax-functions_verifyFreeFireId.js",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/syntax-functions_verifyFreeFireId.js.log"
+      },
+      {
+        "gate": "A1-registry44",
+        "exitCode": 0,
+        "logSha256": "ab221411ac808b38f1f16c0ad5b2a435f9bc3f2485f59cd1b3cf1db93e0b4784",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/A1-registry44.log"
+      },
+      {
+        "gate": "A2-consumer-base-check",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/A2-consumer-base-check.log"
+      },
+      {
+        "gate": "A2-consumer-base-apply",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/A2-consumer-base-apply.log"
+      },
+      {
+        "gate": "B-expand-check",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/B-expand-check.log"
+      },
+      {
+        "gate": "B-expand-apply",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/B-expand-apply.log"
+      },
+      {
+        "gate": "B-install-locked-rules",
+        "exitCode": 0,
+        "logSha256": "8ec0deb1ad16eb371c187a81cec6d6a89994d932c1832f92a724c97254f65bea",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/B-install-locked-rules.log"
+      },
+      {
+        "gate": "B-handlers",
+        "exitCode": 0,
+        "logSha256": "dd439532e9f3176dd5d0ba3dc82beeb5c6bc4d46f3f5e2bd749bd607296e60f6",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/B-handlers.log",
+        "tests": 14
+      },
+      {
+        "gate": "B-runtime",
+        "exitCode": 0,
+        "logSha256": "ddad5844e7444e370b28d9459800b1c6182c639f45426fea8a30c66f89b45b43",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/B-runtime.log",
+        "tests": 15
+      },
+      {
+        "gate": "C-consumers-check",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/C-consumers-check.log"
+      },
+      {
+        "gate": "C-consumers-apply",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/C-consumers-apply.log"
+      },
+      {
+        "gate": "C-install-locked-frontend",
+        "exitCode": 0,
+        "logSha256": "f315c215a19f15a104ed28bfd0b3a9c9753c2d31a451c7c9ca1ba5619113f06c",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/C-install-locked-frontend.log"
+      },
+      {
+        "gate": "C-real-contract-typecheck",
+        "exitCode": 0,
+        "logSha256": "ce7a97118d6f342d61900013d8469ab970bbbc2d5d1cffeb7659fa5dd03f43e7",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/C-real-contract-typecheck.log"
+      },
+      {
+        "gate": "C-frontend",
+        "exitCode": 0,
+        "logSha256": "d0b8adf8e8146dbd2d166eba7f42b97d08bde08937541f145cd45bebdfbac4c8",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/C-frontend.log",
+        "tests": 65
+      },
+      {
+        "gate": "D-manual-gates-check",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/D-manual-gates-check.log"
+      },
+      {
+        "gate": "D-manual-gates-apply",
+        "exitCode": 0,
+        "logSha256": "b534ddad61f949b9a1b1549c16a7213ff1f012a0774916644ab7fd45eccea07c",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/D-manual-gates-apply.log"
+      },
+      {
+        "gate": "D-install-locked-tools",
+        "exitCode": 0,
+        "logSha256": "520fd622fe99fa7fef14fa88be42c35e438455699ef3ecc081de942dd69e3cef",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/D-install-locked-tools.log"
+      },
+      {
+        "gate": "D-candidate",
+        "exitCode": 0,
+        "logSha256": "524f295a416505da464af68748edbdfe4e233def01dbb4ed2ef94269b05bfd3b",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/D-candidate.log",
+        "tests": 28
+      },
+      {
+        "gate": "D-historical",
+        "exitCode": 0,
+        "logSha256": "655f271f35a6e0cfdcca1e1ae01a9b2b45d3c42c42afa3643673d993b3cef1f6",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/D-historical.log",
+        "tests": 18
+      },
+      {
+        "gate": "D-workflow",
+        "exitCode": 0,
+        "logSha256": "9ee3cc173c963a6460e658f66a1068b38957fefe47552cd9d9f461b9f67930fe",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/D-workflow.log"
+      },
+      {
+        "gate": "D-contract-dry-run",
+        "exitCode": 0,
+        "logSha256": "6a7fb4c3393701ae9615bd278942fda5ff5f8c42d3a684ae59d327ed5f050921",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/D-contract-dry-run.log"
+      },
+      {
+        "gate": "D-expand-dry-run",
+        "exitCode": 0,
+        "logSha256": "a3b09ee35e2d91df8017343aee4c671681f1975a67800bc45a9ed54d7b0f7ca6",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/D-expand-dry-run.log"
+      },
+      {
+        "gate": "A1-runtime-base-independent-check",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/A1-runtime-base-independent-check.log"
+      },
+      {
+        "gate": "A1-runtime-base-independent-apply",
+        "exitCode": 0,
+        "logSha256": "683703c58eb141cdb70a815a40de6c81f225df31503dda93a96daac9005767aa",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/A1-runtime-base-independent-apply.log"
+      },
+      {
+        "gate": "B-expand-independent-check",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/B-expand-independent-check.log"
+      },
+      {
+        "gate": "B-expand-independent-apply",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/B-expand-independent-apply.log"
+      },
+      {
+        "gate": "independent-registry46",
+        "exitCode": 0,
+        "logSha256": "7b2b95bd8ac61bda71f2602d6693477555cec13ce542695f8b7de0a7dff36e0a",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/independent-registry46.log"
+      },
+      {
+        "gate": "independent-handlers",
+        "exitCode": 0,
+        "logSha256": "86b6d14ad9698b8e50300eb11c3a82cab099eb274be138356eb749c6f8724db6",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/independent-handlers.log",
+        "tests": 14
+      },
+      {
+        "gate": "A2-consumer-base-independent-check",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/A2-consumer-base-independent-check.log"
+      },
+      {
+        "gate": "A2-consumer-base-independent-apply",
+        "exitCode": 0,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/A2-consumer-base-independent-apply.log"
+      },
+      {
+        "gate": "node-version",
+        "exitCode": 0,
+        "logSha256": "256a8e08ee35cb8ad36ae16385257192c3dbe7d80cfdeff9eaa886531b2f83bc",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/node-version.log"
+      },
+      {
+        "gate": "npm-version",
+        "exitCode": 0,
+        "logSha256": "b90f6efb804599bb0ba84fec754b8c7807381dabfcdc1ffe3437ff37f18fb0f5",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/npm-version.log"
+      },
+      {
+        "gate": "java-version",
+        "exitCode": 0,
+        "logSha256": "73855e3134a7daa1faef84f4e9b4a87fcfa7e5bae3b740f6dcf0a978a18e2fea",
+        "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/java-version.log"
+      }
+    ],
+    "sourceTests": {
+      "candidate": 28,
+      "handlers": 14,
+      "frontend": 65,
+      "runtime": 15,
+      "total": 122
+    },
+    "historicalCharacterizationSeparate": 18,
+    "finalGateComposition": "B 29 + C 65 unchanged after D; D candidate 28. New 30 tests import real internal contracts.",
+    "apiCount": 48,
+    "apiManifestSha256": "e715dc3eff29740fd08c92a2098f5321d2082913cad7a2ac3e0befcddfc92e2e",
+    "subsetManifestSha256": "73d111a1d367f53494d6b2275508a71dc7e34ce8954a2f0b7f5293f24c916756",
+    "node": "v22.16.0",
+    "npm": "10.9.2",
+    "javaLog": "",
+    "sourceSymlinks": 0,
+    "externalSymlinks": 0,
+    "npmInternalSymlinks": 60,
+    "trackedDiffSha256": "389e5081803785644620740d07ad6d2575e0f92f42e8bb04db554d16b873bda6",
+    "index": "empty",
+    "noRootApiFunctionsInstall": true,
+    "targetRuntime": {
+      "node": "v22.16.0",
+      "nodeBinary": "/usr/local/bin/node",
+      "java": "java version \"21.0.8\" 2025-07-15 LTS\nJava(TM) SE Runtime Environment (build 21.0.8+12-LTS-250)\nJava HotSpot(TM) 64-Bit Server VM (build 21.0.8+12-LTS-250, mixed mode, sharing)",
+      "javaHome": "/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home",
+      "os": "darwin",
+      "exitCode": 0,
+      "sourceTests": 122,
+      "allFiveManualGates": "PASS",
+      "log": "/var/folders/zq/6h6qz_616b371m8v3q93wklh0000gn/T/opencode/security-units-logs-lywy36k7/final-node22-java21.log",
+      "logSha256": "54ede92a6a95c1ac4458f586da43c205a1952bdba361761dd7738f7c02ff4892",
+      "limit": "Local macOS / existing Oracle Java 21; NOT GitHub Ubuntu / Temurin proof"
+    },
+    "finalAudit": {
+      "patchPathsSafe": true,
+      "privateKeyAndGitHubTokenPatternScan": "PASS (known patterns only)",
+      "workingTreeSelection109HashesPreserved": true,
+      "trackedDiffSha256": "389e5081803785644620740d07ad6d2575e0f92f42e8bb04db554d16b873bda6",
+      "index": "empty",
+      "helperSha256": {
+        "README.md": "1b07ad9832b446026340fd1093278c337f0ecea904924f113ced627baf3271e4",
+        "remote-proof.py": "8f5bc67aab4aa4b10a130561596e19b1d61a518461c431d645dcaa2375dcc2ed",
+        "lock-frontend.py": "980f2f6fc3f9866c72d748edb48bf088df3eb6d96219989e5ed8d18dd0f81566",
+        "contracts.py": "5edbb9828b33bdc53805383b4ff6bc80800fed91459e1591f222fd748f588b62",
+        "verify.py": "8a46a66ddcf4ee1e0499a1877123d772fbfd05d42033d1e6d0a3d18f6df91dc7",
+        "prepare.py": "3c2336630812ee6fa209473b48fb0f8b1ce33c89ad9d96c78dfd1b1369cd87ba"
+      }
+    }
+  },
+  "resolvedIntegrationBoundaries": [
+    {
+      "boundary": "src/services/auth.ts",
+      "requiredSymbol": "export const SIGNUP_BONUS",
+      "consumer": "src/pages/Product.jsx:10",
+      "status": "RESOLVED",
+      "headGap": "HEAD had no named export; single signup policy now shared by Product copy and register write.",
+      "evidence": "Symbol present in applied snapshot and frozen working tree; contracts.test.tsx exercises the real implementation with SDK/HTTP doubles only.",
+      "snapshotSha256": "56637c1f11538bf16b3c8ff9aebcc19a825ee308a6c06a92eedf348df45d605e"
+    },
+    {
+      "boundary": "src/services/firebase.ts",
+      "requiredSymbol": "export const logAnalyticsEvent",
+      "consumer": "src/pages/Product.jsx:11",
+      "status": "RESOLVED",
+      "headGap": "HEAD had no export; real GA4 wrapper selected while adminApp/Functions exports from HEAD are kept.",
+      "evidence": "Symbol present in applied snapshot and frozen working tree; contracts.test.tsx exercises the real implementation with SDK/HTTP doubles only.",
+      "snapshotSha256": "8705f4f633e6f433950be72bad5b71f40f7177c98be790249ff7958a91790038"
+    },
+    {
+      "boundary": "src/services/firestore.ts",
+      "requiredSymbol": "export const getWholesaleServices",
+      "consumer": "src/pages/reseller/CatalogoMayorista.tsx:5",
+      "status": "RESOLVED",
+      "headGap": "HEAD had no export/serviceType projection; real tenant-scoped read selected, diamond excluded, errors propagate.",
+      "evidence": "Symbol present in applied snapshot and frozen working tree; contracts.test.tsx exercises the real implementation with SDK/HTTP doubles only.",
+      "snapshotSha256": "a32bc7e73cfc83abd081a3aaad3a895d05a0aa7b406aadc02c5c52f647a00cdc"
+    },
+    {
+      "boundary": "src/store/authStore.ts",
+      "requiredSymbol": "patchBalance:",
+      "consumer": "src/pages/Product.jsx:169,282",
+      "status": "RESOLVED",
+      "headGap": "HEAD had no method; absolute-balance patch selected with identity/finite guards and stale-refresh guard.",
+      "evidence": "Symbol present in applied snapshot and frozen working tree; contracts.test.tsx exercises the real implementation with SDK/HTTP doubles only.",
+      "snapshotSha256": "28c6558cbf20b295fab0afffaaa047247d80ef4b164f3190a2db9cc2bef8e69b"
+    },
+    {
+      "boundary": "src/types/index.ts",
+      "requiredSymbol": "serviceType?:",
+      "consumer": "src/components/ServiceCard.tsx:19",
+      "status": "RESOLVED",
+      "headGap": "HEAD type lacked the discriminator; diamond/subscription union selected.",
+      "evidence": "Symbol present in applied snapshot and frozen working tree; contracts.test.tsx exercises the real implementation with SDK/HTTP doubles only.",
+      "snapshotSha256": "8405afaa4c044875b7c6284631677e70f11ff02d286347b3da453ec003ddf614"
+    },
+    {
+      "boundary": "src/types/marketplace.ts",
+      "requiredSymbol": "export interface DiamondOrder",
+      "consumer": "src/services/marketplace.ts:42-46",
+      "status": "RESOLVED",
+      "headGap": "HEAD types lacked prior DiamondOrder request/response contracts; type-only imports are checked by the focused typecheck.",
+      "evidence": "Symbol present in applied snapshot and frozen working tree; contracts.test.tsx exercises the real implementation with SDK/HTTP doubles only.",
+      "snapshotSha256": "98c14bd30caf75fdfcf5fed5d53c72beb68a7b19e361d2cda0e1f716185b1567"
+    },
+    {
+      "boundary": "src/services/firebase.ts + src/store/authStore.ts + src/services/apiClient.ts + Catalog",
+      "status": "RESOLVED",
+      "headGap": "HEAD keeps auth/adminAuth separate while A2 expected unified session.",
+      "evidence": "Dual apps retained: customCallable uses auth, customAdminCallable uses adminAuth, Catalog reads adminUser/adminDb. Suite asserts distinct Bearer tokens, rejects missing/failed/empty tokens and in-flight identity changes without cross-session fallback, and verifies listener cleanup."
+    }
+  ],
+  "integrationBlockers": []
+}

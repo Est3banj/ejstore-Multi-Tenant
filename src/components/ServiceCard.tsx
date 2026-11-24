@@ -4,6 +4,7 @@ import { ShoppingCart } from 'lucide-react';
 import type { Service } from '../types';
 import { useApp } from '../context/AppContext';
 import { useAuthStore } from '../store/authStore';
+import { withTenantParam } from '../utils/tenantUrl';
 
 interface ServiceCardProps {
   service: Service;
@@ -15,7 +16,21 @@ const ServiceCard = ({ service, index, stock }: ServiceCardProps): JSX.Element =
   const hasPromo = service.promotionalPrice && service.promotionalPrice < service.price;
   const { settings } = useApp();
   const { user } = useAuthStore();
-  const showStock = stock !== undefined && !!user; // Solo mostrar stock si el usuario está logueado
+  const isDiamond = service.serviceType === 'diamond';
+  // Diamantes: sin inventario de cuentas → siempre "Disponible", nunca "Agotado".
+  const showStock = isDiamond || (stock !== undefined && !!user); // Solo mostrar stock si el usuario está logueado
+  const stockCount = stock ?? 0;
+  // Sin cuentas cargadas se vende por WhatsApp: "por encargo", jamás rojo "Agotado".
+  const isByOrder = !isDiamond && stock === 0;
+  const isLowStock = !isDiamond && stockCount > 0 && stockCount <= 5;
+  const isAmberTone = isByOrder || isLowStock;
+  const availabilityLabel = isDiamond
+    ? 'Disponible'
+    : isByOrder
+    ? 'Por encargo'
+    : isLowStock
+    ? `Solo ${stockCount}`
+    : `${stockCount} disp.`;
   const primaryColor = settings?.primaryColor || '#E50914';
   
   // Generar color de sombra basado en el color primario del tenant
@@ -31,7 +46,7 @@ const ServiceCard = ({ service, index, stock }: ServiceCardProps): JSX.Element =
       className="glass overflow-hidden"
       whileHover={shadowStyle}
     >
-      <Link to={`/servicio/${service.id}`}>
+      <Link to={withTenantParam(`/servicio/${service.id}`)}>
         <div className="relative h-48 bg-gradient-to-br from-primary-500/10 to-red-600/5 flex items-center justify-center overflow-hidden">
           {service.image ? (
             <img
@@ -42,11 +57,21 @@ const ServiceCard = ({ service, index, stock }: ServiceCardProps): JSX.Element =
           ) : (
             <div className="text-6xl opacity-50">📺</div>
           )}
-          {hasPromo && (
-            <div className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">
-              PROMO
-            </div>
-          )}
+          <div className="absolute top-2 right-2 flex items-center gap-2">
+            {isDiamond && (
+              <span
+                className="bg-emerald-500 text-white px-3 py-1 rounded-full text-sm font-bold"
+                data-testid="nuevo-badge"
+              >
+                NUEVO
+              </span>
+            )}
+            {hasPromo && (
+              <span className="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">
+                PROMO
+              </span>
+            )}
+          </div>
           {service.hasCodeExtraction && (
             <div className="absolute top-2 left-2 bg-white/20 text-white px-3 py-1 rounded-full text-sm font-semibold">
               📡 Extracción de Código
@@ -77,16 +102,14 @@ const ServiceCard = ({ service, index, stock }: ServiceCardProps): JSX.Element =
             </div>
             {showStock && (
               <div className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 ${
-                stock === 0
-                  ? 'bg-red-500/15 border-red-500/30 text-red-400'
-                  : stock <= 5
+                isAmberTone
                   ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
                   : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
-              }`}>
+              }`} data-testid="availability-badge">
                 <span className={`w-1.5 h-1.5 rounded-full ${
-                  stock === 0 ? 'bg-red-400' : stock <= 5 ? 'bg-amber-400' : 'bg-emerald-400'
+                  isAmberTone ? 'bg-amber-400' : 'bg-emerald-400'
                 }`} />
-                {stock === 0 ? 'Agotado' : stock <= 5 ? `Solo ${stock}` : `${stock} disp.`}
+                {availabilityLabel}
               </div>
             )}
           </div>

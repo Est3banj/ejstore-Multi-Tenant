@@ -12,6 +12,8 @@ import { auth, adminAuth, db, adminDb } from './firebase';
 import { FirebaseError } from 'firebase/app';
 import type { User as AppUser } from '../types';
 
+export const SIGNUP_BONUS = 1000;
+
 export interface AuthUser extends User {
   tenantId: string | null;
   role?: string;
@@ -89,7 +91,7 @@ export const register = async (
       firstName,
       lastName,
       phone,
-      balance: 1000, // Saldo inicial para probar la ruleta
+      balance: SIGNUP_BONUS, // Same registration policy; not an additional credit
       createdAt: serverTimestamp()
     };
     

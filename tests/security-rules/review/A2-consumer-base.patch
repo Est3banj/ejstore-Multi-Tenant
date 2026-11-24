@@ -1,0 +1,1916 @@
+diff --git a/src/components/PurchaseConfirmModal.tsx b/src/components/PurchaseConfirmModal.tsx
+--- a/src/components/PurchaseConfirmModal.tsx
++++ b/src/components/PurchaseConfirmModal.tsx
+@@ -1,6 +1,13 @@
+ import { motion } from 'framer-motion';
+-import { AlertCircle, Loader } from 'lucide-react';
++import { AlertCircle, Check, Loader } from 'lucide-react';
+ import Modal from './Modal';
++import { isValidFFId } from '../utils/freefire';
++
++export interface FreeFireVerification {
++  status: 'idle' | 'verifying' | 'valid' | 'not_found' | 'unavailable';
++  nickname: string;
++  level: number | null;
++}
+ 
+ interface PurchaseConfirmModalProps {
+   isOpen: boolean;
+@@ -13,6 +20,11 @@
+   loading: boolean;
+   error: string | null;
+   terms?: string;
++  serviceType?: 'diamond' | 'subscription';
++  freeFireId?: string;
++  onFreeFireIdChange?: (value: string) => void;
++  onFreeFireIdBlur?: () => void;
++  ffVerification?: FreeFireVerification;
+ }
+ 
+ const PurchaseConfirmModal = ({
+@@ -26,9 +38,21 @@
+   loading,
+   error,
+   terms,
++  serviceType,
++  freeFireId = '',
++  onFreeFireIdChange,
++  onFreeFireIdBlur,
++  ffVerification,
+ }: PurchaseConfirmModalProps) => {
+   const remaining = currentBalance - price;
+   const insufficient = price > currentBalance;
++  const isDiamond = serviceType === 'diamond';
++  const ffIdValid = !isDiamond || isValidFFId(freeFireId.trim());
++  const ffIdInvalid = isDiamond && freeFireId.trim().length > 0 && !isValidFFId(freeFireId.trim());
++  // Bloqueo central del flujo: sólo un ID que el upstream marcó como inexistente
++  // corta la compra. UNAVAILABLE (y el resto) es fallback no bloqueante.
++  const ffNotFound = isDiamond && ffVerification?.status === 'not_found';
++  const canConfirm = ffIdValid && !insufficient && !ffNotFound;
+ 
+   return (
+     <Modal isOpen={isOpen} onClose={onClose} title="Confirmar compra" size="sm">
+@@ -55,6 +79,61 @@
+             </div>
+           </div>
+         </div>
++
++        {isDiamond && (
++          <div>
++            <label htmlFor="ff-id-input" className="block text-white/70 mb-2">
++              ID de jugador de Free Fire
++            </label>
++            <input
++              id="ff-id-input"
++              data-testid="ff-id-input"
++              type="text"
++              inputMode="numeric"
++              autoComplete="off"
++              value={freeFireId}
++              onChange={(e) => onFreeFireIdChange?.(e.target.value)}
++              onBlur={() => onFreeFireIdBlur?.()}
++              className="input-field font-mono tracking-wider"
++              placeholder="Ej: 123456789"
++              disabled={loading}
++            />
++            {ffIdInvalid && (
++              <p className="text-red-400 text-xs mt-1.5">
++                Ingresá tu ID de jugador de Free Fire (8 a 12 dígitos, sin letras ni espacios).
++              </p>
++            )}
++            {ffVerification?.status === 'verifying' && (
++              <p
++                className="text-white/50 text-xs mt-1.5 animate-pulse"
++                data-testid="ff-verify-pending"
++              >
++                Verificando ID…
++              </p>
++            )}
++            {ffVerification?.status === 'valid' && (
++              <p
++                className="text-emerald-400 text-xs mt-1.5 flex items-center gap-1"
++                data-testid="ff-verify-ok"
++              >
++                <Check size={14} aria-hidden="true" />
++                <span>
++                  Jugador: {ffVerification.nickname} · Nivel {ffVerification.level}
++                </span>
++              </p>
++            )}
++            {ffVerification?.status === 'not_found' && (
++              <p className="text-red-400 text-xs mt-1.5" data-testid="ff-verify-not-found">
++                ID no encontrado — verificá que sea correcto
++              </p>
++            )}
++            {ffVerification?.status === 'unavailable' && (
++              <p className="text-amber-400 text-xs mt-1.5" data-testid="ff-verify-unavailable">
++                No se pudo verificar el ID
++              </p>
++            )}
++          </div>
++        )}
+ 
+         {terms && (
+           <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-4 max-h-40 overflow-y-auto">
+@@ -97,7 +176,8 @@
+           ) : (
+             <button
+               onClick={onConfirm}
+-              disabled={loading}
++              disabled={loading || !canConfirm}
++              data-testid={isDiamond ? 'confirm-diamond-purchase' : undefined}
+               className="flex-1 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+               style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+             >
+diff --git a/src/components/ServiceCard.tsx b/src/components/ServiceCard.tsx
+--- a/src/components/ServiceCard.tsx
++++ b/src/components/ServiceCard.tsx
+@@ -4,6 +4,7 @@
+ import type { Service } from '../types';
+ import { useApp } from '../context/AppContext';
+ import { useAuthStore } from '../store/authStore';
++import { withTenantParam } from '../utils/tenantUrl';
+ 
+ interface ServiceCardProps {
+   service: Service;
+@@ -15,7 +16,21 @@
+   const hasPromo = service.promotionalPrice && service.promotionalPrice < service.price;
+   const { settings } = useApp();
+   const { user } = useAuthStore();
+-  const showStock = stock !== undefined && !!user; // Solo mostrar stock si el usuario está logueado
++  const isDiamond = service.serviceType === 'diamond';
++  // Diamantes: sin inventario de cuentas → siempre "Disponible", nunca "Agotado".
++  const showStock = isDiamond || (stock !== undefined && !!user); // Solo mostrar stock si el usuario está logueado
++  const stockCount = stock ?? 0;
++  // Sin cuentas cargadas se vende por WhatsApp: "por encargo", jamás rojo "Agotado".
++  const isByOrder = !isDiamond && stockCount === 0;
++  const isLowStock = !isDiamond && stockCount > 0 && stockCount <= 5;
++  const isAmberTone = isByOrder || isLowStock;
++  const availabilityLabel = isDiamond
++    ? 'Disponible'
++    : isByOrder
++    ? 'Por encargo'
++    : isLowStock
++    ? `Solo ${stockCount}`
++    : `${stockCount} disp.`;
+   const primaryColor = settings?.primaryColor || '#E50914';
+   
+   // Generar color de sombra basado en el color primario del tenant
+@@ -31,7 +46,7 @@
+       className="glass overflow-hidden"
+       whileHover={shadowStyle}
+     >
+-      <Link to={`/servicio/${service.id}`}>
++      <Link to={withTenantParam(`/servicio/${service.id}`)}>
+         <div className="relative h-48 bg-gradient-to-br from-primary-500/10 to-red-600/5 flex items-center justify-center overflow-hidden">
+           {service.image ? (
+             <img
+@@ -42,11 +57,21 @@
+           ) : (
+             <div className="text-6xl opacity-50">📺</div>
+           )}
+-          {hasPromo && (
+-            <div className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">
+-              PROMO
+-            </div>
+-          )}
++          <div className="absolute top-2 right-2 flex items-center gap-2">
++            {isDiamond && (
++              <span
++                className="bg-emerald-500 text-white px-3 py-1 rounded-full text-sm font-bold"
++                data-testid="nuevo-badge"
++              >
++                NUEVO
++              </span>
++            )}
++            {hasPromo && (
++              <span className="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">
++                PROMO
++              </span>
++            )}
++          </div>
+           {service.hasCodeExtraction && (
+             <div className="absolute top-2 left-2 bg-white/20 text-white px-3 py-1 rounded-full text-sm font-semibold">
+               📡 Extracción de Código
+@@ -77,16 +102,14 @@
+             </div>
+             {showStock && (
+               <div className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 ${
+-                stock === 0
+-                  ? 'bg-red-500/15 border-red-500/30 text-red-400'
+-                  : stock <= 5
++                isAmberTone
+                   ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                   : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+-              }`}>
++              }`} data-testid="availability-badge">
+                 <span className={`w-1.5 h-1.5 rounded-full ${
+-                  stock === 0 ? 'bg-red-400' : stock <= 5 ? 'bg-amber-400' : 'bg-emerald-400'
++                  isAmberTone ? 'bg-amber-400' : 'bg-emerald-400'
+                 }`} />
+-                {stock === 0 ? 'Agotado' : stock <= 5 ? `Solo ${stock}` : `${stock} disp.`}
++                {availabilityLabel}
+               </div>
+             )}
+           </div>
+diff --git a/src/pages/Home.jsx b/src/pages/Home.jsx
+--- a/src/pages/Home.jsx
++++ b/src/pages/Home.jsx
+@@ -10,17 +10,18 @@
+ import { Sparkles, ArrowRight } from 'lucide-react';
+ 
+ const Home = () => {
+-  const { services, settings } = useApp();
++  const { services, settings, tenant } = useApp();
+   const { customer } = useAuthStore();
+   const [selectedCategory, setSelectedCategory] = useState('all');
+   const [stockMap, setStockMap] = useState({});
+   const primaryColor = settings?.primaryColor || '#E50914';
+ 
+-  // Cargar stock de servicios visibles
++  // Cargar stock de servicios visibles (los diamantes no tienen inventario de cuentas: sin query)
+   useEffect(() => {
+     const loadStocks = async () => {
+       const map = {};
+-      const batch = services.map(async (svc) => {
++      const subscriptionServices = services.filter((svc) => svc.serviceType !== 'diamond');
++      const batch = subscriptionServices.map(async (svc) => {
+         try {
+           const stock = await getAvailableServiceStock(svc.id);
+           map[svc.id] = stock;
+@@ -31,7 +32,7 @@
+     };
+     if (services.length > 0) loadStocks();
+   }, [services]);
+-  
++
+   // Filtrar servicios populares
+   const popularServices = services.filter((service) => service.isPopular === true);
+ 
+diff --git a/src/pages/Product.jsx b/src/pages/Product.jsx
+--- a/src/pages/Product.jsx
++++ b/src/pages/Product.jsx
+@@ -1,21 +1,37 @@
+-import { useState, useEffect } from 'react';
++import { useState, useEffect, useRef } from 'react';
+ import { useParams, useNavigate } from 'react-router-dom';
+ import { useApp } from '../context/AppContext';
+ import { useAuthStore } from '../store/authStore';
+ import { getServiceById } from '../services/firestore';
+-import { getAvailableServiceStock, processPurchase } from '../services/marketplace';
++import { getAvailableServiceStock, processPurchase, createDiamondOrder } from '../services/marketplace';
++import { customCallable } from '../services/apiClient';
++import { isValidFFId } from '../utils/freefire';
+ import { PLANS } from '../utils/constants';
++import { SIGNUP_BONUS } from '../services/auth';
++import { logAnalyticsEvent } from '../services/firebase';
+ import { generateWhatsAppMessage } from '../utils/whatsapp';
++import { withTenantParam } from '../utils/tenantUrl';
+ import Modal from '../components/Modal';
+ import PurchaseConfirmModal from '../components/PurchaseConfirmModal';
+ import { RechargeModal } from '../components/RechargeModal';
+-import { motion } from 'framer-motion';
+-import { ArrowLeft, Check, Wallet, MessageCircle } from 'lucide-react';
++import { motion, AnimatePresence } from 'framer-motion';
++import { ArrowLeft, Check, Wallet, MessageCircle, Gem, UserPlus } from 'lucide-react';
++
++// Clave idempotente generada al ABRIR el modal de compra; estable entre
++// reintentos del mismo intento lógico. Se regenera al cerrar o tras éxito.
++const generateIdempotencyKey = () => {
++  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
++    return crypto.randomUUID();
++  }
++  return `dk-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
++};
++
++const FF_VERIFY_IDLE = { status: 'idle', nickname: '', level: null };
+ 
+ const Product = () => {
+   const { id } = useParams();
+   const navigate = useNavigate();
+-  const { terms, settings, tenant } = useApp();
++  const { settings, tenant } = useApp();
+   const [service, setService] = useState(null);
+   const [loading, setLoading] = useState(true);
+   const [stock, setStock] = useState(null);
+@@ -26,7 +42,17 @@
+   const [purchaseLoading, setPurchaseLoading] = useState(false);
+   const [purchaseError, setPurchaseError] = useState(null);
+   const [showRechargeModal, setShowRechargeModal] = useState(false);
++  const [freeFireId, setFreeFireId] = useState('');
++  const [ffVerify, setFfVerify] = useState(FF_VERIFY_IDLE);
++  const [diamondResult, setDiamondResult] = useState(null);
++  const idempotencyKeyRef = useRef(generateIdempotencyKey());
++  // Espejo async del input + último ID verificado: las respuestas de un blur
++  // anterior se descartan si el usuario ya editó el campo.
++  const freeFireIdRef = useRef('');
++  const lastVerifyRef = useRef('');
++  const verifyInflightRef = useRef('');
+   const customer = useAuthStore((state) => state.customer);
++  const hasTerms = typeof service?.terms === 'string' && service.terms.trim().length > 0;
+ 
+   useEffect(() => {
+     const loadService = async () => {
+@@ -39,6 +65,10 @@
+         const serviceData = await getServiceById(id, tenant.id);
+         setService(serviceData);
+         if (serviceData) {
++          if (serviceData.serviceType === 'diamond') {
++            // Los diamantes son bienes digitales puntuales: sin planes ni stock.
++            return;
++          }
+           const availablePlans = serviceData.pricing && serviceData.pricing.length > 0
+             ? serviceData.pricing.map(p => ({
+               id: p.months.toString(),
+@@ -100,7 +130,7 @@
+   }, [settings]);
+ 
+   const handleBuyWhatsApp = () => {
+-    if (!acceptedTerms) {
++    if (hasTerms && !acceptedTerms) {
+       setShowTermsModal(true);
+       return;
+     }
+@@ -125,7 +155,22 @@
+         tenantId: tenant.id
+       });
+ 
+-      navigate('/compra-exitosa/' + result.purchaseId, {
++      // Saldo mutado por la compra: patch inmediato (el snapshot lo confirma
++      // después; acá el Header/UserMenu no esperan latencia de red).
++      if (typeof result.newBalance === 'number') {
++        useAuthStore.getState().patchBalance(result.newBalance);
++      }
++
++      // GA4: el valor = lo que el server cobró de verdad
++      // (purchaseService.js: `promotionalPrice || price`); la response no
++      // trae price, así que se replica la misma fórmula del server.
++      logAnalyticsEvent('purchase', {
++        currency: 'COP',
++        value: service.promotionalPrice || service.price,
++        item_name: service.name
++      });
++
++      navigate(withTenantParam('/compra-exitosa/' + result.purchaseId), {
+         state: {
+           credential: result.account.credential,
+           serviceName: result.account.serviceName,
+@@ -145,6 +190,101 @@
+     }
+   };
+ 
++  const isDiamond = service?.serviceType === 'diamond';
++  // Suscripción sin cuentas cargadas → se vende por WhatsApp ("por encargo").
++  // El server rechaza la compra por saldo con stock 0, así que ese CTA queda
++  // deshabilitado y WhatsApp pasa a ser el CTA primario.
++  const isByOrder = !isDiamond && stock === 0;
++
++  const openPurchaseModal = () => {
++    idempotencyKeyRef.current = generateIdempotencyKey();
++    setFreeFireId('');
++    freeFireIdRef.current = '';
++    lastVerifyRef.current = '';
++    verifyInflightRef.current = '';
++    setFfVerify(FF_VERIFY_IDLE);
++    setPurchaseError(null);
++    setShowPurchaseModal(true);
++  };
++
++  const closePurchaseModal = () => {
++    idempotencyKeyRef.current = generateIdempotencyKey();
++    setShowPurchaseModal(false);
++    setPurchaseError(null);
++  };
++
++  // La verificación corre SÓLO en blur (la cuota upstream es 500 total):
++  // cada tecla limpia el estado y habilita re-verificar en el próximo blur.
++  const handleFreeFireIdChange = (value) => {
++    freeFireIdRef.current = value;
++    setFreeFireId(value);
++    lastVerifyRef.current = '';
++    setFfVerify(FF_VERIFY_IDLE);
++  };
++
++  const handleFreeFireIdBlur = async () => {
++    const value = freeFireIdRef.current.trim();
++    if (!isValidFFId(value)) return;
++    if (lastVerifyRef.current === value) return;
++    if (verifyInflightRef.current === value) return;
++
++    lastVerifyRef.current = value;
++    verifyInflightRef.current = value;
++    setFfVerify({ status: 'verifying', nickname: '', level: null });
++
++    try {
++      const res = await customCallable('verifyFreeFireId', { freeFireId: value });
++      if (lastVerifyRef.current !== value) return;
++      const payload = res?.data;
++      if (payload && payload.ok === true) {
++        setFfVerify({ status: 'valid', nickname: payload.nickname, level: payload.level ?? null });
++      } else if (payload && payload.reason === 'NOT_FOUND') {
++        setFfVerify({ status: 'not_found', nickname: '', level: null });
++      } else {
++        setFfVerify({ status: 'unavailable', nickname: '', level: null });
++      }
++    } catch {
++      if (lastVerifyRef.current !== value) return;
++      setFfVerify({ status: 'unavailable', nickname: '', level: null });
++    } finally {
++      if (verifyInflightRef.current === value) verifyInflightRef.current = '';
++    }
++  };
++
++  const handleDiamondPurchase = async () => {
++    if (!isValidFFId(freeFireId.trim())) return;
++    if (ffVerify.status === 'not_found') return;
++    setPurchaseLoading(true);
++    setPurchaseError(null);
++    try {
++      const result = await createDiamondOrder({
++        serviceId: id,
++        tenantId: tenant.id,
++        freeFireId: freeFireId.trim(),
++        idempotencyKey: idempotencyKeyRef.current,
++      });
++      idempotencyKeyRef.current = generateIdempotencyKey();
++      // El pedido debitó saldo (newBalance del callable) → reflejo inmediato.
++      if (typeof result.newBalance === 'number') {
++        useAuthStore.getState().patchBalance(result.newBalance);
++      }
++      // GA4: price viene del server (createDiamondOrder lo calcula y lo
++      // devuelve en la response) — no se replica el cálculo en el cliente.
++      logAnalyticsEvent('purchase', {
++        currency: 'COP',
++        value: result.price,
++        item_name: service.name,
++        item_category: 'diamonds'
++      });
++      setDiamondResult(result);
++      setShowPurchaseModal(false);
++    } catch (error) {
++      setPurchaseError(error.message || 'Error al procesar la compra');
++    } finally {
++      setPurchaseLoading(false);
++    }
++  };
++
+   if (loading) {
+     return (
+       <div className="min-h-screen flex items-center justify-center">
+@@ -158,7 +298,7 @@
+       <div className="min-h-screen flex items-center justify-center">
+         <div className="text-center">
+           <p className="text-white/70 text-xl mb-4">Servicio no encontrado</p>
+-          <button onClick={() => navigate('/')} className="btn-primary">
++          <button onClick={() => navigate(withTenantParam('/'))} className="btn-primary">
+             Volver al inicio
+           </button>
+         </div>
+@@ -170,22 +310,93 @@
+   const finalPrice = hasPromo ? service.promotionalPrice : service.price;
+   // Use custom price if available in the selected plan, otherwise calculate
+   const planPrice = selectedPlan?.customPrice ?? (selectedPlan ? finalPrice * selectedPlan.months : finalPrice);
+-
+-  const availablePlans = service.pricing && service.pricing.length > 0
++  const purchasePrice = isDiamond ? service.price : planPrice;
++
++  const availablePlans = isDiamond ? [] : (service.pricing && service.pricing.length > 0
+     ? service.pricing.map(p => ({
+       id: p.months.toString(),
+       name: `${p.months} ${p.months === 1 ? 'Mes' : 'Meses'}`,
+       months: p.months,
+       customPrice: p.price
+     }))
+-    : PLANS;
++    : PLANS);
++
++  const primaryBtnStyle = {
++    background: settings?.primaryColor
++      ? `linear-gradient(135deg, ${settings.primaryColor}, ${settings.primaryColor}dd)`
++      : 'linear-gradient(135deg, #E50914, #E50914dd)',
++    boxShadow: settings?.primaryColor
++      ? `0 4px 15px -3px ${settings.primaryColor}80`
++      : '0 4px 15px -3px rgba(229, 9, 20, 0.5)'
++  };
++
++  // Con stock 0 el server rechaza la compra por saldo → CTA deshabilitado con
++  // aviso, y WhatsApp (el canal real de venta) se vuelve el CTA primario verde.
++  const saldoCta = (
++    <button
++      onClick={openPurchaseModal}
++      disabled={(hasTerms && !acceptedTerms) || isByOrder}
++      title={isByOrder ? 'Sin stock — pedí por WhatsApp' : undefined}
++      data-testid="saldo-cta"
++      className={`w-full text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed ${
++        isByOrder ? 'flex flex-col items-center justify-center gap-1' : 'flex items-center justify-center gap-2'
++      }`}
++      style={primaryBtnStyle}
++    >
++      <span className="flex items-center justify-center gap-2">
++        <Wallet size={20} />
++        Comprar con saldo {customer?.balance ? `($${customer.balance.toLocaleString()})` : ''}
++      </span>
++      {isByOrder && (
++        <span className="text-xs font-normal opacity-80">Sin stock — pedí por WhatsApp</span>
++      )}
++    </button>
++  );
++
++  // Deslogueado: en vez de comprar con saldo, incentivo de registro con el
++  // regalo de bienvenida (fuente única: SIGNUP_BONUS de services/auth).
++  const registerCta = (
++    <div className="space-y-2" data-testid="register-incentive">
++      <button
++        onClick={() => window.dispatchEvent(new CustomEvent('openAuthModal', { detail: 'register' }))}
++        className="w-full flex items-center justify-center gap-2 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105"
++        style={primaryBtnStyle}
++        data-testid="register-cta"
++      >
++        <UserPlus size={20} />
++        Registrate y comprá al instante
++      </button>
++      <p className="text-center text-sm font-semibold text-amber-300" data-testid="signup-bonus-copy">
++        ${SIGNUP_BONUS.toLocaleString('es-AR')} de regalo al registrarte
++      </p>
++    </div>
++  );
++
++  const whatsappCta = (
++    <button
++      onClick={handleBuyWhatsApp}
++      disabled={hasTerms && !acceptedTerms}
++      data-testid="whatsapp-cta"
++      className={`w-full flex items-center justify-center gap-2 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed ${
++        isByOrder
++          ? 'border-2 border-green-400/50 shadow-lg shadow-green-500/20'
++          : 'border-2 border-white/20 hover:border-white/40'
++      }`}
++      style={isByOrder
++        ? { background: 'linear-gradient(135deg, #22c55e, #16a34a)', boxShadow: '0 4px 15px -3px rgba(34, 197, 94, 0.5)' }
++        : undefined}
++    >
++      <MessageCircle size={20} className={isByOrder ? 'text-white' : 'text-green-400'} />
++      Comprar por WhatsApp
++    </button>
++  );
+ 
+   return (
+     <div className="min-h-screen py-12">
+       <div className="container mx-auto px-4">
+         <button
+           onClick={() => navigate(-1)}
+-          className="mb-6 flex items-center space-x-2 text-white/70 hover:text-white transition-colors"
++          className="mb-6 min-h-10 flex items-center space-x-2 text-white/70 hover:text-white transition-colors"
+         >
+           <ArrowLeft size={20} />
+           <span>Volver</span>
+@@ -218,7 +429,17 @@
+             className="space-y-6"
+           >
+             <div>
+-              <h1 className="text-4xl font-bold mb-4 text-white">{service.name}</h1>
++              <div className="flex items-center gap-3 mb-4 flex-wrap">
++                <h1 className="text-4xl font-bold text-white">{service.name}</h1>
++                {isDiamond && (
++                  <span
++                    className="bg-emerald-500 text-white px-3 py-1 rounded-full text-sm font-bold"
++                    data-testid="nuevo-badge"
++                  >
++                    NUEVO
++                  </span>
++                )}
++              </div>
+               <p className="text-white/70 text-lg">{service.description || 'Servicio de streaming premium'}</p>
+             </div>
+ 
+@@ -226,18 +447,24 @@
+             <div className="glass p-6 rounded-xl">
+               <div className="flex items-start justify-between mb-2">
+                 <h3 className="text-lg font-semibold text-white">Precio</h3>
+-                {stock !== null && (
++                {isDiamond ? (
++                  // Diamantes: sin inventario de cuentas (recarga manual del admin) → siempre disponible.
++                  <div className="px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 bg-emerald-500/15 border-emerald-500/30 text-emerald-400">
++                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
++                    Disponible
++                  </div>
++                ) : stock !== null && (
+                   <div className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 ${
+                     stock === 0
+-                      ? 'bg-red-500/15 border-red-500/30 text-red-400'
++                      ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                       : stock <= 5
+                       ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                       : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+-                  }`}>
++                  }`} data-testid="availability-badge">
+                     <span className={`w-1.5 h-1.5 rounded-full ${
+-                      stock === 0 ? 'bg-red-400' : stock <= 5 ? 'bg-amber-400' : 'bg-emerald-400'
++                      stock === 0 || stock <= 5 ? 'bg-amber-400' : 'bg-emerald-400'
+                     }`} />
+-                    {stock === 0 ? 'Agotado' : stock <= 5 ? `Solo ${stock}` : `${stock} disponible${stock !== 1 ? 's' : ''}`}
++                    {stock === 0 ? 'Disponible por encargo' : stock <= 5 ? `Solo ${stock}` : `${stock} disponible${stock !== 1 ? 's' : ''}`}
+                   </div>
+                 )}
+               </div>
+@@ -312,53 +539,36 @@
+               </div>
+             )}
+ 
+-            {/* Términos y condiciones */}
+-            <div className="flex items-center space-x-2">
+-              <input
+-                type="checkbox"
+-                id="terms"
+-                checked={acceptedTerms}
+-                onChange={(e) => setAcceptedTerms(e.target.checked)}
+-                className="w-5 h-5 rounded"
+-              />
+-              <label htmlFor="terms" className="text-white/70">
+-                Acepto los{' '}
+-                <button
+-                  onClick={() => setShowTermsModal(true)}
+-                  className="text-primary-400 hover:text-primary-300 underline"
+-                >
+-                  términos y condiciones
+-                </button>
+-              </label>
+-            </div>
+-
+-            {customer && (
+-              <button
+-                onClick={() => setShowPurchaseModal(true)}
+-                disabled={!acceptedTerms}
+-                className="w-full flex items-center justify-center gap-2 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+-                style={{
+-                  background: settings?.primaryColor 
+-                    ? `linear-gradient(135deg, ${settings.primaryColor}, ${settings.primaryColor}dd)`
+-                    : 'linear-gradient(135deg, #E50914, #E50914dd)',
+-                  boxShadow: settings?.primaryColor
+-                    ? `0 4px 15px -3px ${settings.primaryColor}80`
+-                    : '0 4px 15px -3px rgba(229, 9, 20, 0.5)'
+-                }}
+-              >
+-                <Wallet size={20} />
+-                Comprar con saldo {customer?.balance ? `($${customer.balance.toLocaleString()})` : ''}
+-              </button>
++            {/* Términos y condiciones (solo si el servicio define los suyos) */}
++            {hasTerms && (
++              <div className="flex items-center space-x-2">
++                <input
++                  type="checkbox"
++                  id="terms"
++                  checked={acceptedTerms}
++                  onChange={(e) => setAcceptedTerms(e.target.checked)}
++                  className="w-5 h-5 rounded"
++                />
++                <label htmlFor="terms" className="text-white/70">
++                  Acepto los{' '}
++                  <button
++                    onClick={() => setShowTermsModal(true)}
++                    className="min-h-10 py-2 text-primary-400 hover:text-primary-300 underline"
++                  >
++                    términos y condiciones
++                  </button>
++                </label>
++              </div>
+             )}
+ 
+-            <button
+-              onClick={handleBuyWhatsApp}
+-              disabled={!acceptedTerms}
+-              className="w-full flex items-center justify-center gap-2 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed border-2 border-white/20 hover:border-white/40"
+-            >
+-              <MessageCircle size={20} className="text-green-400" />
+-              Comprar por WhatsApp
+-            </button>
++            {/* Con stock 0: WhatsApp (verde) primero como CTA primario.
++                Con stock > 0: orden original (saldo primero, WhatsApp debajo).
++                Deslogueado: incentivo de registro en el slot de compra con saldo. */}
++            {isByOrder && whatsappCta}
++
++            {customer ? saldoCta : registerCta}
++
++            {!isByOrder && whatsappCta}
+           </motion.div>
+         </div>
+       </div>
+@@ -372,7 +582,7 @@
+       >
+         <div className="prose prose-invert max-w-none">
+           <div className="text-white/80 whitespace-pre-wrap">
+-            {terms || 'No hay términos y condiciones disponibles.'}
++            {service?.terms}
+           </div>
+         </div>
+         <div className="mt-6 flex justify-end">
+@@ -390,22 +600,98 @@
+ 
+       <PurchaseConfirmModal
+         isOpen={showPurchaseModal}
+-        onClose={() => {
+-          setShowPurchaseModal(false);
+-          setPurchaseError(null);
+-        }}
+-        onConfirm={handleDirectPurchase}
++        onClose={closePurchaseModal}
++        onConfirm={isDiamond ? handleDiamondPurchase : handleDirectPurchase}
+         onRecharge={() => {
+           setShowPurchaseModal(false);
+           setShowRechargeModal(true);
+         }}
+         serviceName={service?.name || ''}
+-        price={planPrice}
++        price={purchasePrice}
+         currentBalance={customer?.balance || 0}
+         loading={purchaseLoading}
+         error={purchaseError}
+         terms={service?.terms}
++        serviceType={service?.serviceType}
++        freeFireId={freeFireId}
++        onFreeFireIdChange={handleFreeFireIdChange}
++        onFreeFireIdBlur={handleFreeFireIdBlur}
++        ffVerification={ffVerify}
+       />
++
++      {/* Vista de éxito de compra de diamantes (pedido pendiente de confirmación) */}
++      <AnimatePresence>
++        {diamondResult && (
++          <motion.div
++            initial={{ opacity: 0 }}
++            animate={{ opacity: 1 }}
++            exit={{ opacity: 0 }}
++            className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
++          >
++            <motion.div
++              initial={{ scale: 0.92, opacity: 0 }}
++              animate={{ scale: 1, opacity: 1 }}
++              exit={{ scale: 0.92, opacity: 0 }}
++              className="glass w-full max-w-md p-6 rounded-2xl text-center space-y-5"
++              data-testid="diamond-purchase-success"
++            >
++              <div className="w-16 h-16 mx-auto rounded-full bg-green-500/20 flex items-center justify-center">
++                <Gem size={32} className="text-green-400" />
++              </div>
++              <div>
++                <h3 className="text-white font-bold text-xl">Compra exitosa</h3>
++                <p className="text-gray-400 text-sm mt-1">
++                  Tu pedido de diamantes fue recibido y está en estado{' '}
++                  <span className="text-yellow-400 font-semibold">Pendiente</span>. Vas a recibir
++                  los diamantes en tu cuenta de Free Fire una vez sea procesado.
++                </p>
++              </div>
++              <div className="bg-white/5 rounded-xl p-4 space-y-2 border border-white/10 text-left">
++                <div className="flex justify-between text-sm">
++                  <span className="text-gray-400">Servicio</span>
++                  <span className="text-white font-medium">{service?.name}</span>
++                </div>
++                <div className="flex justify-between text-sm">
++                  <span className="text-gray-400">ID de jugador</span>
++                  <span className="text-white font-mono">{diamondResult.freeFireId || freeFireId}</span>
++                </div>
++                <div className="flex justify-between text-sm">
++                  <span className="text-gray-400">Precio</span>
++                  <span className="text-white font-medium">${(diamondResult.price ?? purchasePrice).toLocaleString()}</span>
++                </div>
++                {typeof diamondResult.newBalance === 'number' && (
++                  <div className="flex justify-between text-sm">
++                    <span className="text-gray-400">Saldo restante</span>
++                    <span className="text-white font-medium">${diamondResult.newBalance.toLocaleString()}</span>
++                  </div>
++                )}
++              </div>
++              <div className="flex flex-col gap-2 pt-1">
++                <button
++                  onClick={() => {
++                    setDiamondResult(null);
++                    navigate(withTenantParam('/mis-servicios'));
++                  }}
++                  className="w-full py-3 text-white font-semibold rounded-xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]"
++                  style={{
++                    background: settings?.primaryColor
++                      ? `linear-gradient(135deg, ${settings.primaryColor}, ${settings.primaryColor}dd)`
++                      : 'linear-gradient(135deg, #E50914, #E50914dd)',
++                  }}
++                >
++                  Ver mis pedidos
++                </button>
++                <button
++                  onClick={() => setDiamondResult(null)}
++                  className="w-full py-2.5 text-gray-400 hover:text-white font-medium text-sm transition-colors"
++                >
++                  Seguir comprando
++                </button>
++              </div>
++            </motion.div>
++          </motion.div>
++        )}
++      </AnimatePresence>
+ 
+       {showRechargeModal && (
+         <RechargeModal onClose={() => setShowRechargeModal(false)} />
+@@ -415,4 +701,3 @@
+ };
+ 
+ export default Product;
+-
+diff --git a/src/pages/customer/PurchaseResult.tsx b/src/pages/customer/PurchaseResult.tsx
+--- a/src/pages/customer/PurchaseResult.tsx
++++ b/src/pages/customer/PurchaseResult.tsx
+@@ -3,6 +3,7 @@
+ import { motion } from 'framer-motion';
+ import { doc, getDoc } from 'firebase/firestore';
+ import { db } from '../../services/firebase';
++import { withTenantParam } from '../../utils/tenantUrl';
+ import { Check, Copy, ClipboardCheck, ShoppingBag, Home, Loader } from 'lucide-react';
+ 
+ interface LocationState {
+@@ -121,13 +122,13 @@
+         <div className="glass p-8 rounded-xl text-center max-w-md w-full">
+           <p className="text-white/70 mb-4">No se encontraron datos de la compra.</p>
+           <button
+-            onClick={() => navigate('/mis-servicios')}
++            onClick={() => navigate(withTenantParam('/mis-servicios'))}
+             className="w-full mb-2 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 border border-white/20 hover:border-white/40"
+           >
+             Ver mis servicios
+           </button>
+           <button
+-            onClick={() => navigate('/')}
++            onClick={() => navigate(withTenantParam('/'))}
+             className="w-full text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300"
+             style={{
+               background: 'linear-gradient(135deg, #E50914, #E50914dd)',
+@@ -156,7 +157,7 @@
+         <div className="glass p-8 rounded-xl text-center max-w-md w-full">
+           <p className="text-white/70 mb-4">No se encontraron datos de la compra.</p>
+           <button
+-            onClick={() => navigate('/')}
++            onClick={() => navigate(withTenantParam('/'))}
+             className="w-full text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300"
+             style={{
+               background: 'linear-gradient(135deg, #E50914, #E50914dd)',
+@@ -326,14 +327,14 @@
+ 
+           <div className="flex gap-3">
+             <button
+-              onClick={() => navigate('/mis-servicios')}
++              onClick={() => navigate(withTenantParam('/mis-servicios'))}
+               className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg border border-white/20 text-white/70 hover:text-white hover:border-white/40 transition-all"
+             >
+               <ShoppingBag size={18} />
+               <span>Ver en mis servicios</span>
+             </button>
+             <button
+-              onClick={() => navigate('/')}
++              onClick={() => navigate(withTenantParam('/'))}
+               className="flex-1 flex items-center justify-center gap-2 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300"
+               style={{
+                 background: 'linear-gradient(135deg, #E50914, #E50914dd)',
+diff --git a/src/pages/reseller/CatalogoMayorista.tsx b/src/pages/reseller/CatalogoMayorista.tsx
+--- a/src/pages/reseller/CatalogoMayorista.tsx
++++ b/src/pages/reseller/CatalogoMayorista.tsx
+@@ -2,9 +2,9 @@
+ import { motion } from 'framer-motion';
+ import { useAuthStore } from '../../store/authStore';
+ import { useEffectiveTenantId } from '../../store';
+-import { getServices } from '../../services/firestore';
++import { adminDb } from '../../services/firebase';
++import { getWholesaleServices } from '../../services/firestore';
+ import { getAvailableServiceStock, getResellerById, processBulkPurchase } from '../../services/marketplace';
+-import { adminDb, adminFunctions } from '../../services/firebase';
+ import ResellerPurchaseSuccessModal from './ResellerPurchaseSuccessModal';
+ import ResellerPurchaseConfirmModal from './ResellerPurchaseConfirmModal';
+ import { CATEGORIES } from '../../utils/constants';
+@@ -62,8 +62,8 @@
+       setLoading(true);
+       try {
+         const [resellerData, svcs] = await Promise.all([
+-          getResellerById(uid),
+-          getServices(tenantId),
++          getResellerById(uid, adminDb),
++          getWholesaleServices(tenantId, adminDb),
+         ]);
+ 
+         if (resellerData) {
+@@ -76,7 +76,7 @@
+           svcs.map(async (svc) => {
+             let stock = 0;
+             try {
+-              stock = await getAvailableServiceStock(svc.id, adminDb);
++              stock = await getAvailableServiceStock(svc.id);
+             } catch (e) {
+               console.error(`Stock error for ${svc.id}:`, e);
+             }
+@@ -143,7 +143,7 @@
+         tenantId,
+         quantity: confirmService.quantity,
+         customerName,
+-      }, adminFunctions);
++      });
+ 
+       setBalance(result.newBalance);
+       setConfirmService(null);
+diff --git a/src/services/apiClient.ts b/src/services/apiClient.ts
+new file mode 100644
+--- /dev/null
++++ b/src/services/apiClient.ts
+@@ -0,0 +1,72 @@
++import { auth, adminAuth } from './firebase';
++import type { Auth } from 'firebase/auth';
++
++const CALL_TIMEOUT_MS = 70_000;
++const FRIENDLY_UNAVAILABLE = 'No se pudo conectar con el servidor. Intentá de nuevo.';
++const PUBLIC_CALLS = new Set(['getStockAvailability', 'getPublicAccount', 'getPublicStats']);
++const CODE_FOR_STATUS: Record<number, string> = {
++  400: 'invalid-argument', 401: 'unauthenticated', 403: 'permission-denied',
++  404: 'not-found', 409: 'failed-precondition', 429: 'resource-exhausted',
++  500: 'internal', 501: 'unimplemented', 503: 'unavailable', 504: 'deadline-exceeded',
++};
++
++function functionsError(code: string, message: string): Error & { code: string } {
++  const error = new Error(message) as Error & { code: string };
++  error.code = code.startsWith('functions/') ? code : `functions/${code}`;
++  return error;
++}
++
++async function execute<Res>(session: Auth, name: string, data: unknown, signal: AbortSignal): Promise<{ data: Res }> {
++  const base = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
++  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
++  const privateCall = !PUBLIC_CALLS.has(name);
++  // Wait for persisted Firebase sessions, without creating/signing out an app.
++  if (privateCall) await session.authStateReady();
++  const user = session.currentUser;
++  const assertSession = () => {
++    if (privateCall && (!user || session.currentUser !== user)) {
++      throw functionsError('unauthenticated', 'La sesión cambió o venció. Volvé a iniciar sesión.');
++    }
++  };
++  assertSession();
++  if (privateCall && user) {
++    let token: string;
++    try {
++      token = await user.getIdToken();
++    } catch {
++      throw functionsError('unauthenticated', 'No se pudo validar la sesión. Volvé a iniciar sesión.');
++    }
++    assertSession();
++    if (!token) throw functionsError('unauthenticated', 'Falta el token de sesión.');
++    headers.Authorization = `Bearer ${token}`;
++  }
++  const response = await fetch(`${base}/api/${name}`, {
++    method: 'POST', headers, body: JSON.stringify({ data }), signal,
++  });
++  if (response.ok) {
++    const body = (await response.json()) as { result?: Res };
++    assertSession();
++    return { data: body.result as Res };
++  }
++  const text = await response.text().catch(() => '');
++  assertSession();
++  let parsed: { error?: { code?: string; message?: string } } | null = null;
++  try { parsed = text ? JSON.parse(text) : null; } catch { /* HTTP status remains authoritative */ }
++  throw functionsError(parsed?.error?.code || CODE_FOR_STATUS[response.status] || 'internal',
++    parsed?.error?.message || 'Error inesperado del servidor. Intentá de nuevo.');
++}
++
++async function call<Res>(session: Auth, name: string, data?: unknown): Promise<{ data: Res }> {
++  const controller = new AbortController();
++  const timer = setTimeout(() => controller.abort(), CALL_TIMEOUT_MS);
++  try {
++    return await execute<Res>(session, name, data, controller.signal);
++  } catch (err) {
++    if (typeof (err as { code?: unknown })?.code === 'string' && (err as { code: string }).code.startsWith('functions/')) throw err;
++    if (controller.signal.aborted) throw functionsError('deadline-exceeded', 'deadline-exceeded');
++    throw functionsError('unavailable', FRIENDLY_UNAVAILABLE);
++  } finally { clearTimeout(timer); }
++}
++
++export const customCallable = <Res>(name: string, data?: unknown): Promise<{ data: Res }> => call<Res>(auth, name, data);
++export const customAdminCallable = <Res>(name: string, data?: unknown): Promise<{ data: Res }> => call<Res>(adminAuth, name, data);
+diff --git a/src/services/auth.ts b/src/services/auth.ts
+--- a/src/services/auth.ts
++++ b/src/services/auth.ts
+@@ -12,6 +12,8 @@
+ import { FirebaseError } from 'firebase/app';
+ import type { User as AppUser } from '../types';
+ 
++export const SIGNUP_BONUS = 1000;
++
+ export interface AuthUser extends User {
+   tenantId: string | null;
+   role?: string;
+@@ -89,7 +91,7 @@
+       firstName,
+       lastName,
+       phone,
+-      balance: 1000, // Saldo inicial para probar la ruleta
++      balance: SIGNUP_BONUS, // Same registration policy; not an additional credit
+       createdAt: serverTimestamp()
+     };
+     
+diff --git a/src/services/firebase.ts b/src/services/firebase.ts
+--- a/src/services/firebase.ts
++++ b/src/services/firebase.ts
+@@ -3,6 +3,12 @@
+ import { getFirestore } from 'firebase/firestore';
+ import { getStorage } from 'firebase/storage';
+ import { getFunctions } from 'firebase/functions';
++import {
++  getAnalytics,
++  isSupported,
++  logEvent as firebaseLogEvent,
++  type Analytics
++} from 'firebase/analytics';
+ 
+ const firebaseConfig = {
+   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+@@ -28,5 +34,28 @@
+ export const functions = getFunctions(app, 'us-central1');
+ export const adminFunctions = getFunctions(adminApp, 'us-central1');
+ 
++// GA4: init lazy/async. isSupported() resuelve false en entornos sin soporte
++// (SSR, algunos webviews) y nunca debe tirar. Sin VITE_FIREBASE_MEASUREMENT_ID
++// (dev/local sin GA) no se inicializa nada.
++let analytics: Analytics | null = null;
++if (import.meta.env.VITE_FIREBASE_MEASUREMENT_ID) {
++  isSupported()
++    .then((supported) => {
++      if (supported) analytics = getAnalytics(app);
++    })
++    .catch(() => {});
++}
++
++// Wrapper seguro para el resto de la app: no-op si analytics no está
++// disponible y jamás lanza — GA4 nunca puede romper el flujo del usuario.
++export const logAnalyticsEvent = (name: string, params?: Record<string, unknown>): void => {
++  if (!analytics) return;
++  try {
++    firebaseLogEvent(analytics, name, params);
++  } catch {
++    // silencioso: el tracking es best-effort
++  }
++};
++
+ export default app;
+ 
+diff --git a/src/services/firestore.ts b/src/services/firestore.ts
+--- a/src/services/firestore.ts
++++ b/src/services/firestore.ts
+@@ -47,6 +47,7 @@
+         promotionalPrice: data.promotionalPrice,
+         wholesalePrice: data.wholesalePrice,
+         category: data.category,
++        serviceType: data.serviceType,
+         images: data.images || [],
+         image: data.image || data.images?.[0] || '',
+         isActive: data.active !== false,
+@@ -89,6 +90,7 @@
+         promotionalPrice: data.promotionalPrice,
+         wholesalePrice: data.wholesalePrice,
+         category: data.category,
++        serviceType: data.serviceType,
+         images: data.images || [],
+         image: data.image || data.images?.[0] || '',
+         isActive: data.active !== false,
+@@ -127,6 +129,7 @@
+         promotionalPrice: data.promotionalPrice,
+         wholesalePrice: data.wholesalePrice,
+         category: data.category,
++        serviceType: data.serviceType,
+           images: data.images || [],
+           image: data.image || data.images?.[0] || '',
+           isActive: data.active !== false,
+@@ -153,8 +156,14 @@
+   isActive: boolean;
+   isPopular?: boolean;
+   terms?: string;
++  serviceType?: 'diamond' | 'subscription';
+   plans?: Service['plans'];
+ }
++
++export const getWholesaleServices = async (tenantId: string, _db?: Firestore): Promise<Service[]> => {
++  const services = await getServices(tenantId, _db);
++  return services.filter((s) => (s.serviceType || 'subscription') !== 'diamond');
++};
+ 
+ export const createService = async (serviceData: ServiceInput, tenantId: string, _db?: Firestore): Promise<string> => {
+   const dbInstance = _db || db;
+diff --git a/src/services/marketplace.ts b/src/services/marketplace.ts
+--- a/src/services/marketplace.ts
++++ b/src/services/marketplace.ts
+@@ -9,13 +9,13 @@
+   writeBatch,
+   query,
+   where,
++  orderBy,
+   serverTimestamp,
+   Timestamp,
+   type Firestore,
+ } from 'firebase/firestore';
+-import { db, adminDb } from './firebase';
+-import { httpsCallable, type Functions } from 'firebase/functions';
+-import { functions, adminFunctions } from './firebase';
++import { db } from './firebase';
++import { customCallable, customAdminCallable } from './apiClient';
+ import type {
+   ServiceAccount,
+   Purchase,
+@@ -39,6 +39,11 @@
+   GetRechargeHistoryResponse,
+   Reseller,
+   SmtpConfig,
++  DiamondOrder,
++  CreateDiamondOrderRequest,
++  CreateDiamondOrderResponse,
++  ProcessDiamondOrderRequest,
++  ProcessDiamondOrderResponse,
+ } from '../types/marketplace';
+ 
+ // Helper to convert Firestore timestamps
+@@ -269,8 +274,7 @@
+ // Cloud Function wrappers
+ export const processPurchase = async (data: PurchaseRequest): Promise<PurchaseResponse> => {
+   try {
+-    const cf = httpsCallable<PurchaseRequest, PurchaseResponse>(functions, 'processPurchase');
+-    const result = await cf(data);
++    const result = await customCallable<PurchaseResponse>('processPurchase', data);
+     return result.data;
+   } catch (error) {
+     console.error('Error processing purchase:', error);
+@@ -280,12 +284,99 @@
+ 
+ export const extraerCodigo = async (data: ExtraerCodigoRequest): Promise<ExtraerCodigoResponse> => {
+   try {
+-    const cf = httpsCallable<ExtraerCodigoRequest, ExtraerCodigoResponse>(functions, 'extraerCodigo');
+-    const result = await cf(data);
++    const result = await customCallable<ExtraerCodigoResponse>('extraerCodigo', data);
+     return result.data;
+   } catch (error) {
+     console.error('Error extracting code:', error);
+     throw error;
++  }
++};
++
++// ===== DIAMOND ORDERS =====
++
++export const createDiamondOrder = async (data: CreateDiamondOrderRequest): Promise<CreateDiamondOrderResponse> => {
++  try {
++    const result = await customCallable<CreateDiamondOrderResponse>('createDiamondOrder', data);
++    return result.data;
++  } catch (error) {
++    console.error('Error creating diamond order:', error);
++    throw error;
++  }
++};
++
++export const processDiamondOrder = async (data: ProcessDiamondOrderRequest): Promise<ProcessDiamondOrderResponse> => {
++  try {
++    const result = await customAdminCallable<ProcessDiamondOrderResponse>('processDiamondOrder', data);
++    return result.data;
++  } catch (error) {
++    console.error('Error processing diamond order:', error);
++    throw error;
++  }
++};
++
++export const getDiamondOrders = async (customerId: string): Promise<DiamondOrder[]> => {
++  if (!customerId) throw new Error('customerId required');
++  try {
++    const q = query(
++      collection(db, 'diamondOrders'),
++      where('customerId', '==', customerId),
++      orderBy('createdAt', 'desc')
++    );
++    const snapshot = await getDocs(q);
++    return snapshot.docs.map((snapDoc) => {
++      const data = snapDoc.data();
++      return {
++        id: snapDoc.id,
++        tenantId: data.tenantId,
++        customerId: data.customerId,
++        customerEmail: data.customerEmail,
++        serviceId: data.serviceId,
++        serviceName: data.serviceName,
++        price: data.price,
++        freeFireId: data.freeFireId,
++        status: data.status,
++        createdAt: convertTimestamp(data.createdAt) || new Date(),
++        processedAt: convertTimestamp(data.processedAt),
++        processedBy: data.processedBy,
++        rejectReason: data.rejectReason,
++      } as DiamondOrder;
++    });
++  } catch (error) {
++    console.error('Error getting diamond orders:', error);
++    return [];
++  }
++};
++
++export const getDiamondOrdersByTenant = async (tenantId: string): Promise<DiamondOrder[]> => {
++  if (!tenantId) throw new Error('tenantId required');
++  try {
++    const q = query(
++      collection(db, 'diamondOrders'),
++      where('tenantId', '==', tenantId),
++      orderBy('createdAt', 'desc')
++    );
++    const snapshot = await getDocs(q);
++    return snapshot.docs.map((snapDoc) => {
++      const data = snapDoc.data();
++      return {
++        id: snapDoc.id,
++        tenantId: data.tenantId,
++        customerId: data.customerId,
++        customerEmail: data.customerEmail,
++        serviceId: data.serviceId,
++        serviceName: data.serviceName,
++        price: data.price,
++        freeFireId: data.freeFireId,
++        status: data.status,
++        createdAt: convertTimestamp(data.createdAt) || new Date(),
++        processedAt: convertTimestamp(data.processedAt),
++        processedBy: data.processedBy,
++        rejectReason: data.rejectReason,
++      } as DiamondOrder;
++    });
++  } catch (error) {
++    console.error('Error getting tenant diamond orders:', error);
++    return [];
+   }
+ };
+ 
+@@ -338,6 +429,7 @@
+       createdAt: serverTimestamp(),
+       updatedAt: serverTimestamp(),
+     });
++    customCallable('onTicketCreated', { ticketId: docRef.id }).catch(() => {});
+     return docRef.id;
+   } catch (error) {
+     console.error('Error creating ticket:', error);
+@@ -348,7 +440,7 @@
+ export const getTickets = async (tenantId: string): Promise<Ticket[]> => {
+   if (!tenantId) throw new Error('tenantId required');
+   try {
+-    const q = query(collection(adminDb, 'tickets'), where('tenantId', '==', tenantId));
++    const q = query(collection(db, 'tickets'), where('tenantId', '==', tenantId));
+     const snapshot = await getDocs(q);
+     const list = snapshot.docs.map((doc) => {
+       const data = doc.data();
+@@ -380,6 +472,9 @@
+     ...data,
+     updatedAt: serverTimestamp(),
+   });
++  if (data.status === 'resolved') {
++    customAdminCallable('onTicketUpdated', { ticketId }).catch(() => {});
++  }
+ };
+ 
+ // ===== STOCK =====
+@@ -455,28 +550,22 @@
+   name: string;
+   phone?: string;
+   commissionPercent?: number;
+-}, _functions?: Functions): Promise<CreateResellerResponse> => {
+-  const fnInstance = _functions || functions;
+-  const cf = httpsCallable<Record<string, unknown>, CreateResellerResponse>(fnInstance, 'createReseller');
+-  const result = await cf(data);
++}): Promise<CreateResellerResponse> => {
++  const result = await customAdminCallable<CreateResellerResponse>('createReseller', data);
+   return result.data;
+ };
+ 
+ // TEMPORAL: eliminar distribuidor por email
+-export const adminDeleteResellerByEmail = async (email: string, _functions?: Functions): Promise<{ success: boolean; message: string }> => {
+-  const fnInstance = _functions || functions;
+-  const cf = httpsCallable<{ email: string }, { success: boolean; message: string }>(fnInstance, 'adminDeleteResellerByEmail');
+-  const result = await cf({ email });
++export const adminDeleteResellerByEmail = async (email: string): Promise<{ success: boolean; message: string }> => {
++  const result = await customAdminCallable<{ success: boolean; message: string }>('adminDeleteResellerByEmail', { email });
+   return result.data;
+ };
+ 
+ export const loadResellerBalance = async (data: {
+   resellerId: string;
+   amount: number;
+-}, _functions?: Functions): Promise<LoadResellerBalanceResponse> => {
+-  const fnInstance = _functions || functions;
+-  const cf = httpsCallable<Record<string, unknown>, LoadResellerBalanceResponse>(fnInstance, 'loadResellerBalance');
+-  const result = await cf(data);
++}): Promise<LoadResellerBalanceResponse> => {
++  const result = await customAdminCallable<LoadResellerBalanceResponse>('loadResellerBalance', data);
+   return result.data;
+ };
+ 
+@@ -485,26 +574,24 @@
+   tenantId: string;
+   quantity: number;
+   customerName?: string;
+-}, _functions?: Functions): Promise<ProcessBulkPurchaseResponse> => {
+-  const fnInstance = _functions || functions;
+-  const cf = httpsCallable<Record<string, unknown>, ProcessBulkPurchaseResponse>(fnInstance, 'processBulkPurchase');
+-  const result = await cf(data);
++}): Promise<ProcessBulkPurchaseResponse> => {
++  const result = await customAdminCallable<ProcessBulkPurchaseResponse>('processBulkPurchase', data);
+   return result.data;
+ };
+ 
+ export const getResellers = async (tenantId: string): Promise<Reseller[]> => {
+   if (!tenantId) throw new Error('tenantId required');
+   const { collection, query, where, getDocs } = await import('firebase/firestore');
+-  const { adminDb: db } = await import('./firebase');
+-  const q = query(collection(db, 'resellers'), where('tenantId', '==', tenantId));
++  const { db: dbInstance } = await import('./firebase');
++  const q = query(collection(dbInstance, 'resellers'), where('tenantId', '==', tenantId));
+   const snapshot = await getDocs(q);
+   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Reseller));
+ };
+ 
+-export const getResellerById = async (resellerId: string): Promise<Reseller | null> => {
++export const getResellerById = async (resellerId: string, _db?: Firestore): Promise<Reseller | null> => {
+   const { doc, getDoc } = await import('firebase/firestore');
+-  const { adminDb } = await import('./firebase');
+-  const docRef = doc(adminDb, 'resellers', resellerId);
++  const { db: dbInstance } = await import('./firebase');
++  const docRef = doc(_db || dbInstance, 'resellers', resellerId);
+   const docSnap = await getDoc(docRef);
+   if (docSnap.exists()) return { id: docSnap.id, ...docSnap.data() } as Reseller;
+   return null;
+@@ -519,38 +606,36 @@
+   host: string;
+   port: number;
+   docId?: string;
+-}, _functions?: Functions): Promise<SaveEmailConfigResponse> => {
+-  const fnInstance = _functions || functions;
+-  const cf = httpsCallable<Record<string, unknown>, SaveEmailConfigResponse>(fnInstance, 'saveEmailConfig');
+-  const result = await cf(data);
+-  return result.data;
+-};
+-
+-export const getEmailConfig = async (tenantId: string, docId?: string, _functions?: Functions): Promise<GetEmailConfigResponse> => {
+-  const fnInstance = _functions || functions;
+-  const cf = httpsCallable<Record<string, unknown>, GetEmailConfigResponse>(fnInstance, 'getEmailConfig');
+-  const result = await cf({ tenantId, docId: docId || 'emailConfig' });
+-  return result.data;
+-};
+-
+-export const checkEmailStatus = async (tenantId: string, docId?: string, _functions?: Functions): Promise<CheckEmailStatusResponse> => {
+-  const fnInstance = _functions || functions;
+-  const cf = httpsCallable<Record<string, unknown>, CheckEmailStatusResponse>(fnInstance, 'checkEmailStatus');
+-  const result = await cf({ tenantId, docId: docId || 'emailConfig' });
+-  return result.data;
+-};
+-
+-// ─── Telegram ────────────────────────────────────────────────────────────
++}): Promise<SaveEmailConfigResponse> => {
++  const result = await customAdminCallable<SaveEmailConfigResponse>('saveEmailConfig', data);
++  return result.data;
++};
++
++export const getEmailConfig = async (tenantId: string, docId?: string): Promise<GetEmailConfigResponse> => {
++  const result = await customAdminCallable<GetEmailConfigResponse>('getEmailConfig', {
++    tenantId,
++    docId: docId || 'emailConfig',
++  });
++  return result.data;
++};
++
++export const checkEmailStatus = async (tenantId: string, docId?: string): Promise<CheckEmailStatusResponse> => {
++  const result = await customAdminCallable<CheckEmailStatusResponse>('checkEmailStatus', {
++    tenantId,
++    docId: docId || 'emailConfig',
++  });
++  return result.data;
++};
++
++// ─── Telegram ──────────────────────────────────────────────────────────────
+ 
+ export const generateTelegramToken = async (): Promise<GenerateTelegramTokenResponse> => {
+-  const cf = httpsCallable<Record<string, never>, GenerateTelegramTokenResponse>(adminFunctions, 'generateTelegramToken');
+-  const result = await cf({});
++  const result = await customAdminCallable<GenerateTelegramTokenResponse>('generateTelegramToken', {});
+   return result.data;
+ };
+ 
+ export const checkTelegramStatus = async (): Promise<CheckTelegramStatusResponse> => {
+-  const cf = httpsCallable<Record<string, never>, CheckTelegramStatusResponse>(adminFunctions, 'checkTelegramStatus');
+-  const result = await cf({});
++  const result = await customAdminCallable<CheckTelegramStatusResponse>('checkTelegramStatus', {});
+   return result.data;
+ };
+ 
+@@ -562,22 +647,18 @@
+   newPassword?: string;
+   newProfileName?: string;
+   newProfilePin?: string;
+-}, _functions?: Functions): Promise<UpdateTicketCredentialsResponse> => {
+-  const fnInstance = _functions || functions;
+-  const cf = httpsCallable<Record<string, unknown>, UpdateTicketCredentialsResponse>(fnInstance, 'updateTicketCredentials');
+-  const result = await cf(data);
++}): Promise<UpdateTicketCredentialsResponse> => {
++  const result = await customAdminCallable<UpdateTicketCredentialsResponse>('updateTicketCredentials', data);
+   return result.data;
+ };
+ 
+ export const adminUpdateTicket = async (data: Record<string, unknown>): Promise<{ success: boolean }> => {
+-  const cf = httpsCallable<Record<string, unknown>, { success: boolean }>(adminFunctions, 'adminUpdateTicket');
+-  const result = await cf(data);
++  const result = await customAdminCallable<{ success: boolean }>('adminUpdateTicket', data);
+   return result.data;
+ };
+ 
+ export const checkRechargePayment = async (data: { rechargeId: string; customerName?: string }): Promise<CheckRechargePaymentResponse> => {
+-  const cf = httpsCallable<Record<string, unknown>, CheckRechargePaymentResponse>(functions, 'checkRechargePayment');
+-  const result = await cf(data);
++  const result = await customCallable<CheckRechargePaymentResponse>('checkRechargePayment', data);
+   return result.data;
+ };
+ 
+@@ -586,38 +667,28 @@
+   password: string;
+   host: string;
+   port: number;
+-}, _functions?: Functions): Promise<TestEmailConnectionResponse> => {
+-  const fnInstance = _functions || functions;
+-  const cf = httpsCallable<Record<string, unknown>, TestEmailConnectionResponse>(fnInstance, 'testEmailConnection');
+-  const result = await cf(data);
+-  return result.data;
+-};
+-
+-export const getRechargeHistory = async (_functions?: Functions): Promise<GetRechargeHistoryResponse> => {
+-  const fnInstance = _functions || functions;
+-  const cf = httpsCallable<Record<string, never>, GetRechargeHistoryResponse>(fnInstance, 'getRechargeHistory');
+-  const result = await cf({});
+-  return result.data;
+-};
+-
+-// ─── SMTP ─────────────────────────────────────────────────────────────────
+-
+-export const saveSmtpConfig = async (data: SmtpConfig, _functions?: Functions): Promise<void> => {
+-  const fnInstance = _functions || functions;
+-  const fn = httpsCallable<Record<string, unknown>, void>(fnInstance, 'saveSmtpConfig');
+-  await fn(data as unknown as Record<string, unknown>);
+-};
+-
+-export const getSmtpConfig = async (_functions?: Functions): Promise<SmtpConfig | null> => {
+-  const fnInstance = _functions || functions;
+-  const fn = httpsCallable<Record<string, never>, SmtpConfig | null>(fnInstance, 'getSmtpConfig');
+-  const result = await fn({});
+-  return result.data;
+-};
+-
+-export const sendTestEmail = async (_functions?: Functions): Promise<{ success: boolean; message: string }> => {
+-  const fnInstance = _functions || functions;
+-  const fn = httpsCallable<Record<string, never>, { success: boolean; message: string }>(fnInstance, 'sendTestEmail');
+-  const result = await fn({});
+-  return result.data;
+-};
++}): Promise<TestEmailConnectionResponse> => {
++  const result = await customAdminCallable<TestEmailConnectionResponse>('testEmailConnection', data);
++  return result.data;
++};
++
++export const getRechargeHistory = async (): Promise<GetRechargeHistoryResponse> => {
++  const result = await customCallable<GetRechargeHistoryResponse>('getRechargeHistory', {});
++  return result.data;
++};
++
++// ─── SMTP ──────────────────────────────────────────────────────────────────
++
++export const saveSmtpConfig = async (data: SmtpConfig): Promise<void> => {
++  await customAdminCallable<void>('saveSmtpConfig', data);
++};
++
++export const getSmtpConfig = async (): Promise<SmtpConfig | null> => {
++  const result = await customAdminCallable<SmtpConfig | null>('getSmtpConfig', {});
++  return result.data;
++};
++
++export const sendTestEmail = async (): Promise<{ success: boolean; message: string }> => {
++  const result = await customAdminCallable<{ success: boolean; message: string }>('sendTestEmail', {});
++  return result.data;
++};
+diff --git a/src/store/authStore.ts b/src/store/authStore.ts
+--- a/src/store/authStore.ts
++++ b/src/store/authStore.ts
+@@ -3,198 +3,106 @@
+ import type { User as FirebaseUser } from 'firebase/auth';
+ import type { CustomerUser } from '../services/auth';
+ 
++type Role = 'admin' | 'superadmin' | 'reseller' | null;
+ interface AuthState {
+   user: FirebaseUser | null;
+   adminUser: FirebaseUser | null;
+   userTenantId: string | null;
+   customer: CustomerUser | null;
+   isAdmin: boolean;
+-  role: 'admin' | 'superadmin' | 'reseller' | null;
++  role: Role;
+   loading: boolean;
+   initialized: boolean;
+-
+   initialize: () => (() => void) | undefined;
+   setUserTenantId: (tenantId: string | null) => void;
+   setCustomer: (customer: CustomerUser | null) => void;
++  patchBalance: (balance: number) => void;
+   logout: () => Promise<void>;
+   refreshCustomer: () => Promise<void>;
+ }
+ 
+ export const useAuthStore = create<AuthState>((set, get) => ({
+-  user: null,
+-  adminUser: null,
+-  userTenantId: null,
+-  customer: null,
+-  isAdmin: false,
+-  role: null,
+-  loading: false,
+-  initialized: false,
+-
++  user: null, adminUser: null, userTenantId: null, customer: null,
++  isAdmin: false, role: null, loading: false, initialized: false,
+   initialize: () => {
+-    let authReady = false;
+-    let adminReady = false;
+-
+-    const checkInitialized = () => {
+-      if (authReady && adminReady) {
+-        set({ loading: false, initialized: true });
++    let active = true;
++    const versions = [0, 0];
++    const ready = [false, false];
++    const identities: Array<{ role: Role; tenantId: string | null } | null> = [null, null];
++    const publish = () => {
++      // Panel routing prefers the panel identity; customer belongs exclusively
++      // to the default Firebase app, including simultaneous client/admin login.
++      const identity = identities[1] || identities[0];
++      set({ role: identity?.role || null, userTenantId: identity?.tenantId || null,
++        isAdmin: identity?.role === 'admin' || identity?.role === 'superadmin',
++        loading: !ready.every(Boolean), initialized: ready.every(Boolean) });
++    };
++    const listen = async (slot: number, user: FirebaseUser | null) => {
++      const version = ++versions[slot];
++      const current = () => active && versions[slot] === version;
++      ready[slot] = false;
++      identities[slot] = null;
++      set(slot === 0 ? { user, customer: null } : { adminUser: user });
++      publish();
++      try {
++        if (user) {
++          const record = await (slot === 0 ? checkUserRole : checkAdminRole)(user.uid);
++          let role = record?.role as string | undefined;
++          let tenantId = record?.tenantId || null;
++          if (!role) {
++            const token = await user.getIdTokenResult();
++            role = token.claims.role as string | undefined;
++            tenantId = token.claims.tenantId as string || null;
++          }
++          if (!current()) return;
++          if (role === 'admin' || role === 'superadmin' || role === 'reseller') {
++            identities[slot] = { role, tenantId };
++          } else if (slot === 0) {
++            const customer = await getCustomerData(user.uid, user.email || '');
++            if (!current()) return;
++            set({ customer });
++          }
++        }
++      } catch (error) {
++        if (current()) console.error('Error resolving session:', error);
++      } finally {
++        if (current()) {
++          ready[slot] = true;
++          publish();
++          const identity = identities[1] || identities[0];
++          if (identity?.tenantId) {
++            const { useTenantStore } = await import('./tenantStore');
++            if (current() && identity === (identities[1] || identities[0])) {
++              useTenantStore.getState().loadTenantFromAuth(identity.tenantId);
++            }
++          }
++        }
+       }
+     };
+-
+-    const unsubscribe = onAuthChange(async (currentUser) => {
+-      set({ user: currentUser, loading: true });
+-
+-      if (currentUser) {
+-        // 1. Intentar con Firestore (users/{uid})
+-        const userData = await checkUserRole(currentUser.uid);
+-
+-        // 2. Fallback: leer custom claims del token (más confiable)
+-        let role = userData?.role as string | null;
+-        let tenantId = userData?.tenantId as string | null;
+-
+-        if (!role) {
+-          try {
+-            const idTokenResult = await currentUser.getIdTokenResult();
+-            role = idTokenResult.claims.role as string || null;
+-            tenantId = idTokenResult.claims.tenantId as string || null;
+-          } catch (e) {
+-            console.warn('Error reading custom claims:', e);
+-          }
+-        }
+-
+-
+-
+-        const isAdminUser = role === 'admin' || role === 'superadmin';
+-
+-        if (isAdminUser) {
+-          set({
+-            userTenantId: tenantId,
+-            isAdmin: true,
+-            role: role as 'admin' | 'superadmin',
+-            customer: null
+-          });
+-          // Cargar tenant desde auth si no hay tenant en URL
+-          if (tenantId) {
+-            const { useTenantStore } = await import('./tenantStore');
+-            useTenantStore.getState().loadTenantFromAuth(tenantId);
+-          }
+-        } else if (role === 'reseller') {
+-          set({
+-            userTenantId: tenantId,
+-            isAdmin: false,
+-            role: 'reseller',
+-            customer: null,
+-          });
+-          // Cargar tenant desde auth si no hay tenant en URL
+-          if (tenantId) {
+-            const { useTenantStore } = await import('./tenantStore');
+-            useTenantStore.getState().loadTenantFromAuth(tenantId);
+-          }
+-        } else {
+-          set({ userTenantId: null, isAdmin: false, role: null });
+-          const customerData = await getCustomerData(currentUser.uid, currentUser.email || '');
+-          set({ customer: customerData });
+-        }
+-      } else {
+-        // Solo limpiar user/customer — si hay adminUser, preservar estado admin
+-        const state = get();
+-        set({ user: null, customer: null });
+-        if (!state.adminUser) {
+-          set({ userTenantId: null, isAdmin: false, role: null });
+-        }
+-      }
+-
+-      set({ loading: false });
+-      authReady = true;
+-      checkInitialized();
+-    });
+-
+-    const unsubscribeAdmin = onAdminAuthChange(async (currentUser) => {
+-      set({ adminUser: currentUser, loading: true });
+-
+-      if (currentUser) {
+-        const userData = await checkAdminRole(currentUser.uid);
+-
+-        let role = userData?.role as string | null;
+-        let tenantId = userData?.tenantId as string | null;
+-
+-        if (!role) {
+-          try {
+-            const idTokenResult = await currentUser.getIdTokenResult();
+-            role = idTokenResult.claims.role as string || null;
+-            tenantId = idTokenResult.claims.tenantId as string || null;
+-          } catch (e) {
+-            console.warn('Error reading admin claims:', e);
+-          }
+-        }
+-
+-        const isAdminUser = role === 'admin' || role === 'superadmin';
+-
+-        if (isAdminUser) {
+-          set({
+-            userTenantId: tenantId,
+-            isAdmin: true,
+-            role: role as 'admin' | 'superadmin',
+-            customer: null
+-          });
+-          if (tenantId) {
+-            const { useTenantStore } = await import('./tenantStore');
+-            useTenantStore.getState().loadTenantFromAuth(tenantId);
+-          }
+-        } else if (role === 'reseller') {
+-          set({
+-            userTenantId: tenantId,
+-            isAdmin: false,
+-            role: 'reseller',
+-            customer: null,
+-          });
+-          if (tenantId) {
+-            const { useTenantStore } = await import('./tenantStore');
+-            useTenantStore.getState().loadTenantFromAuth(tenantId);
+-          }
+-        }
+-      } else {
+-        // Solo limpiar adminUser — si hay usuario regular, preservar su estado
+-        const state = get();
+-        set({ adminUser: null });
+-        if (!state.user) {
+-          set({ userTenantId: null, isAdmin: false, role: null });
+-        }
+-      }
+-
+-      set({ loading: false });
+-      adminReady = true;
+-      checkInitialized();
+-    });
+-
+-    return () => {
+-      unsubscribe();
+-      unsubscribeAdmin();
+-    };
++    const stopClient = onAuthChange(user => { void listen(0, user); });
++    const stopAdmin = onAdminAuthChange(user => { void listen(1, user); });
++    return () => { active = false; stopClient(); stopAdmin(); };
+   },
+-
+-  setUserTenantId: (tenantId) => {
+-    set({ userTenantId: tenantId });
++  setUserTenantId: userTenantId => set({ userTenantId }),
++  setCustomer: customer => set({ customer }),
++  // Absolute value, never an increment or another Firestore debit.
++  patchBalance: balance => {
++    const { user, customer } = get();
++    if (!Number.isFinite(balance) || !customer || customer.uid !== user?.uid || customer.balance === balance) return;
++    set({ customer: { ...customer, balance } });
+   },
+-
+-  setCustomer: (customer) => {
+-    set({ customer });
++  refreshCustomer: async () => {
++    const { user, customer } = get();
++    if (!user || !customer) return;
++    const next = await getCustomerData(user.uid);
++    if (!next || get().user !== user || get().customer !== customer) return;
++    set({ customer: next });
+   },
+-
+-  refreshCustomer: async () => {
+-    const { user } = get();
+-    if (user) {
+-      const customerData = await getCustomerData(user.uid);
+-      set({ customer: customerData });
+-    }
+-  },
+-
+   logout: async () => {
+-    const { logout: authLogout, adminLogout } = await import('../services/auth');
+-    await Promise.all([authLogout(), adminLogout()]);
+-
++    const { logout, adminLogout } = await import('../services/auth');
++    await Promise.all([logout(), adminLogout()]);
+     localStorage.removeItem('ejstore_roulette_data');
+     localStorage.removeItem('roulette_dont_ask');
+-
+-    set({ user: null, adminUser: null, userTenantId: null, customer: null, isAdmin: false, role: null });
+-  }
++    set({ user: null, adminUser: null, customer: null, userTenantId: null, isAdmin: false, role: null });
++  },
+ }));
+diff --git a/src/types/index.ts b/src/types/index.ts
+--- a/src/types/index.ts
++++ b/src/types/index.ts
+@@ -22,6 +22,7 @@
+   promotionalPrice?: number;
+   wholesalePrice?: number;
+   category: string;
++  serviceType?: 'diamond' | 'subscription';
+   images: string[];
+   image?: string; // Legacy single image field
+   isActive: boolean;
+diff --git a/src/types/marketplace.ts b/src/types/marketplace.ts
+--- a/src/types/marketplace.ts
++++ b/src/types/marketplace.ts
+@@ -69,6 +69,53 @@
+   linkTokens?: string[];
+ }
+ 
++export type DiamondOrderStatus = 'pending' | 'completed' | 'rejected';
++
++export interface DiamondOrder {
++  id: string;
++  tenantId: string;
++  customerId: string;
++  customerEmail: string;
++  serviceId: string;
++  serviceName: string;
++  price: number;
++  freeFireId: string;
++  status: DiamondOrderStatus;
++  createdAt: Date;
++  processedAt?: Date;
++  processedBy?: string;
++  rejectReason?: string;
++}
++
++export interface CreateDiamondOrderRequest {
++  serviceId: string;
++  tenantId: string;
++  freeFireId: string;
++  idempotencyKey: string;
++}
++
++export interface CreateDiamondOrderResponse {
++  success: boolean;
++  orderId: string;
++  status: DiamondOrderStatus;
++  price: number;
++  newBalance: number;
++  idempotent?: boolean;
++}
++
++export interface ProcessDiamondOrderRequest {
++  orderId: string;
++  action: 'confirm' | 'reject';
++  reason?: string;
++}
++
++export interface ProcessDiamondOrderResponse {
++  success: boolean;
++  orderId: string;
++  status: DiamondOrderStatus;
++  newBalance?: number;
++}
++
+ export interface Reseller {
+   id: string;
+   tenantId: string;
+diff --git a/src/utils/constants.js b/src/utils/constants.js
+--- a/src/utils/constants.js
++++ b/src/utils/constants.js
+@@ -1,11 +1,12 @@
+-import { Monitor, User, Music, Tv, Gift } from 'lucide-react';
++import { Monitor, User, Music, Tv, Gift, Gem } from 'lucide-react';
+ 
+ export const CATEGORIES = [
+   { id: 'pantallas', name: 'Pantallas', icon: Monitor },
+   { id: 'cuentas', name: 'Cuentas', icon: User },
+   { id: 'musica-video', name: 'Música y Video', icon: Music },
+   { id: 'tv-deportes', name: 'TV / Deportes', icon: Tv },
+-  { id: 'combos', name: 'Combos', icon: Gift }
++  { id: 'combos', name: 'Combos', icon: Gift },
++  { id: 'diamantes', name: 'Diamantes', icon: Gem }
+ ];
+ 
+ export const PAYMENT_METHODS = [
+@@ -19,4 +20,3 @@
+   { id: '6', name: '6 Meses', months: 6 },
+   { id: '12', name: '12 Meses', months: 12 }
+ ];
+-
+diff --git a/src/utils/freefire.ts b/src/utils/freefire.ts
+new file mode 100644
+--- /dev/null
++++ b/src/utils/freefire.ts
+@@ -0,0 +1,3 @@
++export const FF_ID_REGEX = /^\d{8,12}$/;
++
++export const isValidFFId = (value: string): boolean => FF_ID_REGEX.test(value);
+diff --git a/src/utils/tenantUrl.ts b/src/utils/tenantUrl.ts
+new file mode 100644
+--- /dev/null
++++ b/src/utils/tenantUrl.ts
+@@ -0,0 +1,29 @@
++import { useTenantStore } from '../store/tenantStore';
++import { detectTenantFromUrl } from '../services/tenant';
++
++// Tenant activo para construir links: store resuelto (URL o sesión) con
++// fallback al parámetro de URL si el store todavía no cargó.
++export const currentTenantId = (): string | null => {
++  return useTenantStore.getState().tenant?.id || detectTenantFromUrl();
++};
++
++// Agrega ?v=<tenant> a un path interno preservando params y hash existentes.
++// Sin tenant activo devuelve el path sin tocar (apex/marketing).
++export const withTenantParam = (path: string): string => {
++  const tenantId = currentTenantId();
++  if (!tenantId) return path;
++
++  const [pathPart, hash] = path.split('#');
++  const queryIndex = pathPart.indexOf('?');
++  const pathname = queryIndex === -1 ? pathPart : pathPart.slice(0, queryIndex);
++  const search = new URLSearchParams(
++    queryIndex === -1 ? '' : pathPart.slice(queryIndex + 1)
++  );
++
++  if (!search.get('v') && !search.get('tenant')) {
++    search.set('v', tenantId);
++  }
++
++  const query = search.toString();
++  return `${pathname}${query ? `?${query}` : ''}${hash ? `#${hash}` : ''}`;
++};
+diff --git a/src/vite-env.d.ts b/src/vite-env.d.ts
+--- a/src/vite-env.d.ts
++++ b/src/vite-env.d.ts
+@@ -1,6 +1,8 @@
+ /// <reference types="vite/client" />
+ 
+ interface ImportMetaEnv {
++  readonly VITE_API_URL?: string;
++  readonly VITE_FIREBASE_MEASUREMENT_ID?: string;
+   readonly VITE_FIREBASE_API_KEY: string;
+   readonly VITE_FIREBASE_AUTH_DOMAIN: string;
+   readonly VITE_FIREBASE_PROJECT_ID: string;

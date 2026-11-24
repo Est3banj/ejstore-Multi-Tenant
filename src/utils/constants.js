@@ -1,11 +1,12 @@
-import { Monitor, User, Music, Tv, Gift } from 'lucide-react';
+import { Monitor, User, Music, Tv, Gift, Gem } from 'lucide-react';
 
 export const CATEGORIES = [
   { id: 'pantallas', name: 'Pantallas', icon: Monitor },
   { id: 'cuentas', name: 'Cuentas', icon: User },
   { id: 'musica-video', name: 'Música y Video', icon: Music },
   { id: 'tv-deportes', name: 'TV / Deportes', icon: Tv },
-  { id: 'combos', name: 'Combos', icon: Gift }
+  { id: 'combos', name: 'Combos', icon: Gift },
+  { id: 'diamantes', name: 'Diamantes', icon: Gem }
 ];
 
 export const PAYMENT_METHODS = [
@@ -19,4 +20,3 @@ export const PLANS = [
   { id: '6', name: '6 Meses', months: 6 },
   { id: '12', name: '12 Meses', months: 12 }
 ];
-

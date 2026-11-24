@@ -27,6 +27,9 @@ vi.mock('firebase/firestore', () => ({
   setDoc: vi.fn(),
   query: vi.fn(),
   where: vi.fn(),
+  orderBy: vi.fn(),
+  onSnapshot: vi.fn(() => () => {}),
+  Timestamp: class Timestamp {},
   serverTimestamp: vi.fn(() => new Date()),
   connectFirestoreEmulator: vi.fn(),
 }));
@@ -38,6 +41,15 @@ vi.mock('firebase/storage', () => ({
   getDownloadURL: vi.fn(() => Promise.resolve('https://test.url')),
   deleteObject: vi.fn(),
   connectStorageEmulator: vi.fn(),
+}));
+
+// GA4: isSupported resuelve false por default → analytics queda null en
+// services/firebase.ts y logAnalyticsEvent es no-op en TODA la suite
+// (determinístico, sin gtag/IndexedDB reales en jsdom).
+vi.mock('firebase/analytics', () => ({
+  getAnalytics: vi.fn(() => ({})),
+  isSupported: vi.fn(() => Promise.resolve(false)),
+  logEvent: vi.fn(),
 }));
 
 vi.mock('firebase/functions', () => ({
@@ -67,3 +79,22 @@ global.ResizeObserver = vi.fn().mockImplementation(() => ({
   unobserve: vi.fn(),
   disconnect: vi.fn()
 }));
+
+// Framer-motion (whileInView en Home CTA / LandingPage) construye un
+// IntersectionObserver en jsdom — sin este mock, `new IntersectionObserver`
+// revienta con ReferenceError. Mock no-disparador: los elementos quedan en su
+// estado inicial (mismo criterio que tenantRouting.test.tsx); las aserciones
+// son de presencia/texto, no de visibilidad computada.
+class MockIntersectionObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+}
+Object.defineProperty(window, 'IntersectionObserver', {
+  writable: true,
+  configurable: true,
+  value: MockIntersectionObserver,
+});

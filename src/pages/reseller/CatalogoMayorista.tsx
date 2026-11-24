@@ -2,9 +2,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '../../store/authStore';
 import { useEffectiveTenantId } from '../../store';
-import { getServices } from '../../services/firestore';
+import { adminDb } from '../../services/firebase';
+import { getWholesaleServices } from '../../services/firestore';
 import { getAvailableServiceStock, getResellerById, processBulkPurchase } from '../../services/marketplace';
-import { adminDb, adminFunctions } from '../../services/firebase';
 import ResellerPurchaseSuccessModal from './ResellerPurchaseSuccessModal';
 import ResellerPurchaseConfirmModal from './ResellerPurchaseConfirmModal';
 import { CATEGORIES } from '../../utils/constants';
@@ -57,15 +57,19 @@ const CatalogoMayorista = (): JSX.Element => {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
+    let active = true;
+    setServices([]);
     const load = async () => {
       if (!uid || !tenantId) return;
       setLoading(true);
+      setError(null);
       try {
         const [resellerData, svcs] = await Promise.all([
-          getResellerById(uid),
-          getServices(tenantId),
+          getResellerById(uid, adminDb),
+          getWholesaleServices(tenantId, adminDb),
         ]);
 
+        if (!active) return;
         if (resellerData) {
           setBalance(resellerData.balance || 0);
         }
@@ -74,12 +78,7 @@ const CatalogoMayorista = (): JSX.Element => {
 
         const servicesWithStock: ServiceWithPrice[] = await Promise.all(
           svcs.map(async (svc) => {
-            let stock = 0;
-            try {
-              stock = await getAvailableServiceStock(svc.id, adminDb);
-            } catch (e) {
-              console.error(`Stock error for ${svc.id}:`, e);
-            }
+            const stock = await getAvailableServiceStock(svc.id, tenantId);
 
             let wholesalePrice: number;
             if ((svc as any).wholesalePrice) {
@@ -107,15 +106,16 @@ const CatalogoMayorista = (): JSX.Element => {
           })
         );
 
-        setServices(servicesWithStock);
+        if (active) setServices(servicesWithStock);
       } catch (err) {
         console.error('Error loading catalog:', err);
-        setError('Error al cargar el catálogo');
+        if (active) setError('Error al cargar el catálogo');
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
     load();
+    return () => { active = false; };
   }, [uid, tenantId]);
 
   const handleQuantityChange = (serviceId: string, delta: number) => {
@@ -143,7 +143,7 @@ const CatalogoMayorista = (): JSX.Element => {
         tenantId,
         quantity: confirmService.quantity,
         customerName,
-      }, adminFunctions);
+      });
 
       setBalance(result.newBalance);
       setConfirmService(null);

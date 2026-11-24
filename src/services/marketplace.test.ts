@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { collection, doc, getDocs, addDoc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDocs, addDoc, deleteDoc, query } from 'firebase/firestore';
+import { customCallable } from './apiClient';
 import {
   getAccounts,
   createAccount,
@@ -7,12 +8,14 @@ import {
   deleteAccount,
   getServiceStock,
   getAvailableServiceStock,
+  getPurchases,
 } from './marketplace';
 
 vi.mock('./firebase', () => ({
   db: {},
   functions: {},
 }));
+vi.mock('./apiClient', () => ({ customCallable: vi.fn() }));
 
 const mockAccountData = {
   label: 'Account 1',
@@ -28,28 +31,6 @@ const mockDocs = [
   { id: 'acc-2', data: () => ({ ...mockAccountData, label: 'Account 2', status: 'sold' }) },
   { id: 'acc-3', data: () => ({ ...mockAccountData, label: 'Account 3', status: 'expired' }) },
 ];
-
-// Legacy accounts: no availableProfiles field
-const mockLegacyAccountData = {
-  label: 'Account Legacy',
-  status: 'available',
-  serviceId: 'svc-1',
-  credential: { email: 'legacy@test.com', password: 'pass789' },
-  createdAt: new Date('2025-06-01'),
-  updatedAt: new Date('2025-06-01'),
-};
-
-// New format accounts: with availableProfiles
-const mockProfileAccountData = {
-  label: 'Account with Profiles',
-  serviceId: 'svc-1',
-  status: 'available',
-  totalProfiles: 10,
-  availableProfiles: 7,
-  credential: { email: 'profiles@test.com', password: 'pass999' },
-  createdAt: new Date('2025-06-01'),
-  updatedAt: new Date('2025-06-01'),
-};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -226,52 +207,65 @@ describe('getServiceStock', () => {
 });
 
 describe('getAvailableServiceStock', () => {
-  it('returns count of legacy available accounts (no availableProfiles)', async () => {
-    vi.mocked(getDocs).mockResolvedValue({
-      docs: [
-        { id: 'acc-1', data: () => ({ ...mockLegacyAccountData }) },
-        { id: 'acc-2', data: () => ({ ...mockLegacyAccountData, label: 'Acc 2' }) },
-      ],
-    } as any);
-    vi.mocked(collection as any).mockReturnValue('col-ref');
-    vi.mocked(query as any).mockReturnValue('query-ref');
-    vi.mocked(where as any).mockReturnValue('filter-ref');
-
-    const result = await getAvailableServiceStock('svc-1');
-
-    expect(collection).toHaveBeenCalledWith({}, 'services', 'svc-1', 'accounts');
-    expect(where).toHaveBeenCalledWith('status', '==', 'available');
-    expect(result).toBe(2);
+  it('requests only tenant/service aggregate; never reads account documents', async () => {
+    vi.mocked(customCallable).mockResolvedValue({ data: { available: 2 } });
+    expect(await getAvailableServiceStock('svc-1', 'tenant-a')).toBe(2);
+    expect(customCallable).toHaveBeenCalledWith('getStockAvailability', { serviceId: 'svc-1', tenantId: 'tenant-a' });
+    expect(collection).not.toHaveBeenCalled();
+    expect(getDocs).not.toHaveBeenCalled();
   });
-
-  it('sums availableProfiles for new format accounts', async () => {
-    vi.mocked(getDocs).mockResolvedValue({
-      docs: [
-        { id: 'acc-1', data: () => ({ ...mockProfileAccountData }) },
-        { id: 'acc-2', data: () => ({ ...mockProfileAccountData, availableProfiles: 3, totalProfiles: 5 }) },
-      ],
-    } as any);
-    vi.mocked(collection as any).mockReturnValue('col-ref');
-    vi.mocked(query as any).mockReturnValue('query-ref');
-    vi.mocked(where as any).mockReturnValue('filter-ref');
-
-    const result = await getAvailableServiceStock('svc-1');
-
-    expect(result).toBe(10); // 7 + 3
+  it('propagates endpoint failure rather than returning zero', async () => {
+    vi.mocked(customCallable).mockRejectedValue(new Error('unavailable'));
+    await expect(getAvailableServiceStock('svc-1', 'tenant-a')).rejects.toThrow('unavailable');
+    expect(getDocs).not.toHaveBeenCalled();
   });
-
-  it('returns 0 when no available accounts', async () => {
-    vi.mocked(getDocs).mockResolvedValue({ docs: [] } as any);
-    vi.mocked(collection as any).mockReturnValue('col-ref');
-    vi.mocked(query as any).mockReturnValue('query-ref');
-    vi.mocked(where as any).mockReturnValue('filter-ref');
-
-    const result = await getAvailableServiceStock('svc-1');
-
-    expect(result).toBe(0);
+  it('accepts real zero and rejects malformed aggregate responses', async () => {
+    vi.mocked(customCallable).mockResolvedValue({ data: { available: 0 } });
+    expect(await getAvailableServiceStock('svc-1', 'tenant-a')).toBe(0);
+    for (const available of [-1, 0.5, '3', undefined]) {
+      vi.mocked(customCallable).mockResolvedValue({ data: { available } });
+      await expect(getAvailableServiceStock('svc-1', 'tenant-a')).rejects.toThrow('disponibilidad inválida');
+    }
   });
+  it('requires service and tenant', async () => {
+    await expect(getAvailableServiceStock('', 'tenant-a')).rejects.toThrow('serviceId required');
+    await expect(getAvailableServiceStock('svc-1', '')).rejects.toThrow('tenantId required');
+  });
+});
 
-  it('throws when serviceId is empty', async () => {
-    await expect(getAvailableServiceStock('')).rejects.toThrow('serviceId required');
+describe('purchase credential recovery', () => {
+  it('recovers single purchases with an empty historical profiles array', async () => {
+    vi.mocked(getDocs).mockResolvedValue({ docs: [{ id: 'single-empty', data: () => ({ serviceId: 'svc-1', accountId: 'parent', profiles: [] }) }] } as never);
+    vi.mocked(customCallable).mockResolvedValue({ data: { credential: { email: 'empty@example.invalid', password: 'FICTIONAL' } } });
+    const purchases = await getPurchases('owner');
+    expect(customCallable).toHaveBeenCalledWith('getPurchaseCredentials', { purchaseId: 'single-empty' });
+    expect(purchases[0].credential?.email).toBe('empty@example.invalid');
+    expect(collection).toHaveBeenCalledTimes(1);
+  });
+  it('keeps history metadata when recovery fails or a stale backend returns a malformed envelope', async () => {
+    vi.mocked(getDocs).mockResolvedValue({ docs: [{ id: 'single', data: () => ({ serviceId: 'svc-1', accountId: 'parent' }) }] } as never);
+    for (const response of [{}, { data: {} }, { data: { credential: { email: 3, password: 'FICTIONAL' } } }]) {
+      vi.mocked(customCallable).mockResolvedValue(response as never);
+      const purchases = await getPurchases('owner');
+      expect(purchases).toHaveLength(1);
+      expect(purchases[0].credential).toBeUndefined();
+    }
+    vi.mocked(customCallable).mockRejectedValue(new Error('unavailable'));
+    expect((await getPurchases('owner'))[0].credential).toBeUndefined();
+  });
+  it('hydrates historical single purchases with a private purchase-scoped request', async () => {
+    vi.mocked(getDocs).mockResolvedValue({ docs: [{ id: 'purchase-1', data: () => ({ customerId: 'owner', serviceId: 'svc-1', accountId: 'parent', profileId: 'profile', profileName: 'Owned profile' }) }] } as never);
+    vi.mocked(customCallable).mockResolvedValue({ data: { credential: { email: 'fictional@example.invalid', password: 'FICTIONAL' } } });
+    const purchases = await getPurchases('owner');
+    expect(customCallable).toHaveBeenCalledWith('getPurchaseCredentials', { purchaseId: 'purchase-1' });
+    expect(purchases[0].credential).toEqual({ email: 'fictional@example.invalid', password: 'FICTIONAL' });
+    expect(purchases[0].profileName).toBe('Owned profile');
+    expect(collection).toHaveBeenCalledTimes(1);
+    expect(collection).toHaveBeenCalledWith({}, 'purchases');
+  });
+  it('keeps bulk inline credentials without requesting parent access', async () => {
+    vi.mocked(getDocs).mockResolvedValue({ docs: [{ id: 'bulk', data: () => ({ profiles: [{ credential: { email: 'fictional@example.invalid', password: 'FICTIONAL' } }] }) }] } as never);
+    await getPurchases('owner');
+    expect(customCallable).not.toHaveBeenCalled();
   });
 });

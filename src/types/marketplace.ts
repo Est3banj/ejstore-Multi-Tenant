@@ -69,6 +69,53 @@ export interface Purchase {
   linkTokens?: string[];
 }
 
+export type DiamondOrderStatus = 'pending' | 'completed' | 'rejected';
+
+export interface DiamondOrder {
+  id: string;
+  tenantId: string;
+  customerId: string;
+  customerEmail: string;
+  serviceId: string;
+  serviceName: string;
+  price: number;
+  freeFireId: string;
+  status: DiamondOrderStatus;
+  createdAt: Date;
+  processedAt?: Date;
+  processedBy?: string;
+  rejectReason?: string;
+}
+
+export interface CreateDiamondOrderRequest {
+  serviceId: string;
+  tenantId: string;
+  freeFireId: string;
+  idempotencyKey: string;
+}
+
+export interface CreateDiamondOrderResponse {
+  success: boolean;
+  orderId: string;
+  status: DiamondOrderStatus;
+  price: number;
+  newBalance: number;
+  idempotent?: boolean;
+}
+
+export interface ProcessDiamondOrderRequest {
+  orderId: string;
+  action: 'confirm' | 'reject';
+  reason?: string;
+}
+
+export interface ProcessDiamondOrderResponse {
+  success: boolean;
+  orderId: string;
+  status: DiamondOrderStatus;
+  newBalance?: number;
+}
+
 export interface Reseller {
   id: string;
   tenantId: string;

@@ -9,13 +9,13 @@ import {
   writeBatch,
   query,
   where,
+  orderBy,
   serverTimestamp,
   Timestamp,
   type Firestore,
 } from 'firebase/firestore';
-import { db, adminDb } from './firebase';
-import { httpsCallable, type Functions } from 'firebase/functions';
-import { functions, adminFunctions } from './firebase';
+import { db } from './firebase';
+import { customCallable, customAdminCallable } from './apiClient';
 import type {
   ServiceAccount,
   Purchase,
@@ -39,6 +39,11 @@ import type {
   GetRechargeHistoryResponse,
   Reseller,
   SmtpConfig,
+  DiamondOrder,
+  CreateDiamondOrderRequest,
+  CreateDiamondOrderResponse,
+  ProcessDiamondOrderRequest,
+  ProcessDiamondOrderResponse,
 } from '../types/marketplace';
 
 // Helper to convert Firestore timestamps
@@ -236,22 +241,11 @@ export const getPurchases = async (customerId: string): Promise<Purchase[]> => {
         lastCodeExtraction: data.lastCodeExtraction ? convertTimestamp(data.lastCodeExtraction) : undefined,
       };
 
-      // Si la compra tiene accountId pero no tiene credenciales inline,
-      // buscar las credenciales desde el documento de la cuenta
-      if (base.accountId && data.serviceId && !data.credential && !data.profiles) {
+      // Las compras históricas sin credencial inline recuperan sólo la
+      // credencial asignada mediante autorización server-side de la compra.
+      if (base.accountId && data.serviceId && !data.credential && !data.profiles?.length) {
         try {
-          const acctRef = doc(db, 'services', data.serviceId, 'accounts', base.accountId as string);
-          const acctSnap = await getDoc(acctRef);
-          if (acctSnap.exists()) {
-            const acctData = acctSnap.data() as Record<string, unknown>;
-            const cred = (acctData.credential as Record<string, string>) || acctData;
-            base.credential = {
-              email: (cred.email || cred.correo || '') as string,
-              password: (cred.password || cred.clave || '') as string,
-            };
-            base.profileName = (base.profileName as string) || (acctData.profileName as string) || '';
-            base.profilePin = (base.profilePin as string) || (acctData.profilePin as string) || '';
-          }
+          base.credential = await getPurchaseCredentials(snapDoc.id);
         } catch {
           // silencioso
         }
@@ -269,8 +263,7 @@ export const getPurchases = async (customerId: string): Promise<Purchase[]> => {
 // Cloud Function wrappers
 export const processPurchase = async (data: PurchaseRequest): Promise<PurchaseResponse> => {
   try {
-    const cf = httpsCallable<PurchaseRequest, PurchaseResponse>(functions, 'processPurchase');
-    const result = await cf(data);
+    const result = await customCallable<PurchaseResponse>('processPurchase', data);
     return result.data;
   } catch (error) {
     console.error('Error processing purchase:', error);
@@ -280,12 +273,99 @@ export const processPurchase = async (data: PurchaseRequest): Promise<PurchaseRe
 
 export const extraerCodigo = async (data: ExtraerCodigoRequest): Promise<ExtraerCodigoResponse> => {
   try {
-    const cf = httpsCallable<ExtraerCodigoRequest, ExtraerCodigoResponse>(functions, 'extraerCodigo');
-    const result = await cf(data);
+    const result = await customCallable<ExtraerCodigoResponse>('extraerCodigo', data);
     return result.data;
   } catch (error) {
     console.error('Error extracting code:', error);
     throw error;
+  }
+};
+
+// ===== DIAMOND ORDERS =====
+
+export const createDiamondOrder = async (data: CreateDiamondOrderRequest): Promise<CreateDiamondOrderResponse> => {
+  try {
+    const result = await customCallable<CreateDiamondOrderResponse>('createDiamondOrder', data);
+    return result.data;
+  } catch (error) {
+    console.error('Error creating diamond order:', error);
+    throw error;
+  }
+};
+
+export const processDiamondOrder = async (data: ProcessDiamondOrderRequest): Promise<ProcessDiamondOrderResponse> => {
+  try {
+    const result = await customAdminCallable<ProcessDiamondOrderResponse>('processDiamondOrder', data);
+    return result.data;
+  } catch (error) {
+    console.error('Error processing diamond order:', error);
+    throw error;
+  }
+};
+
+export const getDiamondOrders = async (customerId: string): Promise<DiamondOrder[]> => {
+  if (!customerId) throw new Error('customerId required');
+  try {
+    const q = query(
+      collection(db, 'diamondOrders'),
+      where('customerId', '==', customerId),
+      orderBy('createdAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((snapDoc) => {
+      const data = snapDoc.data();
+      return {
+        id: snapDoc.id,
+        tenantId: data.tenantId,
+        customerId: data.customerId,
+        customerEmail: data.customerEmail,
+        serviceId: data.serviceId,
+        serviceName: data.serviceName,
+        price: data.price,
+        freeFireId: data.freeFireId,
+        status: data.status,
+        createdAt: convertTimestamp(data.createdAt) || new Date(),
+        processedAt: convertTimestamp(data.processedAt),
+        processedBy: data.processedBy,
+        rejectReason: data.rejectReason,
+      } as DiamondOrder;
+    });
+  } catch (error) {
+    console.error('Error getting diamond orders:', error);
+    return [];
+  }
+};
+
+export const getDiamondOrdersByTenant = async (tenantId: string): Promise<DiamondOrder[]> => {
+  if (!tenantId) throw new Error('tenantId required');
+  try {
+    const q = query(
+      collection(db, 'diamondOrders'),
+      where('tenantId', '==', tenantId),
+      orderBy('createdAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((snapDoc) => {
+      const data = snapDoc.data();
+      return {
+        id: snapDoc.id,
+        tenantId: data.tenantId,
+        customerId: data.customerId,
+        customerEmail: data.customerEmail,
+        serviceId: data.serviceId,
+        serviceName: data.serviceName,
+        price: data.price,
+        freeFireId: data.freeFireId,
+        status: data.status,
+        createdAt: convertTimestamp(data.createdAt) || new Date(),
+        processedAt: convertTimestamp(data.processedAt),
+        processedBy: data.processedBy,
+        rejectReason: data.rejectReason,
+      } as DiamondOrder;
+    });
+  } catch (error) {
+    console.error('Error getting tenant diamond orders:', error);
+    return [];
   }
 };
 
@@ -338,6 +418,7 @@ export const createTicket = async (data: Omit<Ticket, 'id' | 'createdAt' | 'upda
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+    customCallable('onTicketCreated', { ticketId: docRef.id }).catch(() => {});
     return docRef.id;
   } catch (error) {
     console.error('Error creating ticket:', error);
@@ -348,7 +429,7 @@ export const createTicket = async (data: Omit<Ticket, 'id' | 'createdAt' | 'upda
 export const getTickets = async (tenantId: string): Promise<Ticket[]> => {
   if (!tenantId) throw new Error('tenantId required');
   try {
-    const q = query(collection(adminDb, 'tickets'), where('tenantId', '==', tenantId));
+    const q = query(collection(db, 'tickets'), where('tenantId', '==', tenantId));
     const snapshot = await getDocs(q);
     const list = snapshot.docs.map((doc) => {
       const data = doc.data();
@@ -380,6 +461,9 @@ export const updateTicket = async (
     ...data,
     updatedAt: serverTimestamp(),
   });
+  if (data.status === 'resolved') {
+    customAdminCallable('onTicketUpdated', { ticketId }).catch(() => {});
+  }
 };
 
 // ===== STOCK =====
@@ -415,36 +499,26 @@ export const getServiceStock = async (serviceId: string, _db?: Firestore): Promi
   }
 };
 
-/**
- * Returns available stock count for a service — queries only `status == 'available'` accounts.
- * Works within Firestore rules for resellers who don't have isSuperadmin()/isAdmin().
- *
- * The rules allow reading accounts where `resource.data.status == 'available'`,
- * but for a list query to match this condition, the query MUST include a `where('status', '==', 'available')`.
- * This function exists specifically for the reseller catalog view where we only need the available count
- * and can't use getServiceStock() (which queries ALL accounts without a filter).
- */
-export const getAvailableServiceStock = async (serviceId: string, _db?: Firestore): Promise<number> => {
-  const dbInstance = _db || db;
+/** Public aggregate only. Errors remain unknown availability, never stock zero. */
+export const getAvailableServiceStock = async (serviceId: string, tenantId: string): Promise<number> => {
   if (!serviceId) throw new Error('serviceId required');
-  try {
-    const q = query(
-      collection(dbInstance, 'services', serviceId, 'accounts'),
-      where('status', '==', 'available')
-    );
-    const snapshot = await getDocs(q);
-    let available = 0;
-    for (const doc of snapshot.docs) {
-      const data = doc.data();
-      // New format: accounts have availableProfiles counter
-      // Legacy format: each account = 1 profile
-      available += data.availableProfiles ?? 1;
-    }
-    return available;
-  } catch (error) {
-    console.error('Error getting available stock:', error);
-    throw error;
+  if (!tenantId) throw new Error('tenantId required');
+  const result = await customCallable<{ available: number }>('getStockAvailability', { serviceId, tenantId });
+  if (!Number.isSafeInteger(result.data?.available) || result.data.available < 0) {
+    throw new Error('Respuesta de disponibilidad inválida');
   }
+  return result.data.available;
+};
+
+export const getPurchaseCredentials = async (purchaseId: string): Promise<{ email: string; password: string }> => {
+  const result = await customCallable<{ credential: { email: string; password: string } }>(
+    'getPurchaseCredentials', { purchaseId }
+  );
+  const credential = result.data?.credential;
+  if (typeof credential?.email !== 'string' || typeof credential?.password !== 'string') {
+    throw new Error('Respuesta de credenciales inválida');
+  }
+  return { email: credential.email, password: credential.password };
 };
 
 // ===== RESELLER =====
@@ -455,28 +529,22 @@ export const createReseller = async (data: {
   name: string;
   phone?: string;
   commissionPercent?: number;
-}, _functions?: Functions): Promise<CreateResellerResponse> => {
-  const fnInstance = _functions || functions;
-  const cf = httpsCallable<Record<string, unknown>, CreateResellerResponse>(fnInstance, 'createReseller');
-  const result = await cf(data);
+}): Promise<CreateResellerResponse> => {
+  const result = await customAdminCallable<CreateResellerResponse>('createReseller', data);
   return result.data;
 };
 
 // TEMPORAL: eliminar distribuidor por email
-export const adminDeleteResellerByEmail = async (email: string, _functions?: Functions): Promise<{ success: boolean; message: string }> => {
-  const fnInstance = _functions || functions;
-  const cf = httpsCallable<{ email: string }, { success: boolean; message: string }>(fnInstance, 'adminDeleteResellerByEmail');
-  const result = await cf({ email });
+export const adminDeleteResellerByEmail = async (email: string): Promise<{ success: boolean; message: string }> => {
+  const result = await customAdminCallable<{ success: boolean; message: string }>('adminDeleteResellerByEmail', { email });
   return result.data;
 };
 
 export const loadResellerBalance = async (data: {
   resellerId: string;
   amount: number;
-}, _functions?: Functions): Promise<LoadResellerBalanceResponse> => {
-  const fnInstance = _functions || functions;
-  const cf = httpsCallable<Record<string, unknown>, LoadResellerBalanceResponse>(fnInstance, 'loadResellerBalance');
-  const result = await cf(data);
+}): Promise<LoadResellerBalanceResponse> => {
+  const result = await customAdminCallable<LoadResellerBalanceResponse>('loadResellerBalance', data);
   return result.data;
 };
 
@@ -485,26 +553,24 @@ export const processBulkPurchase = async (data: {
   tenantId: string;
   quantity: number;
   customerName?: string;
-}, _functions?: Functions): Promise<ProcessBulkPurchaseResponse> => {
-  const fnInstance = _functions || functions;
-  const cf = httpsCallable<Record<string, unknown>, ProcessBulkPurchaseResponse>(fnInstance, 'processBulkPurchase');
-  const result = await cf(data);
+}): Promise<ProcessBulkPurchaseResponse> => {
+  const result = await customAdminCallable<ProcessBulkPurchaseResponse>('processBulkPurchase', data);
   return result.data;
 };
 
 export const getResellers = async (tenantId: string): Promise<Reseller[]> => {
   if (!tenantId) throw new Error('tenantId required');
   const { collection, query, where, getDocs } = await import('firebase/firestore');
-  const { adminDb: db } = await import('./firebase');
-  const q = query(collection(db, 'resellers'), where('tenantId', '==', tenantId));
+  const { db: dbInstance } = await import('./firebase');
+  const q = query(collection(dbInstance, 'resellers'), where('tenantId', '==', tenantId));
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Reseller));
 };
 
-export const getResellerById = async (resellerId: string): Promise<Reseller | null> => {
+export const getResellerById = async (resellerId: string, _db?: Firestore): Promise<Reseller | null> => {
   const { doc, getDoc } = await import('firebase/firestore');
-  const { adminDb } = await import('./firebase');
-  const docRef = doc(adminDb, 'resellers', resellerId);
+  const { db: dbInstance } = await import('./firebase');
+  const docRef = doc(_db || dbInstance, 'resellers', resellerId);
   const docSnap = await getDoc(docRef);
   if (docSnap.exists()) return { id: docSnap.id, ...docSnap.data() } as Reseller;
   return null;
@@ -519,38 +585,36 @@ export const saveEmailConfig = async (data: {
   host: string;
   port: number;
   docId?: string;
-}, _functions?: Functions): Promise<SaveEmailConfigResponse> => {
-  const fnInstance = _functions || functions;
-  const cf = httpsCallable<Record<string, unknown>, SaveEmailConfigResponse>(fnInstance, 'saveEmailConfig');
-  const result = await cf(data);
+}): Promise<SaveEmailConfigResponse> => {
+  const result = await customAdminCallable<SaveEmailConfigResponse>('saveEmailConfig', data);
   return result.data;
 };
 
-export const getEmailConfig = async (tenantId: string, docId?: string, _functions?: Functions): Promise<GetEmailConfigResponse> => {
-  const fnInstance = _functions || functions;
-  const cf = httpsCallable<Record<string, unknown>, GetEmailConfigResponse>(fnInstance, 'getEmailConfig');
-  const result = await cf({ tenantId, docId: docId || 'emailConfig' });
+export const getEmailConfig = async (tenantId: string, docId?: string): Promise<GetEmailConfigResponse> => {
+  const result = await customAdminCallable<GetEmailConfigResponse>('getEmailConfig', {
+    tenantId,
+    docId: docId || 'emailConfig',
+  });
   return result.data;
 };
 
-export const checkEmailStatus = async (tenantId: string, docId?: string, _functions?: Functions): Promise<CheckEmailStatusResponse> => {
-  const fnInstance = _functions || functions;
-  const cf = httpsCallable<Record<string, unknown>, CheckEmailStatusResponse>(fnInstance, 'checkEmailStatus');
-  const result = await cf({ tenantId, docId: docId || 'emailConfig' });
+export const checkEmailStatus = async (tenantId: string, docId?: string): Promise<CheckEmailStatusResponse> => {
+  const result = await customAdminCallable<CheckEmailStatusResponse>('checkEmailStatus', {
+    tenantId,
+    docId: docId || 'emailConfig',
+  });
   return result.data;
 };
 
-// ─── Telegram ────────────────────────────────────────────────────────────
+// ─── Telegram ──────────────────────────────────────────────────────────────
 
 export const generateTelegramToken = async (): Promise<GenerateTelegramTokenResponse> => {
-  const cf = httpsCallable<Record<string, never>, GenerateTelegramTokenResponse>(adminFunctions, 'generateTelegramToken');
-  const result = await cf({});
+  const result = await customAdminCallable<GenerateTelegramTokenResponse>('generateTelegramToken', {});
   return result.data;
 };
 
 export const checkTelegramStatus = async (): Promise<CheckTelegramStatusResponse> => {
-  const cf = httpsCallable<Record<string, never>, CheckTelegramStatusResponse>(adminFunctions, 'checkTelegramStatus');
-  const result = await cf({});
+  const result = await customAdminCallable<CheckTelegramStatusResponse>('checkTelegramStatus', {});
   return result.data;
 };
 
@@ -562,22 +626,18 @@ export const updateTicketCredentials = async (data: {
   newPassword?: string;
   newProfileName?: string;
   newProfilePin?: string;
-}, _functions?: Functions): Promise<UpdateTicketCredentialsResponse> => {
-  const fnInstance = _functions || functions;
-  const cf = httpsCallable<Record<string, unknown>, UpdateTicketCredentialsResponse>(fnInstance, 'updateTicketCredentials');
-  const result = await cf(data);
+}): Promise<UpdateTicketCredentialsResponse> => {
+  const result = await customAdminCallable<UpdateTicketCredentialsResponse>('updateTicketCredentials', data);
   return result.data;
 };
 
 export const adminUpdateTicket = async (data: Record<string, unknown>): Promise<{ success: boolean }> => {
-  const cf = httpsCallable<Record<string, unknown>, { success: boolean }>(adminFunctions, 'adminUpdateTicket');
-  const result = await cf(data);
+  const result = await customAdminCallable<{ success: boolean }>('adminUpdateTicket', data);
   return result.data;
 };
 
 export const checkRechargePayment = async (data: { rechargeId: string; customerName?: string }): Promise<CheckRechargePaymentResponse> => {
-  const cf = httpsCallable<Record<string, unknown>, CheckRechargePaymentResponse>(functions, 'checkRechargePayment');
-  const result = await cf(data);
+  const result = await customCallable<CheckRechargePaymentResponse>('checkRechargePayment', data);
   return result.data;
 };
 
@@ -586,38 +646,28 @@ export const testEmailConnection = async (data: {
   password: string;
   host: string;
   port: number;
-}, _functions?: Functions): Promise<TestEmailConnectionResponse> => {
-  const fnInstance = _functions || functions;
-  const cf = httpsCallable<Record<string, unknown>, TestEmailConnectionResponse>(fnInstance, 'testEmailConnection');
-  const result = await cf(data);
+}): Promise<TestEmailConnectionResponse> => {
+  const result = await customAdminCallable<TestEmailConnectionResponse>('testEmailConnection', data);
   return result.data;
 };
 
-export const getRechargeHistory = async (_functions?: Functions): Promise<GetRechargeHistoryResponse> => {
-  const fnInstance = _functions || functions;
-  const cf = httpsCallable<Record<string, never>, GetRechargeHistoryResponse>(fnInstance, 'getRechargeHistory');
-  const result = await cf({});
+export const getRechargeHistory = async (): Promise<GetRechargeHistoryResponse> => {
+  const result = await customCallable<GetRechargeHistoryResponse>('getRechargeHistory', {});
   return result.data;
 };
 
-// ─── SMTP ─────────────────────────────────────────────────────────────────
+// ─── SMTP ──────────────────────────────────────────────────────────────────
 
-export const saveSmtpConfig = async (data: SmtpConfig, _functions?: Functions): Promise<void> => {
-  const fnInstance = _functions || functions;
-  const fn = httpsCallable<Record<string, unknown>, void>(fnInstance, 'saveSmtpConfig');
-  await fn(data as unknown as Record<string, unknown>);
+export const saveSmtpConfig = async (data: SmtpConfig): Promise<void> => {
+  await customAdminCallable<void>('saveSmtpConfig', data);
 };
 
-export const getSmtpConfig = async (_functions?: Functions): Promise<SmtpConfig | null> => {
-  const fnInstance = _functions || functions;
-  const fn = httpsCallable<Record<string, never>, SmtpConfig | null>(fnInstance, 'getSmtpConfig');
-  const result = await fn({});
+export const getSmtpConfig = async (): Promise<SmtpConfig | null> => {
+  const result = await customAdminCallable<SmtpConfig | null>('getSmtpConfig', {});
   return result.data;
 };
 
-export const sendTestEmail = async (_functions?: Functions): Promise<{ success: boolean; message: string }> => {
-  const fnInstance = _functions || functions;
-  const fn = httpsCallable<Record<string, never>, { success: boolean; message: string }>(fnInstance, 'sendTestEmail');
-  const result = await fn({});
+export const sendTestEmail = async (): Promise<{ success: boolean; message: string }> => {
+  const result = await customAdminCallable<{ success: boolean; message: string }>('sendTestEmail', {});
   return result.data;
 };

@@ -1,0 +1,21 @@
+{
+  "name": "ejstore-local-security-rules-characterization",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "test": "node run.mjs",
+    "test:baseline": "node run.mjs --baseline",
+    "test:handlers": "node --require ./loopback-only.cjs --test availability.test.cjs",
+    "test:runtime": "node --require ./loopback-only.cjs --test runtime.test.cjs",
+    "diagnostic:denial": "node run.mjs --diagnostic-denial"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "4.0.1",
+    "express": "5.3.0",
+    "firebase": "11.10.0"
+  }
+}

@@ -3,6 +3,8 @@ import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
+import { getPurchaseCredentials } from '../../services/marketplace';
+import { withTenantParam } from '../../utils/tenantUrl';
 import { Check, Copy, ClipboardCheck, ShoppingBag, Home, Loader } from 'lucide-react';
 
 interface LocationState {
@@ -81,6 +83,7 @@ const PurchaseResult = () => {
           credential = data.credential ? { email: data.credential.email, password: data.credential.password } : undefined;
           profileName = data.profileName;
           profilePin = data.profilePin;
+          if (!credential && data.accountId) credential = await getPurchaseCredentials(purchaseId);
         }
 
         const durationDays = (data as any).durationDays || 30;
@@ -121,13 +124,13 @@ const PurchaseResult = () => {
         <div className="glass p-8 rounded-xl text-center max-w-md w-full">
           <p className="text-white/70 mb-4">No se encontraron datos de la compra.</p>
           <button
-            onClick={() => navigate('/mis-servicios')}
+            onClick={() => navigate(withTenantParam('/mis-servicios'))}
             className="w-full mb-2 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 border border-white/20 hover:border-white/40"
           >
             Ver mis servicios
           </button>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate(withTenantParam('/'))}
             className="w-full text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300"
             style={{
               background: 'linear-gradient(135deg, #E50914, #E50914dd)',
@@ -156,7 +159,7 @@ const PurchaseResult = () => {
         <div className="glass p-8 rounded-xl text-center max-w-md w-full">
           <p className="text-white/70 mb-4">No se encontraron datos de la compra.</p>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate(withTenantParam('/'))}
             className="w-full text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300"
             style={{
               background: 'linear-gradient(135deg, #E50914, #E50914dd)',
@@ -326,14 +329,14 @@ const PurchaseResult = () => {
 
           <div className="flex gap-3">
             <button
-              onClick={() => navigate('/mis-servicios')}
+              onClick={() => navigate(withTenantParam('/mis-servicios'))}
               className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg border border-white/20 text-white/70 hover:text-white hover:border-white/40 transition-all"
             >
               <ShoppingBag size={18} />
               <span>Ver en mis servicios</span>
             </button>
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate(withTenantParam('/'))}
               className="flex-1 flex items-center justify-center gap-2 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300"
               style={{
                 background: 'linear-gradient(135deg, #E50914, #E50914dd)',

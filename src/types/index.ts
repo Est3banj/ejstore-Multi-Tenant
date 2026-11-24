@@ -22,6 +22,7 @@ export interface Service {
   promotionalPrice?: number;
   wholesalePrice?: number;
   category: string;
+  serviceType?: 'diamond' | 'subscription';
   images: string[];
   image?: string; // Legacy single image field
   isActive: boolean;

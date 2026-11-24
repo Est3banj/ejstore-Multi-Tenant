@@ -10,28 +10,32 @@ import { motion } from 'framer-motion';
 import { Sparkles, ArrowRight } from 'lucide-react';
 
 const Home = () => {
-  const { services, settings } = useApp();
+  const { services, settings, tenant } = useApp();
   const { customer } = useAuthStore();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [stockMap, setStockMap] = useState({});
   const primaryColor = settings?.primaryColor || '#E50914';
 
-  // Cargar stock de servicios visibles
+  // Cargar stock de servicios visibles (los diamantes no tienen inventario de cuentas: sin query)
   useEffect(() => {
+    let active = true;
+    setStockMap({});
     const loadStocks = async () => {
       const map = {};
-      const batch = services.map(async (svc) => {
+      const subscriptionServices = services.filter((svc) => svc.serviceType !== 'diamond');
+      const batch = subscriptionServices.map(async (svc) => {
         try {
-          const stock = await getAvailableServiceStock(svc.id);
+          const stock = await getAvailableServiceStock(svc.id, tenant?.id);
           map[svc.id] = stock;
-        } catch { map[svc.id] = 0; }
+        } catch { map[svc.id] = undefined; }
       });
       await Promise.all(batch);
-      setStockMap(map);
+      if (active) setStockMap(map);
     };
-    if (services.length > 0) loadStocks();
-  }, [services]);
-  
+    if (services.length > 0 && tenant?.id) loadStocks();
+    return () => { active = false; };
+  }, [services, tenant?.id]);
+
   // Filtrar servicios populares
   const popularServices = services.filter((service) => service.isPopular === true);
 

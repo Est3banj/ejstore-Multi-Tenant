@@ -1,4 +1,5 @@
-const { functions, admin, db } = require('./config');
+const { admin, db } = require('./config');
+const { HttpsError } = require('./services/httpsError');
 const { sendTelegramAdminNotification } = require('./telegram');
 const { sendEmail } = require('./email');
 
@@ -53,28 +54,28 @@ function selectPrizeWithStockCheck(prizes) {
 
 // ========== EXPORTED FUNCTIONS ==========
 
-const notifyPrizeWon = functions.https.onCall(async (data, context) => {
+async function notifyPrizeWon(data, context) {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+    throw new HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
 
   const { transactionId } = data;
 
   if (!transactionId) {
-    throw new functions.https.HttpsError('invalid-argument', 'transactionId es requerido');
+    throw new HttpsError('invalid-argument', 'transactionId es requerido');
   }
 
   const txnRef = db.collection('spinTransactions').doc(transactionId);
   const txnDoc = await txnRef.get();
 
   if (!txnDoc.exists) {
-    throw new functions.https.HttpsError('not-found', 'Transacción no encontrada');
+    throw new HttpsError('not-found', 'Transacción no encontrada');
   }
 
   const txn = txnDoc.data();
 
   if (txn.customerId !== context.auth.uid) {
-    throw new functions.https.HttpsError('permission-denied', 'No tiene acceso a esta transacción');
+    throw new HttpsError('permission-denied', 'No tiene acceso a esta transacción');
   }
 
   if (txn.notified) {
@@ -136,18 +137,18 @@ const notifyPrizeWon = functions.https.onCall(async (data, context) => {
   });
 
   return { success: true, notified: true };
-});
+}
 
-const processSpin = functions.https.onCall(async (data, context) => {
+async function processSpin(data, context) {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+    throw new HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
 
   const uid = context.auth.uid;
   const tenantId = data.tenantId || context.auth.token.tenantId;
 
   if (!tenantId) {
-    throw new functions.https.HttpsError('invalid-argument', 'tenantId es requerido');
+    throw new HttpsError('invalid-argument', 'tenantId es requerido');
   }
 
   try {
@@ -163,14 +164,19 @@ const processSpin = functions.https.onCall(async (data, context) => {
       ]);
 
       if (!customerDoc.exists) {
-        throw new functions.https.HttpsError('not-found', 'Cliente no encontrado');
-      }
-
-      if (!configDoc.exists) {
-        throw new functions.https.HttpsError('failed-precondition', 'Ruleta no configurada para este tenant');
+        throw new HttpsError('not-found', 'Cliente no encontrado');
       }
 
       const customer = customerDoc.data();
+
+      if (customer.tenantId && customer.tenantId !== tenantId) {
+        throw new HttpsError('permission-denied', 'Tenant no autorizado', { code: 'TENANT_INVALIDO' });
+      }
+
+      if (!configDoc.exists) {
+        throw new HttpsError('failed-precondition', 'Ruleta no configurada para este tenant');
+      }
+
       const config = configDoc.data();
       const spinData = spinDataDoc.exists ? spinDataDoc.data() : {};
 
@@ -178,7 +184,7 @@ const processSpin = functions.https.onCall(async (data, context) => {
       if (lastUpdated) {
         const elapsed = Date.now() - new Date(lastUpdated).getTime();
         if (elapsed < 3000) {
-          throw new functions.https.HttpsError('failed-precondition', 'Debe esperar antes de girar de nuevo');
+          throw new HttpsError('failed-precondition', 'Debe esperar antes de girar de nuevo');
         }
       }
 
@@ -186,11 +192,11 @@ const processSpin = functions.https.onCall(async (data, context) => {
       const oneMinuteAgo = Date.now() - 60000;
       const recentTimestamps = spinTimestamps.filter(ts => ts > oneMinuteAgo);
       if (recentTimestamps.length >= 10) {
-        throw new functions.https.HttpsError('failed-precondition', 'Demasiados giros por minuto');
+        throw new HttpsError('failed-precondition', 'Demasiados giros por minuto');
       }
 
       if (!config.isEnabled) {
-        throw new functions.https.HttpsError('failed-precondition', 'Ruleta deshabilitada');
+        throw new HttpsError('failed-precondition', 'Ruleta deshabilitada');
       }
 
       const paidSpinsCount = spinData.paidSpinsCount || 0;
@@ -199,11 +205,12 @@ const processSpin = functions.https.onCall(async (data, context) => {
       const price = spinType === 'free' ? 0 : (config.pricePerSpin ?? 1000);
       const newPaidSpinsCount = spinType === 'free' ? 0 : paidSpinsCount + 1;
 
-      if (customer.balance < price) {
-        throw new functions.https.HttpsError('failed-precondition', 'Saldo insuficiente');
+      const balance = Number.isFinite(customer.balance) ? customer.balance : 0;
+      if (balance < price) {
+        throw new HttpsError('failed-precondition', 'Saldo insuficiente');
       }
 
-      const balanceBefore = customer.balance || 0;
+      const balanceBefore = balance;
       const balanceAfter = balanceBefore - price;
       transaction.update(customerRef, { balance: admin.firestore.FieldValue.increment(-price) });
 
@@ -218,7 +225,7 @@ const processSpin = functions.https.onCall(async (data, context) => {
       if (spinType === 'paid' && dailySpendingLimit !== Infinity) {
         const spentToday = spinsPaidToday * price;
         if (spentToday + price > dailySpendingLimit) {
-          throw new functions.https.HttpsError('failed-precondition', 'Límite diario de gasto alcanzado');
+          throw new HttpsError('failed-precondition', 'Límite diario de gasto alcanzado');
         }
       }
 
@@ -228,7 +235,7 @@ const processSpin = functions.https.onCall(async (data, context) => {
       let prizes = (config.prizes || []).filter(p => p.isActive !== false);
 
       if (prizes.length === 0) {
-        throw new functions.https.HttpsError('failed-precondition', 'No hay premios activos');
+        throw new HttpsError('failed-precondition', 'No hay premios activos');
       }
 
       prizes = prizes.map(p => ({ ...p }));
@@ -323,12 +330,12 @@ const processSpin = functions.https.onCall(async (data, context) => {
       pityMode: result.pityMode
     };
   } catch (error) {
-    if (error instanceof functions.https.HttpsError) {
+    if (error instanceof HttpsError) {
       throw error;
     }
     console.error('Error in processSpin:', error);
-    throw new functions.https.HttpsError('internal', 'Error al procesar el giro');
+    throw new HttpsError('internal', 'Error al procesar el giro');
   }
-});
+}
 
 module.exports = { processSpin, notifyPrizeWon };

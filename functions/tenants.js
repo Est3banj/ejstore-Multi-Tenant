@@ -1,8 +1,13 @@
-const { functions, admin, db } = require('./config');
+const { admin, db } = require('./config');
+const { HttpsError } = require('./services/httpsError');
 
-const createSuperadminBootstrap = functions.https.onCall(async (data, context) => {
+async function createSuperadminBootstrap(data, context) {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+    throw new HttpsError('unauthenticated', 'Debe iniciar sesión');
+  }
+
+  if (context.auth.token.role !== 'superadmin') {
+    throw new HttpsError('permission-denied', 'Solo superadmins pueden ejecutar el bootstrap', { code: 'PERMISO_INSUFICIENTE' });
   }
 
   const uid = data.uid || context.auth.uid;
@@ -10,7 +15,7 @@ const createSuperadminBootstrap = functions.https.onCall(async (data, context) =
   const email = data.email || context.auth.token.email || context.auth.token.firebase?.identities?.email?.[0];
 
   if (!uid || !tenantId || !email) {
-    throw new functions.https.HttpsError('invalid-argument', 'No se pudo determinar uid, tenantId o email');
+    throw new HttpsError('invalid-argument', 'No se pudo determinar uid, tenantId o email');
   }
 
   try {
@@ -30,24 +35,24 @@ const createSuperadminBootstrap = functions.https.onCall(async (data, context) =
     return { success: true, message: `Documento users/${uid} creado/reparado con rol superadmin` };
   } catch (error) {
     console.error('Error bootstrap:', error);
-    throw new functions.https.HttpsError('internal', error.message);
+    throw new HttpsError('internal', error.message);
   }
-});
+}
 
-const setTenantClaims = functions.https.onCall(async (data, context) => {
+async function setTenantClaims(data, context) {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe estar autenticado');
+    throw new HttpsError('unauthenticated', 'Debe estar autenticado');
   }
 
   const { uid, tenantId, role } = data;
 
   if (!uid || !tenantId) {
-    throw new functions.https.HttpsError('invalid-argument', 'uid y tenantId son requeridos');
+    throw new HttpsError('invalid-argument', 'uid y tenantId son requeridos');
   }
 
   const callerClaims = context.auth.token;
   if (callerClaims.role !== 'superadmin') {
-    throw new functions.https.HttpsError('permission-denied', 'Solo superadmins pueden asignar permisos');
+    throw new HttpsError('permission-denied', 'Solo superadmins pueden asignar permisos');
   }
 
   try {
@@ -66,24 +71,24 @@ const setTenantClaims = functions.https.onCall(async (data, context) => {
     return { success: true, message: 'Claims actualizados' };
   } catch (error) {
     console.error('Error setting claims:', error);
-    throw new functions.https.HttpsError('internal', error.message);
+    throw new HttpsError('internal', error.message);
   }
-});
+}
 
-const createTenant = functions.https.onCall(async (data, context) => {
+async function createTenant(data, context) {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe estar autenticado');
+    throw new HttpsError('unauthenticated', 'Debe estar autenticado');
   }
 
   const callerClaims = context.auth.token;
   if (callerClaims.role !== 'superadmin') {
-    throw new functions.https.HttpsError('permission-denied', 'Solo superadmins pueden crear tenants');
+    throw new HttpsError('permission-denied', 'Solo superadmins pueden crear tenants');
   }
 
   const { name, subdomain, primaryColor, whatsappNumber, contactEmail } = data;
 
   if (!name || !subdomain) {
-    throw new functions.https.HttpsError('invalid-argument', 'name y subdomain son requeridos');
+    throw new HttpsError('invalid-argument', 'name y subdomain son requeridos');
   }
 
   try {
@@ -91,7 +96,7 @@ const createTenant = functions.https.onCall(async (data, context) => {
     const tenantDoc = await tenantRef.get();
 
     if (tenantDoc.exists) {
-      throw new functions.https.HttpsError('already-exists', 'El subdomain ya existe');
+      throw new HttpsError('already-exists', 'El subdomain ya existe');
     }
 
     await tenantRef.set({
@@ -108,51 +113,38 @@ const createTenant = functions.https.onCall(async (data, context) => {
     return { success: true, tenantId: subdomain };
   } catch (error) {
     console.error('Error creating tenant:', error);
-    throw new functions.https.HttpsError('internal', error.message);
+    throw new HttpsError('internal', error.message);
   }
-});
+}
 
-const onUserCreated = functions.auth.user().onCreate(async (user) => {
-  const { email, uid } = user;
-
-  await db.collection('users').doc(uid).set({
-    email,
-    tenantId: null,
-    role: null,
-    createdAt: admin.firestore.FieldValue.serverTimestamp()
-  });
-
-  return { message: 'User document created' };
-});
-
-const verifyTenantAccess = functions.https.onCall(async (data, context) => {
+async function verifyTenantAccess(data, context) {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe estar autenticado');
+    throw new HttpsError('unauthenticated', 'Debe estar autenticado');
   }
 
   const { tenantId } = data;
   const userClaims = context.auth.token;
 
   if (userClaims.tenantId !== tenantId && userClaims.role !== 'superadmin') {
-    throw new functions.https.HttpsError('permission-denied', 'No tiene acceso a este tenant');
+    throw new HttpsError('permission-denied', 'No tiene acceso a este tenant');
   }
 
   return { valid: true };
-});
+}
 
-const migrateCustomersTenantId = functions.https.onCall(async (data, context) => {
+async function migrateCustomersTenantId(data, context) {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+    throw new HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
 
   const callerClaims = context.auth.token;
   if (callerClaims.role !== 'superadmin') {
-    throw new functions.https.HttpsError('permission-denied', 'Solo superadmins pueden migrar customers');
+    throw new HttpsError('permission-denied', 'Solo superadmins pueden migrar customers');
   }
 
   const { tenantId } = data;
   if (!tenantId) {
-    throw new functions.https.HttpsError('invalid-argument', 'tenantId es requerido');
+    throw new HttpsError('invalid-argument', 'tenantId es requerido');
   }
 
   try {
@@ -182,8 +174,8 @@ const migrateCustomersTenantId = functions.https.onCall(async (data, context) =>
     };
   } catch (error) {
     console.error('Error migrating customers:', error);
-    throw new functions.https.HttpsError('internal', error.message);
+    throw new HttpsError('internal', error.message);
   }
-});
+}
 
-module.exports = { createSuperadminBootstrap, createTenant, setTenantClaims, verifyTenantAccess, migrateCustomersTenantId, onUserCreated };
+module.exports = { createSuperadminBootstrap, createTenant, setTenantClaims, verifyTenantAccess, migrateCustomersTenantId };

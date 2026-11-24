@@ -1,0 +1,333 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ========== HELPER FUNCTIONS ==========
+    
+    function getUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    
+    function userDocExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    
+    function getUserRole() {
+      return userDocExists() ? getUserDoc().data.role : null;
+    }
+    
+    function getUserTenantId() {
+      return userDocExists() ? getUserDoc().data.tenantId : null;
+    }
+    
+    function isSuperadmin() {
+      return getUserRole() == 'superadmin';
+    }
+    
+    function isAdmin() {
+      return getUserRole() in ['admin', 'superadmin'];
+    }
+    
+    function isTenantAdminFor(resourceTenantId) {
+      return getUserTenantId() == resourceTenantId;
+    }
+
+    // spec:diamond-services#admin-crud — validación server-side del form
+    // diamante (design:DD11): precio>0, name/terms non-empty, sin campos de
+    // suscripción. El cliente no puede persistir un diamante inválido.
+    function validDiamondService(d) {
+      return d.serviceType == 'diamond'
+        && d.price is number && d.price > 0
+        && d.name is string && d.name.size() > 0
+        && d.terms is string && d.terms.size() > 0
+        && !('durationDays' in d)
+        && !('pricing' in d);
+    }
+
+    function validServiceTypeField(d) {
+      return d.get('serviceType', 'subscription') in ['diamond', 'subscription'];
+    }
+
+    // ========== TENANTS ==========
+    match /tenants/{tenantId} {
+      allow read: if true;
+      allow create: if false;
+      allow update: if request.auth != null && (
+        isSuperadmin() || 
+        (isAdmin() && isTenantAdminFor(tenantId))
+      );
+    }
+
+    // ========== SECRETS (server-only) ==========
+    match /tenants/{tenantId}/secrets/{secretId} {
+      allow read, write: if false;
+    }
+
+    // ========== SERVICES ==========
+    match /services/{serviceId} {
+      allow read: if true;
+      allow create: if request.auth != null && (
+        isSuperadmin() || 
+        (isAdmin() && isTenantAdminFor(request.resource.data.tenantId))
+      ) && request.resource.data.price is number && request.resource.data.price > 0
+        && request.resource.data.name is string && request.resource.data.name.size() > 0
+        && validServiceTypeField(request.resource.data)
+        && (request.resource.data.get('serviceType', 'subscription') != 'diamond'
+            || validDiamondService(request.resource.data));
+      allow update: if request.auth != null && (
+        isSuperadmin() || 
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId))
+      ) && request.resource.data.price is number && request.resource.data.price > 0
+        && request.resource.data.name is string && request.resource.data.name.size() > 0
+        && validServiceTypeField(request.resource.data)
+        && (request.resource.data.get('serviceType', 'subscription') != 'diamond'
+            || validDiamondService(request.resource.data));
+      allow delete: if request.auth != null && (
+        isSuperadmin() || 
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId))
+      );
+    }
+
+    // ========== BANNERS ==========
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow create: if request.auth != null && (
+        isSuperadmin() || 
+        (isAdmin() && isTenantAdminFor(request.resource.data.tenantId))
+      ) && request.resource.data.title is string && request.resource.data.title.size() > 0;
+      allow update: if request.auth != null && (
+        isSuperadmin() || 
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId))
+      ) && request.resource.data.title is string && request.resource.data.title.size() > 0;
+      allow delete: if request.auth != null && (
+        isSuperadmin() || 
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId))
+      );
+    }
+
+    // ========== USERS ==========
+    match /users/{userId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == userId || isSuperadmin()
+      );
+      allow create, update: if false;
+      allow delete: if false;
+    }
+
+    // ========== CUSTOMERS ==========
+    match /customers/{customerId} {
+      allow read: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId)) ||
+        request.auth.uid == customerId
+      );
+      allow create: if request.auth != null && request.auth.uid == customerId
+        && request.resource.data.balance == 1000;
+      allow update: if request.auth != null && (
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId)) ||
+        request.auth.uid == customerId
+      ) && !(request.auth.uid == customerId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasAny(['balance']))
+      // Hardening (design:DD14): el dueño no puede mutar su propio
+      // emailVerified (fuente autoritativa = claim del token). get() con
+      // default tolera writes setDoc sin merge que omitan el campo.
+      && !(request.auth.uid == customerId &&
+        request.resource.data.get('emailVerified', false) != resource.data.get('emailVerified', false));
+      allow delete: if isSuperadmin();
+    }
+
+    // ========== RECARGAS ==========
+    match /recharges/{rechargeId} {
+      allow read: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId))
+      );
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId))
+      );
+      allow delete: if isSuperadmin();
+    }
+
+    // ========== RULETA CONFIG ==========
+    match /rouletteConfig/{tenantId} {
+      allow read: if true;
+      allow write: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(tenantId))
+      );
+    }
+
+    // ========== SPIN TRANSACTIONS ==========
+    match /spinTransactions/{transactionId} {
+      allow get: if request.auth != null && (
+        isSuperadmin() ||
+        request.auth.uid == resource.data.customerId ||
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId))
+      );
+      allow list: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && resource.data.tenantId == getUserTenantId()) ||
+        request.auth.uid == resource.data.customerId
+      );
+      allow create, update, delete: if false;
+    }
+
+    // ========== SPIN DATA ==========
+    match /customers/{customerId}/spinData/{docId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == customerId ||
+        isAdmin()
+      );
+      allow write: if false;
+    }
+
+    // ========== SERVICE ACCOUNTS (Marketplace) ==========
+    match /services/{serviceId}/accounts/{accountId} {
+      allow read: if (
+        (request.auth == null && resource.data.status == 'available') ||
+        (request.auth != null && (
+          resource.data.status == 'available' ||
+          resource.data.soldTo == request.auth.uid ||
+          isSuperadmin() ||
+          (isAdmin() && isTenantAdminFor(get(/databases/$(database)/documents/services/$(serviceId)).data.tenantId))
+        ))
+      );
+      allow create: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(get(/databases/$(database)/documents/services/$(serviceId)).data.tenantId))
+      );
+      allow update: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(get(/databases/$(database)/documents/services/$(serviceId)).data.tenantId))
+      );
+      allow delete: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(get(/databases/$(database)/documents/services/$(serviceId)).data.tenantId) && resource.data.status != 'sold')
+      );
+      
+      // Secrets subcollection -- only admin can read/write, customers can read own
+      match /secrets/{secretId} {
+        allow read: if request.auth != null && (
+          isSuperadmin() ||
+          (isAdmin() && isTenantAdminFor(get(/databases/$(database)/documents/services/$(serviceId)).data.tenantId))
+        );
+        allow write: if false; // Only through Cloud Functions
+      }
+
+      // Profiles subcollection
+      match /profiles/{profileId} {
+        allow read: if request.auth != null && (
+          isAdmin() ||
+          resource.data.soldTo == request.auth.uid
+        );
+        allow create: if request.auth != null && isAdmin();
+        allow update: if request.auth != null && (
+          resource.data.status == 'sold' ? resource.data.soldTo == request.auth.uid : isAdmin()
+        );
+        allow delete: if request.auth != null && isAdmin();
+      }
+    }
+
+    // ========== PURCHASES (Marketplace) ==========
+    match /purchases/{purchaseId} {
+      allow read: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId)) ||
+        request.auth.uid == resource.data.customerId ||
+        request.auth.uid == resource.data.resellerId
+      );
+      allow create: if false; // Only through Cloud Functions
+      allow update: if false; // Only through Cloud Functions
+      allow delete: if isSuperadmin();
+    }
+
+    // ========== DIAMOND ORDERS (spec:diamond-orders#customer-history) ==========
+    // Escritos SÓLO por la API server (Admin SDK / handlers Vercel) — los
+    // clientes sólo LEEN (historial propio o de su tenant como admin).
+    match /diamondOrders/{orderId} {
+      allow read: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId)) ||
+        request.auth.uid == resource.data.customerId
+      );
+      allow create, update: if false; // Only through API server (Admin SDK)
+      allow delete: if isSuperadmin(); // paridad con purchases
+    }
+
+    // ========== TICKETS (Support) ==========
+    match /tickets/{ticketId} {
+      allow read: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId)) ||
+        request.auth.uid == resource.data.userId
+      );
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId)) ||
+        request.auth.uid == resource.data.userId
+      );
+      allow delete: if isSuperadmin();
+    }
+
+    // ========== RESELLERS (Subdistribuidores) ==========
+    match /resellers/{resellerId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == resellerId ||
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId))
+      );
+      allow write: if false; // Only through Cloud Functions
+      allow delete: if false;
+
+      match /publicLinks/{linkId} {
+        allow read, write: if request.auth != null && request.auth.uid == resellerId;
+        allow delete: if false;
+      }
+    }
+
+    // ========== NOTIFICATIONS (In-app) ==========
+    match /notifications/{notificationId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if false; // Only through Cloud Functions
+      allow update: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow delete: if false;
+    }
+
+    // ========== PUBLIC LINKS (Top-level) ==========
+    match /public_links/{linkId} {
+      allow get: if true;
+      allow list: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId)) ||
+        request.auth.uid == resource.data.resellerId
+      );
+      allow create: if request.auth != null && (
+        isSuperadmin() ||
+        request.auth.uid == request.resource.data.resellerId
+      );
+      allow update: if false;
+      allow delete: if isSuperadmin();
+    }
+
+    // ========== OTP VERIFICATIONS ==========
+    match /otpVerifications/{otpId} {
+      // Sólo Admin SDK / API server (backend) — deny-all a clientes.
+      allow read, write: if false;
+    }
+
+    // ========== BALANCE TRANSACTIONS ==========
+    match /balanceTransactions/{transactionId} {
+      allow read: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId)) ||
+        request.auth.uid == resource.data.customerId
+      );
+      allow create: if false; // Only through Cloud Functions
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

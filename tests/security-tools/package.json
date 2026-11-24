@@ -1,0 +1,7 @@
+{
+  "name": "ejstore-manual-security-tools",
+  "version": "1.0.0",
+  "private": true,
+  "engines": { "node": ">=22 <23" },
+  "devDependencies": { "firebase-tools": "15.15.0" }
+}

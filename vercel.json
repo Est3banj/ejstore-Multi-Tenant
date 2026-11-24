@@ -1,0 +1,6 @@
+{
+  "version": 2,
+  "builds": [{ "src": "api.cjs", "use": "@vercel/node" }],
+  "routes": [{ "src": "/api/(.*)", "dest": "/api.cjs" }],
+  "regions": ["iad1"]
+}

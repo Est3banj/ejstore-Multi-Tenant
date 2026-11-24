@@ -1,16 +1,22 @@
-const { functions, admin, db } = require('./config');
+const { admin, db, createModuleLogger } = require('./config');
+const { HttpsError } = require('./services/httpsError');
+const { generateVerificationCode } = require('./utils/crypto');
+const { notifyTicketResolvedOnce } = require('./services/notificationTriggers');
+const { getUserRole } = require('./auth');
 
-const getPublicAccount = functions.https.onCall(async (data, context) => {
+const log = createModuleLogger('accounts');
+
+async function getPublicAccount(data, context) {
   const { token } = data;
   if (!token) {
-    throw new functions.https.HttpsError('invalid-argument', 'Token es requerido');
+    throw new HttpsError('invalid-argument', 'Token es requerido');
   }
 
   try {
     const linkDoc = await db.collection('public_links').doc(token).get();
 
     if (!linkDoc.exists) {
-      throw new functions.https.HttpsError('not-found', 'Link no encontrado o inválido');
+      throw new HttpsError('not-found', 'Link no encontrado o inválido');
     }
 
     const link = linkDoc.data();
@@ -29,7 +35,7 @@ const getPublicAccount = functions.https.onCall(async (data, context) => {
     }
 
     const svcName = (link.serviceName || '').toLowerCase();
-    const codigo = String(Math.floor(100000 + Math.random() * 900000));
+    const codigo = generateVerificationCode(6);
     const plantillas = {
       netflix: {
         from: 'Netflix <info@account.netflix.com>',
@@ -127,7 +133,6 @@ const getPublicAccount = functions.https.onCall(async (data, context) => {
       success: true,
       account: {
         serviceName: link.serviceName || 'Servicio',
-        credential: link.credential || {},
         status: 'active',
         createdAt: link.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
         expiresAt: link.expiresAt?.toDate?.()?.toISOString() || new Date().toISOString(),
@@ -141,32 +146,32 @@ const getPublicAccount = functions.https.onCall(async (data, context) => {
       },
     };
   } catch (error) {
-    if (error instanceof functions.https.HttpsError) throw error;
+    if (error instanceof HttpsError) throw error;
     console.error('Error en getPublicAccount:', error);
-    throw new functions.https.HttpsError('internal', 'Error al obtener la cuenta');
+    throw new HttpsError('internal', 'Error al obtener la cuenta');
   }
-});
+}
 
-const createAccountWithProfiles = functions.https.onCall(async (data, context) => {
+async function createAccountWithProfiles(data, context) {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+    throw new HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
 
   const claims = context.auth.token;
   if (claims.role !== 'superadmin' && claims.role !== 'admin') {
-    throw new functions.https.HttpsError('permission-denied', 'No tiene permisos de admin');
+    throw new HttpsError('permission-denied', 'No tiene permisos de admin');
   }
 
   const { serviceId, tenantId, accounts } = data;
 
   if (!serviceId || !tenantId || !accounts || !Array.isArray(accounts) || accounts.length === 0) {
-    throw new functions.https.HttpsError('invalid-argument',
+    throw new HttpsError('invalid-argument',
       'serviceId, tenantId y accounts (array no vacío) son requeridos'
     );
   }
 
   if (claims.role !== 'superadmin' && claims.tenantId !== tenantId) {
-    throw new functions.https.HttpsError('permission-denied', 'No tiene acceso a este tenant');
+    throw new HttpsError('permission-denied', 'No tiene acceso a este tenant');
   }
 
   let accountsCreated = 0;
@@ -236,23 +241,31 @@ const createAccountWithProfiles = functions.https.onCall(async (data, context) =
     profilesCreated,
     failed,
   };
-});
+}
 
-const updateTicketCredentials = functions.https.onCall(async (data, context) => {
+async function updateTicketCredentials(data, context) {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+    throw new HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
 
   const { ticketId, purchaseDocId, accountIndex, newEmail, newPassword, newProfileName, newProfilePin } = data;
   if (!ticketId) {
-    throw new functions.https.HttpsError('invalid-argument', 'ticketId es requerido');
+    throw new HttpsError('invalid-argument', 'ticketId es requerido');
   }
 
-  const userDoc = await db.collection('users').doc(context.auth.uid).get();
-  const userData = userDoc.data();
-  const role = userData?.role;
+  const { role, tenantId: callerTenantId } = await getUserRole(context.auth.uid);
   if (role !== 'admin' && role !== 'superadmin') {
-    throw new functions.https.HttpsError('permission-denied', 'Solo administradores pueden actualizar credenciales');
+    throw new HttpsError('permission-denied', 'Solo administradores pueden actualizar credenciales');
+  }
+
+  const ticketRef = db.collection('tickets').doc(ticketId);
+  const ticketDoc = await ticketRef.get();
+  if (!ticketDoc.exists) {
+    throw new HttpsError('not-found', 'Ticket no encontrado', { code: 'TICKET_NO_ENCONTRADO' });
+  }
+  const ticketData = ticketDoc.data();
+  if (role !== 'superadmin' && ticketData.tenantId !== callerTenantId) {
+    throw new HttpsError('permission-denied', 'No autorizado para esta operación', { code: 'NO_AUTORIZADO' });
   }
 
   // Si tiene purchaseDocId y accountIndex, actualizar la compra real
@@ -261,16 +274,19 @@ const updateTicketCredentials = functions.https.onCall(async (data, context) => 
     const purchaseDoc = await purchaseRef.get();
 
     if (!purchaseDoc.exists) {
-      throw new functions.https.HttpsError('not-found', 'Venta no encontrada');
+      throw new HttpsError('not-found', 'Venta no encontrada');
     }
 
     const purchaseData = purchaseDoc.data();
+    if (role !== 'superadmin' && purchaseData.tenantId !== callerTenantId) {
+      throw new HttpsError('permission-denied', 'No autorizado para esta operación', { code: 'NO_AUTORIZADO' });
+    }
     const profiles = purchaseData.profiles || [];
 
     if (profiles.length > 0) {
       // Bulk: actualizar profiles[accountIndex]
       if (accountIndex >= profiles.length) {
-        throw new functions.https.HttpsError('invalid-argument', `Índice ${accountIndex} fuera de rango. Solo hay ${profiles.length} perfiles`);
+        throw new HttpsError('invalid-argument', `Índice ${accountIndex} fuera de rango. Solo hay ${profiles.length} perfiles`);
       }
 
       const credentials = purchaseData.credentials || [];
@@ -335,25 +351,46 @@ const updateTicketCredentials = functions.https.onCall(async (data, context) => 
   });
 
   return { success: true };
-});
+}
 
-const adminUpdateTicket = functions.https.onCall(async (data, context) => {
+async function adminUpdateTicket(data, context) {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Debe iniciar sesión');
+    throw new HttpsError('unauthenticated', 'Debe iniciar sesión');
   }
-  const userDoc = await db.collection('users').doc(context.auth.uid).get();
-  const userData = userDoc.data();
-  const role = userData?.role;
+  const { role, tenantId: callerTenantId } = await getUserRole(context.auth.uid);
   if (role !== 'admin' && role !== 'superadmin') {
-    throw new functions.https.HttpsError('permission-denied', 'Solo administradores');
+    throw new HttpsError('permission-denied', 'Solo administradores');
   }
-  const { ticketId, ...fields } = data;
+  const { ticketId, status, adminNotes } = data;
   if (!ticketId) {
-    throw new functions.https.HttpsError('invalid-argument', 'ticketId es requerido');
+    throw new HttpsError('invalid-argument', 'ticketId es requerido');
   }
-  const updateData = { ...fields, updatedAt: admin.firestore.FieldValue.serverTimestamp() };
-  await db.collection('tickets').doc(ticketId).update(updateData);
+
+  const ticketRef = db.collection('tickets').doc(ticketId);
+  const ticketDoc = await ticketRef.get();
+  if (!ticketDoc.exists) {
+    throw new HttpsError('not-found', 'Ticket no encontrado', { code: 'TICKET_NO_ENCONTRADO' });
+  }
+  const ticketData = ticketDoc.data();
+  if (role !== 'superadmin' && ticketData.tenantId !== callerTenantId) {
+    throw new HttpsError('permission-denied', 'No autorizado para esta operación', { code: 'NO_AUTORIZADO' });
+  }
+
+  const updateData = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
+  if (status !== undefined) updateData.status = status;
+  if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
+  await ticketRef.update(updateData);
+
+  // T4-gap fold (T5.4 pattern): the admin UI resolves tickets through this
+  // callable, not updateTicket — without this call the T4 notification
+  // (telegram reseller+admin + email) would never fire on the real flow.
+  if (status === 'resolved') {
+    notifyTicketResolvedOnce(ticketId).catch((err) => {
+      log.warn({ err, ticketId }, 'Post-write ticket resolution notification failed');
+    });
+  }
+
   return { success: true };
-});
+}
 
 module.exports = { getPublicAccount, createAccountWithProfiles, updateTicketCredentials, adminUpdateTicket };
