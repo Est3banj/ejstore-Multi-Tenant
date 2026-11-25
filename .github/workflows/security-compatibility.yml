@@ -60,6 +60,7 @@ jobs:
           npm ci --prefix tests/security-tools --ignore-scripts --no-audit --no-fund
           npm ci --prefix tests/security-rules --ignore-scripts --no-audit --no-fund
           npm ci --prefix tests/security-frontend --ignore-scripts --no-audit --no-fund
+          npm ci --prefix tests/security-p0 --ignore-scripts --no-audit --no-fund
           printf '%s\n' "$GITHUB_WORKSPACE/tests/security-tools/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Prepare official Firestore emulator runtime (download only)
@@ -75,6 +76,9 @@ jobs:
       - name: Handler and exact registry gate
         run: node tests/security-rules/manual-validation.mjs handlers
 
+      - name: P0 regressions against real demo Firestore and Auth emulators
+        run: node tests/security-p0/run.mjs
+
       - name: Frontend compatibility gate
         run: node tests/security-rules/manual-validation.mjs frontend
 
@@ -86,6 +90,6 @@ jobs:
 
       - name: Validation complete — release remains NO-GO
         run: |
-          printf '\nCandidate, handlers/registry, frontend, HTTP runtime and readiness inspection passed.\n' >> "$GITHUB_STEP_SUMMARY"
+          printf '\nCandidate, handlers/registry, P0 (25 emulator regressions), frontend, HTTP runtime and readiness inspection passed.\n' >> "$GITHUB_STEP_SUMMARY"
           printf 'Baseline characterization was not run as a security gate.\n' >> "$GITHUB_STEP_SUMMARY"
           printf 'NO-GO: API/frontend artifacts, provenance, staging/domain matrix, legacy and historical compatibility still require separate verification and authorization.\n' >> "$GITHUB_STEP_SUMMARY"
