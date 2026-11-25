@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../../store/authStore';
 import { getRechargeHistory, checkRechargePayment } from '../../services/marketplace';
-import { adminFunctions } from '../../services/firebase';
+import { WompiPaymentOption } from '../../components/WompiPaymentOption';
 import {
   Clock,
   CheckCircle,
@@ -26,9 +26,11 @@ interface Recharge {
   transferProof?: string;
   processedAt: string | null;
   createdAt: string | null;
+  provider?: string;
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
+  sandbox_approved: { label: 'Prueba aprobada (sin saldo real)', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: CheckCircle },
   pending: { label: 'Pendiente', color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20', icon: Clock },
   approved: { label: 'Aprobada', color: 'bg-green-500/10 text-green-400 border-green-500/20', icon: CheckCircle },
   rejected: { label: 'Rechazada', color: 'bg-red-500/10 text-red-400 border-red-500/20', icon: XCircle },
@@ -51,7 +53,7 @@ const HistorialRecargas = (): JSX.Element => {
   const loadHistory = async () => {
     setLoading(true);
     try {
-      const result = await getRechargeHistory(isReseller ? adminFunctions : undefined);
+      const result = await getRechargeHistory(isReseller);
       if (result.success) {
         setRecharges(result.recharges);
       }
@@ -64,6 +66,9 @@ const HistorialRecargas = (): JSX.Element => {
 
   useEffect(() => {
     loadHistory();
+    const onVisible = () => { if (document.visibilityState === 'visible') void loadHistory(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
 
   const handleVerifyClick = (recharge: Recharge) => {
@@ -83,7 +88,7 @@ const HistorialRecargas = (): JSX.Element => {
       const result = await checkRechargePayment({
         rechargeId: selectedRecharge.id,
         customerName: customerName.trim(),
-      });
+      }, isReseller);
 
       if (result.found && result.status === 'approved') {
         setVerifyResult({ success: true, message: 'Recarga aprobada. Saldo actualizado.' });
@@ -208,7 +213,9 @@ const HistorialRecargas = (): JSX.Element => {
                       </div>
                     </td>
                     <td className="py-4 text-right pr-4">
-                      {canVerify(recharge.status) ? (
+                      {recharge.provider === 'wompi' && recharge.status === 'pending' ? (
+                        <WompiPaymentOption amount={String(recharge.amount)} tenantId={recharge.tenantId} rechargeId={recharge.id} panel={isReseller} />
+                      ) : canVerify(recharge.status) ? (
                         <button
                           onClick={() => handleVerifyClick(recharge)}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-xs font-medium transition-colors ml-auto"

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { before, after, test } from 'node:test';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { collection, doc, getDoc, getDocs, query, where, writeBatch, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
-import { assertLocalTarget, projectId, host, port } from './baseline.mjs';
+import { assertLocalTarget, projectId, host, port, readBaseline } from './baseline.mjs';
 import { readCandidate } from './candidate.mjs';
 
 assertLocalTarget();
@@ -43,6 +43,11 @@ before(async () => {
       batch.set(doc(db, path(t, 'stale')), { status: 'available', soldTo: `client-${t}`, credential });
       batch.set(doc(db, `${path(t, 'available')}/secrets/login`), { credential });
       batch.set(doc(db, `purchases/purchase-${t}`), { customerId: `client-${t}`, tenantId: `tenant-${t}` });
+      batch.set(doc(db, `tenants/tenant-${t}/secrets/wompi`), { privateKey: 'FICTIONAL-ONLY' });
+      batch.set(doc(db, `tenants/tenant-${t}/secrets/wompi_fixture`), { eventsSecret: 'FICTIONAL-ONLY' });
+      for (const name of ['wompi_intents', 'wompi_requests', 'wompi_payment_consumptions']) {
+        batch.set(doc(db, `${name}/fixture-${t}`), { tenantId: `tenant-${t}`, userId: `client-${t}` });
+      }
     }
     await batch.commit();
   });
@@ -57,6 +62,28 @@ before(async () => {
 
 after(async () => {
   if (env) try { await env.clearFirestore(); } finally { await env.cleanup(); }
+});
+
+test('Wompi credentials, immutable intents, request keys and payment consumption are server-only for every client role', async () => {
+  // Prove secrecy under both CONTRACT and the audited pre-CONTRACT rules.
+  // Loading rules here changes the local demo emulator only.
+  for (const selected of [rules, await readBaseline()]) {
+    const loaded = await initializeTestEnvironment({ projectId, firestore: { host, port, rules: selected } });
+    try {
+      for (const db of [anon, clients.a, clients.b, admins.a, admins.b, resellers.a, resellers.b, superadmin]) {
+        for (const path of ['tenants/tenant-a/secrets/wompi', 'tenants/tenant-a/secrets/wompi_fixture',
+          'wompi_intents/fixture-a', 'wompi_requests/fixture-a', 'wompi_payment_consumptions/fixture-a']) {
+          await assertFails(getDoc(doc(db, path)));
+          await assertFails(setDoc(doc(db, path), { enabled: true, status: 'approved' }));
+          await assertFails(deleteDoc(doc(db, path)));
+        }
+      }
+    } finally {
+      await loaded.cleanup();
+    }
+  }
+  const restored = await initializeTestEnvironment({ projectId, firestore: { host, port, rules } });
+  await restored.cleanup();
 });
 
 for (const t of ['a', 'b']) {

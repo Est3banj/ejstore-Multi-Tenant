@@ -636,8 +636,9 @@ export const adminUpdateTicket = async (data: Record<string, unknown>): Promise<
   return result.data;
 };
 
-export const checkRechargePayment = async (data: { rechargeId: string; customerName?: string }): Promise<CheckRechargePaymentResponse> => {
-  const result = await customCallable<CheckRechargePaymentResponse>('checkRechargePayment', data);
+export const checkRechargePayment = async (data: { rechargeId: string; customerName?: string }, panel = false): Promise<CheckRechargePaymentResponse> => {
+  const callable = panel ? customAdminCallable : customCallable;
+  const result = await callable<CheckRechargePaymentResponse>('checkRechargePayment', data);
   return result.data;
 };
 
@@ -651,8 +652,9 @@ export const testEmailConnection = async (data: {
   return result.data;
 };
 
-export const getRechargeHistory = async (): Promise<GetRechargeHistoryResponse> => {
-  const result = await customCallable<GetRechargeHistoryResponse>('getRechargeHistory', {});
+export const getRechargeHistory = async (panel = false): Promise<GetRechargeHistoryResponse> => {
+  const callable = panel ? customAdminCallable : customCallable;
+  const result = await callable<GetRechargeHistoryResponse>('getRechargeHistory', {});
   return result.data;
 };
 

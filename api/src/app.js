@@ -10,7 +10,7 @@ function createApp(registry = FN_REGISTRY, overrides = {}) {
 
   app.use('/api/:fn', (req, res, next) => {
     // Include CORS, auth and JSON errors, not just successful secret delivery.
-    if (req.params.fn === 'getPurchaseCredentials') {
+    if (req.params.fn === 'getPurchaseCredentials' || /wompi/i.test(req.params.fn)) {
       res.setHeader('Cache-Control', 'private, no-store');
     }
     next();
@@ -21,6 +21,11 @@ function createApp(registry = FN_REGISTRY, overrides = {}) {
   app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'ok' });
   });
+
+  // Dedicated provider route: no Firebase Bearer, checksum + server-side
+  // provider verification instead. Separate URLs for sandbox and production.
+  app.post('/api/wompi/events/:environment', (req, res) =>
+    require('../../functions/wompi').wompiWebhook(req, res));
 
   app.post('/api/:fn', async (req, res, next) => {
     try {

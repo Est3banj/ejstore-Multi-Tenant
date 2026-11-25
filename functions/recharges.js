@@ -180,13 +180,38 @@ function isSenderAllowed(fromAddress, allowedSenders) {
 // (opcional) consumo del UID del email de pago + limpieza del lock de dedupe,
 // TODO en UNA runTransaction. Lecturas antes de escrituras (regla Firestore).
 // Idempotente: reintentos/aprobaciones concurrentes = exactamente 1 crédito.
-async function settleRechargeTransaction({ rechargeRef, action, processedBy, reason, paymentEmail }) {
+async function settleRechargeTransaction({ rechargeRef, action, processedBy, reason, paymentEmail, wompiPayment }) {
   return db.runTransaction(async (transaction) => {
     const snap = await transaction.get(rechargeRef);
     if (!snap.exists) {
       throw new HttpsError('not-found', 'Recarga no encontrada');
     }
     const data = snap.data();
+
+    const intentRef = db.collection('wompi_intents').doc(rechargeRef.id);
+    const intentSnap = await transaction.get(intentRef);
+    const intent = intentSnap.exists ? intentSnap.data() : null;
+    let wompiConsumptionRef = null;
+    if (intent || data.provider === 'wompi' || rechargeRef.id.startsWith('wompi_')) {
+      if (!intent || !wompiPayment || paymentEmail ||
+          wompiPayment.reference !== intent.reference || wompiPayment.environment !== intent.environment ||
+          wompiPayment.amountInCents !== intent.amountInCents || wompiPayment.currency !== 'COP' ||
+          (action === 'approve') !== (wompiPayment.status === 'APPROVED') ||
+          !['APPROVED', 'DECLINED', 'VOIDED', 'ERROR'].includes(wompiPayment.status) ||
+          data.userId !== intent.userId || data.tenantId !== intent.tenantId || data.amount !== intent.amount) {
+        throw new HttpsError('failed-precondition', 'Esta recarga requiere confirmación verificada de Wompi');
+      }
+      if (intent.status !== 'pending') {
+        if (intent.transactionId === wompiPayment.transactionId) return { data, newStatus: intent.status, duplicate: true };
+        throw new HttpsError('failed-precondition', 'La recarga ya fue procesada');
+      }
+      const { hash } = require('./services/wompiProtocol');
+      wompiConsumptionRef = db.collection('wompi_payment_consumptions')
+        .doc(hash(`${intent.environment}:${wompiPayment.transactionId}`));
+      if ((await transaction.get(wompiConsumptionRef)).exists) {
+        throw new HttpsError('failed-precondition', 'La transacción ya fue utilizada');
+      }
+    }
 
     if (data.status !== 'pending') {
       throw new HttpsError('failed-precondition', 'La recarga ya fue procesada', { code: 'RECARGA_YA_PROCESADA' });
@@ -212,11 +237,19 @@ async function settleRechargeTransaction({ rechargeRef, action, processedBy, rea
 
     // Beneficiario: auto-recarga de un reseller (resellers/{uid} existe) acredita
     // su saldo de compra; si no, el customer dueño de la recarga.
+    const creditBalance = action === 'approve' && (!intent || intent.environment === 'prod');
     const resellerRef = db.collection('resellers').doc(data.userId);
-    const resellerSnap = action === 'approve' ? await transaction.get(resellerRef) : null;
-    const beneficiaryRef = action === 'approve'
-      ? (resellerSnap.exists ? resellerRef : db.collection('customers').doc(data.userId))
+    const resellerSnap = creditBalance && !intent ? await transaction.get(resellerRef) : null;
+    const beneficiaryRef = creditBalance
+      ? (intent ? db.collection(intent.beneficiaryCollection).doc(intent.userId)
+        : (resellerSnap.exists ? resellerRef : db.collection('customers').doc(data.userId)))
       : null;
+    if (intent && creditBalance) {
+      const beneficiary = await transaction.get(beneficiaryRef);
+      if (!beneficiary.exists || beneficiary.data().tenantId !== intent.tenantId) {
+        throw new HttpsError('failed-precondition', 'Beneficiario inválido');
+      }
+    }
 
     // ── Escrituras (todas las lecturas ya se hicieron) ──
     if (consumptionRef) {
@@ -231,15 +264,23 @@ async function settleRechargeTransaction({ rechargeRef, action, processedBy, rea
     }
 
     const updateData = {
-      status: action === 'approve' ? 'approved' : 'rejected',
+      status: action === 'approve' ? (intent?.environment === 'test' ? 'sandbox_approved' : 'approved') : 'rejected',
       processedAt: now,
     };
     if (processedBy) updateData.processedBy = processedBy;
     if (paymentEmail && paymentEmail.uid != null) updateData.emailUid = String(paymentEmail.uid);
     if (action === 'reject' && reason) updateData.rejectedReason = reason;
+    if (intent) {
+      updateData.provider = 'wompi';
+      updateData.providerStatus = wompiPayment.status;
+      updateData.transactionId = wompiPayment.transactionId;
+      transaction.update(intentRef, { status: updateData.status, transactionId: wompiPayment.transactionId, processedAt: now });
+      transaction.create(wompiConsumptionRef, { rechargeId: rechargeRef.id, tenantId: intent.tenantId,
+        transactionId: wompiPayment.transactionId, environment: intent.environment, consumedAt: now });
+    }
     transaction.update(rechargeRef, updateData);
 
-    if (action === 'approve') {
+    if (creditBalance) {
       transaction.update(beneficiaryRef, {
         balance: admin.firestore.FieldValue.increment(data.amount),
       });
@@ -620,6 +661,13 @@ async function checkRechargePayment(data, context) {
     };
   }
 
+  // Never send Wompi payments through the email/QR verifier, including when a
+  // client altered the public recharge's provider field under legacy rules.
+  if (rechargeData.provider === 'wompi' || rechargeId.startsWith('wompi_') ||
+      (await db.collection('wompi_intents').doc(rechargeId).get()).exists) {
+    return { found: true, processed: false, status: 'pending', message: 'Esperando confirmación de Wompi.' };
+  }
+
   const tenantId = rechargeData.tenantId;
   if (tenantId) {
     childLog.info({ tenantId }, 'Checking IMAP for payment confirmation');
@@ -801,6 +849,8 @@ async function getRechargeHistory(data, context) {
       rejectedReason: d.rejectedReason || null,
       emailUid: d.emailUid || null,
       resellerId: d.resellerId || null,
+      provider: d.provider || 'qr',
+      environment: d.environment || null,
     };
   };
 
@@ -846,4 +896,5 @@ async function getRechargeHistory(data, context) {
   return { success: true, recharges };
 }
 
-module.exports = { createRechargeRequest, processRecharge, checkRechargePayment, getRechargeHistory };
+module.exports = { createRechargeRequest, processRecharge, checkRechargePayment, getRechargeHistory,
+  settleRechargeTransaction, isValidRechargeAmount, parseRechargeAmount };

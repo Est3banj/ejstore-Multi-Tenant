@@ -22,6 +22,7 @@ const formatDate = (d: Date | string) => {
 };
 
 const formatAmount = (n: number) => `$${n.toLocaleString()}`;
+const isWompi = (recharge: Recharge) => recharge.provider === 'wompi' || recharge.id.startsWith('wompi_');
 
 // ─── Component ────────────────────────────────────────────────────────────
 const Recharges = () => {
@@ -300,14 +301,15 @@ const Recharges = () => {
                       <p className="text-xl font-bold text-yellow-400">{formatAmount(recharge.amount)}</p>
                       <p className={`text-[11px] font-medium ${
                         recharge.status === 'pending' ? 'text-yellow-500' :
-                        recharge.status === 'approved' ? 'text-green-500' : 'text-red-500'
+                         recharge.status === 'sandbox_approved' ? 'text-blue-400' : recharge.status === 'approved' ? 'text-green-500' : 'text-red-500'
                       }`}>
                         {recharge.status === 'pending' ? 'PENDIENTE' :
-                         recharge.status === 'approved' ? 'APROBADA' : 'RECHAZADA'}
+                          recharge.status === 'sandbox_approved' ? 'PRUEBA APROBADA · SIN SALDO REAL' : recharge.status === 'approved' ? 'APROBADA' : 'RECHAZADA'}
                       </p>
                     </div>
 
-                    {recharge.status === 'pending' && (
+                    {recharge.status === 'pending' && isWompi(recharge) && <span className="text-xs text-white/50">Esperando confirmación Wompi</span>}
+                    {recharge.status === 'pending' && !isWompi(recharge) && (
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => handleReVerify(recharge)}
@@ -340,7 +342,7 @@ const Recharges = () => {
                       </div>
                     )}
 
-                    {recharge.status !== 'pending' && (
+                    {recharge.status !== 'pending' && recharge.status !== 'sandbox_approved' && (
                       <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs border ${
                         recharge.status === 'approved'
                           ? 'bg-green-500/10 text-green-400 border-green-500/20'
@@ -432,10 +434,10 @@ const Recharges = () => {
                     <p className="text-gray-500 text-xs mb-1">Estado</p>
                     <p className={`font-bold text-lg ${
                       detailTarget.status === 'pending' ? 'text-yellow-400' :
-                      detailTarget.status === 'approved' ? 'text-green-400' : 'text-red-400'
+                       detailTarget.status === 'sandbox_approved' ? 'text-blue-400' : detailTarget.status === 'approved' ? 'text-green-400' : 'text-red-400'
                     }`}>
                       {detailTarget.status === 'pending' ? 'Pendiente' :
-                       detailTarget.status === 'approved' ? 'Aprobada' : 'Rechazada'}
+                        detailTarget.status === 'sandbox_approved' ? 'Prueba aprobada (sin saldo real)' : detailTarget.status === 'approved' ? 'Aprobada' : 'Rechazada'}
                     </p>
                   </div>
                   <div className="bg-gray-900/50 rounded-xl p-3 col-span-2">
@@ -468,7 +470,8 @@ const Recharges = () => {
               </div>
 
               <div className="mt-5 flex gap-3">
-                {detailTarget.status === 'pending' && (
+                {detailTarget.status === 'pending' && isWompi(detailTarget) && <p className="text-sm text-white/60">Sólo la confirmación verificada de Wompi puede procesar esta recarga.</p>}
+                {detailTarget.status === 'pending' && !isWompi(detailTarget) && (
                   <>
                     <button
                       onClick={() => { setDetailTarget(null); setRejectReason('Pago no válido o no verificado'); setRejectTarget(detailTarget); }}

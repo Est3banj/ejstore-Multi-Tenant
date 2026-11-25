@@ -12,12 +12,13 @@ const db = admin.firestore();
 const auth = admin.auth();
 const root = resolve(__dirname, '../..');
 const logger = { info() {}, warn() {}, error() {}, debug() {}, child() { return this; } };
+let wompiGet = async () => { throw new Error('Outbound Wompi is not configured in this fixture'); };
 function boundary(path, exports) {
   const filename = resolve(root, 'functions', path);
   require.cache[filename] = { id: filename, filename, loaded: true, exports };
 }
 boundary('config.js', {
-  admin, db, auth, logger, createModuleLogger: () => logger,
+  admin, db, auth, axios: { get: (...args) => wompiGet(...args) }, logger, createModuleLogger: () => logger,
   setTenantContext() {}, setUserContext() {}, wrapWithCorrelationId: fn => fn,
 });
 boundary('utils/logger.js', { logger, createModuleLogger: () => logger });
@@ -54,5 +55,6 @@ module.exports = {
   admin, db, auth, root,
   setEmails(value) { emails = value; imapCalls = 0; },
   imapCalls: () => imapCalls,
+  setWompiGet(fn) { wompiGet = fn; },
   async close() { await db.terminate(); await admin.app().delete(); },
 };

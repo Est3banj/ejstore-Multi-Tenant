@@ -136,7 +136,9 @@ export interface Recharge {
   customerName: string;
   customerPhone: string;
   amount: number;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'sandbox_approved';
+  provider?: 'qr' | 'wompi';
+  environment?: 'test' | 'prod';
   createdAt: Date;
   processedAt?: Date;
   processedBy?: string;

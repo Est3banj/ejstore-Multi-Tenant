@@ -90,6 +90,6 @@ jobs:
 
       - name: Validation complete — release remains NO-GO
         run: |
-          printf '\nCandidate, handlers/registry, P0 (25 emulator regressions), frontend, HTTP runtime and readiness inspection passed.\n' >> "$GITHUB_STEP_SUMMARY"
+          printf '\nCandidate (29), handlers/registry (14), P0 + optional Wompi (55 emulator regressions), frontend (83: 65 historical + 18 Wompi), HTTP runtime (15) and readiness inspection passed.\n' >> "$GITHUB_STEP_SUMMARY"
           printf 'Baseline characterization was not run as a security gate.\n' >> "$GITHUB_STEP_SUMMARY"
           printf 'NO-GO: API/frontend artifacts, provenance, staging/domain matrix, legacy and historical compatibility still require separate verification and authorization.\n' >> "$GITHUB_STEP_SUMMARY"

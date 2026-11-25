@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getSettings, updateSettings } from '../../services/firestore';
-import { adminDb, adminFunctions as adminFn } from '../../services/firebase';
+import { adminDb } from '../../services/firebase';
 import { uploadImage } from '../../services/storage';
 import { validateImageUrl } from '../../utils/validation';
 import { motion } from 'framer-motion';
 import { Save, Upload, AlertCircle, CheckCircle2, Mail, Eye, EyeOff } from 'lucide-react';
 import type { SmtpConfig } from '../../types/marketplace';
+import { WompiSettings } from '../../components/admin/WompiSettings';
 
 interface FormData {
   siteName: string;
@@ -136,6 +137,7 @@ const Settings = () => {
 
   return (
     <div className="min-h-screen p-8">
+      <WompiSettings key={tenantId} tenantId={tenantId} />
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold gradient-text">Configuración General</h1>
         <button
@@ -533,7 +535,7 @@ const SmtpSection = () => {
     (async () => {
       try {
         const { getSmtpConfig } = await import('../../services/marketplace');
-        const result = await getSmtpConfig(adminFn);
+        const result = await getSmtpConfig();
         if (result) {
           setConfig({
             host: result.host || '',
@@ -555,7 +557,7 @@ const SmtpSection = () => {
     setSaving(true);
     try {
       const { saveSmtpConfig } = await import('../../services/marketplace');
-      await saveSmtpConfig(config, adminFn);
+      await saveSmtpConfig(config);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (e) {
@@ -649,7 +651,7 @@ const SmtpSection = () => {
             setTestResult(null);
             try {
               const { sendTestEmail } = await import('../../services/marketplace');
-              const result = await sendTestEmail(adminFn);
+              const result = await sendTestEmail();
               setTestResult(result);
             } catch (e) {
               setTestResult({ success: false, message: (e as Error).message || 'Error al enviar prueba' });

@@ -40,10 +40,11 @@ for step in job["steps"]:
     gates.extend(re.findall(r"^node tests/security-rules/manual-validation.mjs (\w+)$", script, re.M))
     for line in script.splitlines():
         if line.startswith("npm "):
-            assert re.fullmatch(r"npm ci --prefix tests/security-(tools|rules|frontend) --ignore-scripts --no-audit --no-fund", line)
+            assert re.fullmatch(r"npm ci --prefix tests/security-(tools|rules|frontend|p0) --ignore-scripts --no-audit --no-fund", line)
             installs.append(line.split()[3])
 assert gates == ["candidate", "handlers", "frontend", "runtime", "readiness"]
-assert installs == ["tests/security-tools", "tests/security-rules", "tests/security-frontend"]
+assert installs == ["tests/security-tools", "tests/security-rules", "tests/security-frontend", "tests/security-p0"]
+assert sum(step.get("run") == "node tests/security-p0/run.mjs" for step in job["steps"]) == 1
 assert (root / "tests/security-rules/manual-validation.mjs").is_file()
 for package in installs:
     descriptor = json.loads((root / package / "package.json").read_text())
@@ -56,4 +57,4 @@ for package in installs:
 tools = json.loads((root / "tests/security-tools/package-lock.json").read_text())
 assert tools["packages"]["node_modules/firebase-tools"]["version"] == "15.15.0"
 assert "test:baseline" not in text and "diagnostic:denial" not in text
-print("PASS: manual-only YAML, read-only permissions, isolated locks, five gates, no release commands, Bash syntax")
+print("PASS: manual-only YAML, read-only permissions, four isolated locks, five gates + P0, no release commands, Bash syntax")

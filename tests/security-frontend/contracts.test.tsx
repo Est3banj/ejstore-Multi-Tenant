@@ -13,6 +13,10 @@ import { useTenantStore } from '../../src/store/tenantStore';
 import Catalogo from '../../src/pages/reseller/CatalogoMayorista';
 import Product from '../../src/pages/Product';
 import PurchaseResult from '../../src/pages/customer/PurchaseResult';
+import { WompiPaymentOption } from '../../src/components/WompiPaymentOption';
+import { WompiSettings } from '../../src/components/admin/WompiSettings';
+import { RechargeModal } from '../../src/components/RechargeModal';
+import HistorialRecargas from '../../src/pages/recargas/HistorialRecargas';
 
 const tenant = { id: 't1', name: 'Synthetic tenant', isActive: true };
 const subscription = { tenantId: 't1', name: 'Synthetic subscription', price: 2000, wholesalePrice: 1500, category: 'pantallas', serviceType: 'subscription', active: true, images: [] };
@@ -66,6 +70,108 @@ beforeEach(() => {
     const result = await reply(name, data);
     return result instanceof Response ? result : new Response(JSON.stringify({ result }), { status: 200 });
   }));
+});
+
+describe('Wompi real import/session contracts / external boundaries only', () => {
+  const checkout = 'https://checkout.wompi.co/p/?reference=synthetic';
+  it('admin config reads/saves with the panel token and never writes public tenant settings', async () => {
+    await sessions();
+    sdk.emit(adminAuth, user('admin-B', { role: 'admin', tenantId: 't1' }));
+    reply = () => ({ enabled: false, environment: 'test', publicKey: 'pub_test_SYNTHETIC' });
+    mount(<WompiSettings tenantId="t1" />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar Wompi' })).toBeEnabled());
+    fireEvent.change(screen.getByLabelText('Llave privada'), { target: { value: 'prv_test_SYNTHETIC' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar Wompi' }));
+    await screen.findByText(/Configuración guardada/);
+    expect(requests.map(r => [r.name, r.headers.Authorization])).toEqual([
+      ['getWompiConfig', 'Bearer token-admin-B'], ['saveWompiConfig', 'Bearer token-admin-B'],
+    ]);
+    expect(requests[1].data).toMatchObject({ tenantId: 't1', privateKey: 'prv_test_SYNTHETIC' });
+    expect(screen.getByLabelText('Llave privada')).toHaveValue('');
+    expect(sdk.writes).toHaveLength(0);
+  });
+  it('customer and reseller checkouts use distinct actual HTTP sessions with both signed in', async () => {
+    await sessions();
+    reply = name => name === 'getWompiAvailability' ? { enabled: true, environment: 'test' } : { checkoutUrl: checkout };
+    const first = mount(<WompiPaymentOption amount="10000" tenantId="t1" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Pagar con Wompi' }));
+    await screen.findByRole('link'); first.unmount();
+    mount(<WompiPaymentOption amount="10000" tenantId="t1" panel />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Pagar con Wompi' }));
+    await screen.findByRole('link');
+    expect(requests.map(r => r.headers.Authorization)).toEqual([
+      'Bearer token-client-A', 'Bearer token-client-A', 'Bearer token-reseller-B', 'Bearer token-reseller-B',
+    ]);
+    expect(sdk.writes).toHaveLength(0);
+    expect(useAuthStore.getState().customer?.balance).toBe(10000);
+  });
+  it('a missing panel session never falls back to the signed-in customer for secret configuration', async () => {
+    sdk.emit(auth, user('client-A'));
+    mount(<WompiSettings tenantId="t1" />);
+    await screen.findByText('No se pudo consultar la configuración Wompi.');
+    expect(requests).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Guardar Wompi' })).toBeDisabled();
+  });
+  it('failed Wompi HTTP availability is visible while the actual modal still opens QR/BRE-B', async () => {
+    sdk.emit(auth, user('client-A'));
+    sdk.documents.set('tenants/t1', { ...tenant, qrImage: '/synthetic-qr.png', brebKey: 'SYNTHETIC-BREB' });
+    reply = () => new Response('{}', { status: 503 });
+    mount(<RechargeModal onClose={() => {}} />);
+    await screen.findByText(/No se pudo consultar Wompi/);
+    expect(screen.queryByRole('button', { name: 'Pagar con Wompi' })).toBeNull();
+    fireEvent.change(screen.getByPlaceholderText('10,000'), { target: { value: '10000' } });
+    fireEvent.click(screen.getByRole('button', { name: /Transferencia BRE-B/ }));
+    expect(await screen.findByAltText('QR de pago')).toHaveAttribute('src', '/synthetic-qr.png');
+    expect(screen.getByText('SYNTHETIC-BREB')).toBeInTheDocument();
+  });
+  it('tenant switches request the exact selected tenant and discard the old enabled result', async () => {
+    sdk.emit(auth, user('client-A'));
+    const pending = defer<any>(); reply = (_name, data) => data.tenantId === 't1' ? pending.promise : { enabled: false };
+    const view = mount(<WompiPaymentOption amount="10000" tenantId="t1" />);
+    await waitFor(() => expect(requests).toHaveLength(1));
+    view.rerender(<WompiPaymentOption amount="10000" tenantId="t2" />);
+    await waitFor(() => expect(requests).toHaveLength(2));
+    await act(async () => pending.resolve({ enabled: true, environment: 'prod' }));
+    expect(requests.map(r => r.data.tenantId)).toEqual(['t1', 't2']);
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+  it('real reseller history and resume keep the panel token and send no browser amount', async () => {
+    await sessions();
+    const reference = `wompi_${'a'.repeat(48)}`;
+    reply = name => name === 'getRechargeHistory' ? { success: true, recharges: [{ id: reference, tenantId: 't1', provider: 'wompi', amount: 10000, status: 'pending', customerName: 'Synthetic', createdAt: null }] }
+      : name === 'getWompiAvailability' ? { enabled: true, environment: 'prod' } : { checkoutUrl: checkout };
+    mount(<HistorialRecargas />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Retomar pago Wompi' }));
+    await screen.findByRole('link');
+    expect(requests.map(r => r.headers.Authorization)).toEqual(Array(3).fill('Bearer token-reseller-B'));
+    expect(requests[1].data).toEqual({ tenantId: 't1', rechargeId: reference });
+    expect(requests[2].data).toEqual({ tenantId: 't1', rechargeId: reference });
+    fireEvent(document, new Event('visibilitychange'));
+    await waitFor(() => expect(requests.filter(r => r.name === 'getRechargeHistory')).toHaveLength(2));
+    expect(requests.at(-1)?.headers.Authorization).toBe('Bearer token-reseller-B');
+  });
+  it('logout during checkout response cannot return a private checkout link', async () => {
+    sdk.emit(auth, user('client-A')); const pending = defer<any>();
+    reply = name => name === 'getWompiAvailability' ? { enabled: true } : pending.promise;
+    mount(<WompiPaymentOption amount="10000" tenantId="t1" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Pagar con Wompi' }));
+    await waitFor(() => expect(requests).toHaveLength(2)); sdk.emit(auth, null);
+    await act(async () => pending.resolve({ checkoutUrl: checkout }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('sesión');
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+  it('amount edits discard late real HTTP checkout responses without changing balance', async () => {
+    await sessions(); const pending = defer<any>();
+    reply = name => name === 'getWompiAvailability' ? { enabled: true } : pending.promise;
+    const view = mount(<WompiPaymentOption amount="10000" tenantId="t1" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Pagar con Wompi' }));
+    await waitFor(() => expect(requests).toHaveLength(2));
+    view.rerender(<WompiPaymentOption amount="20000" tenantId="t1" />);
+    await act(async () => pending.resolve({ checkoutUrl: checkout }));
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(useAuthStore.getState().customer?.balance).toBe(10000);
+    expect(sdk.writes).toHaveLength(0);
+  });
 });
 afterEach(() => { cleanup(); stop?.(); vi.unstubAllGlobals(); });
 

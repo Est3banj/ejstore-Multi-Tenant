@@ -7,7 +7,9 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const modules = resolve(root, 'tests/security-frontend/node_modules');
 const roots = ['src/pages/Product.jsx', 'src/pages/reseller/CatalogoMayorista.tsx',
   'src/pages/customer/PurchaseResult.tsx', 'src/components/ServiceCard.tsx',
-  'src/types/marketplace.ts', 'src/vite-env.d.ts'];
+  'src/types/marketplace.ts', 'src/vite-env.d.ts', 'src/components/WompiPaymentOption.tsx',
+  'src/components/admin/WompiSettings.tsx', 'src/components/RechargeModal.tsx',
+  'src/pages/admin/Settings.tsx', 'src/pages/admin/Recharges.tsx', 'src/pages/recargas/HistorialRecargas.tsx'];
 const options = {
   noEmit: true, allowJs: true, checkJs: false, skipLibCheck: true,
   target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext,

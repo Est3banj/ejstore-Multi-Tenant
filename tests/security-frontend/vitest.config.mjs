@@ -16,7 +16,7 @@ export default defineConfig({
     projects: [
       { extends: true, test: { name: 'legacy', globals: true, environment: 'jsdom',
         setupFiles: [`${root}src/test/setup.ts`, `${root}tests/security-frontend/setup.ts`],
-        include: ['src/services/marketplace.test.ts', 'src/test/DiamondAvailability.test.tsx', 'src/test/StockAvailability.test.tsx', 'src/test/PurchaseCredentialRecovery.test.tsx'] } },
+        include: ['src/services/marketplace.test.ts', 'src/test/DiamondAvailability.test.tsx', 'src/test/StockAvailability.test.tsx', 'src/test/PurchaseCredentialRecovery.test.tsx', 'src/test/WompiPayments.test.tsx'] } },
       { extends: true, test: { name: 'contracts', globals: true, environment: 'jsdom',
         setupFiles: [`${root}tests/security-frontend/sdk-boundary.ts`],
         include: ['tests/security-frontend/contracts.test.tsx'],

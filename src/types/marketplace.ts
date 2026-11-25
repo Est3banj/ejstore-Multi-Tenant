@@ -317,6 +317,8 @@ export interface RechargeRecord {
   createdAt: string | null;
   rejectedReason?: string | null;
   emailUid?: string | null;
+  provider?: 'qr' | 'wompi';
+  environment?: 'test' | 'prod' | null;
 }
 
 export interface GetRechargeHistoryResponse {

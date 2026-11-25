@@ -8,6 +8,10 @@ import { FN_REGISTRY, EXCLUDED_ROUTES } from '../src/registry';
 // Auth classes del spec: N=no token, L/AD/SA/RS=token requerido (role checks dentro del handler).
 // El registry solo distingue none|bearer (design D14): N→none, L/AD/SA/RS→bearer.
 const SPEC_ROUTES = [
+  { name: 'getWompiConfig', auth: 'bearer' },
+  { name: 'saveWompiConfig', auth: 'bearer' },
+  { name: 'getWompiAvailability', auth: 'bearer' },
+  { name: 'createWompiCheckout', auth: 'bearer' },
   { name: 'getUserRole', auth: 'bearer' },
   { name: 'createAdmin', auth: 'bearer' },
   { name: 'getPublicAccount', auth: 'none' },
@@ -73,11 +77,11 @@ describe('registry estructura', () => {
     }
   });
 
-  it('registry contiene exactamente las 45 rutas (46 previas menos adminDeleteResellerByEmail retirado en P0-4)', () => {
+  it('registry contiene exactamente 49 rutas callable (45 existentes + 4 Wompi autenticadas)', () => {
     const registryNames = Object.keys(FN_REGISTRY).sort();
     const specNames = SPEC_ROUTES.map((r) => r.name).sort();
     expect(registryNames).toEqual(specNames);
-    expect(SPEC_ROUTES).toHaveLength(45);
+    expect(SPEC_ROUTES).toHaveLength(49);
   });
 
   it('auth-class de cada ruta coincide con la tabla del spec', () => {

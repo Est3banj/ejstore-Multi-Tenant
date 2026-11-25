@@ -8,6 +8,7 @@ import { httpsCallable } from 'firebase/functions';
 import { functions, adminFunctions } from '../services/firebase';
 import { X } from 'lucide-react';
 import type { CheckRechargePaymentResponse } from '../types/marketplace';
+import { WompiPaymentOption } from './WompiPaymentOption';
 
 interface RechargeModalProps {
   onClose: () => void;
@@ -210,6 +211,8 @@ export const RechargeModal = ({ onClose }: RechargeModalProps) => {
 
             <div className="space-y-3">
               <p className="text-xs text-white/40 uppercase tracking-wider font-medium mb-2">Elegí cómo pagar</p>
+
+              <WompiPaymentOption key={tenantId} amount={amount} tenantId={tenantId} panel={role === 'reseller'} />
 
               <button
                 onClick={handleTransfer}
