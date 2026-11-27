@@ -69,3 +69,9 @@ export const validateImageUrl = (url) => {
 
     return { isValid: true, error: '' };
 };
+
+export const isValidPhone = (phone) => {
+    if (!phone || typeof phone !== 'string') return false;
+    const digits = phone.replace(/[\s()-]/g, '');
+    return /^\+?\d{7,15}$/.test(digits);
+};

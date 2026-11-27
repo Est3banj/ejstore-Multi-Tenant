@@ -20,11 +20,12 @@ const options = {
     react: [resolve(modules, '@types/react/index.d.ts')],
     'react/*': [resolve(modules, '@types/react/*')],
     'react-dom': [resolve(modules, '@types/react-dom/index.d.ts')],
+    'vite/client': [resolve(modules, 'vite/client.d.ts')],
     'firebase/*': [resolve(root, 'tests/security-rules/node_modules/firebase/*')],
     ...Object.fromEntries(['zustand', '@tanstack/react-query', 'framer-motion', 'lucide-react', 'react-router-dom'].map(name => [name, [resolve(modules, name)]])),
   },
 };
-const program = ts.createProgram(roots.map(p => resolve(root, p)), options);
+  const program = ts.createProgram([...roots.map(p => resolve(root, p)), resolve(modules, 'vite/client.d.ts')], options);
 const checker = program.getTypeChecker();
 const sources = program.getSourceFiles().filter(s => s.fileName.startsWith(root) && !s.fileName.includes('/node_modules/') && !s.isDeclarationFile);
 let edges = 0;

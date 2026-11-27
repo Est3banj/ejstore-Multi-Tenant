@@ -318,6 +318,7 @@ export interface RechargeRecord {
   rejectedReason?: string | null;
   emailUid?: string | null;
   provider?: 'qr' | 'wompi';
+  feeQuote?: import('./wompi').WompiFeeQuote;
   environment?: 'test' | 'prod' | null;
 }
 

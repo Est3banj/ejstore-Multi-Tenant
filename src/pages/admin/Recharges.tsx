@@ -11,6 +11,7 @@ import {
   RotateCcw, MessageSquare,
 } from 'lucide-react';
 import type { Recharge } from '../../types';
+import { WompiAmounts } from '../../components/WompiAmounts';
 
 // ─── Types ────────────────────────────────────────────────────────────────
 type FilterTab = 'all' | 'pending' | 'approved' | 'rejected';
@@ -298,7 +299,7 @@ const Recharges = () => {
                   {/* Right: amount + actions */}
                   <div className="flex items-center gap-3 sm:gap-4 ml-12 sm:ml-0">
                     <div className="text-right">
-                      <p className="text-xl font-bold text-yellow-400">{formatAmount(recharge.amount)}</p>
+                      {isWompi(recharge) ? <WompiAmounts amount={recharge.amount} feeQuote={recharge.feeQuote} status={recharge.status} environment={recharge.environment} /> : <p className="text-xl font-bold text-yellow-400">{formatAmount(recharge.amount)}</p>}
                       <p className={`text-[11px] font-medium ${
                         recharge.status === 'pending' ? 'text-yellow-500' :
                          recharge.status === 'sandbox_approved' ? 'text-blue-400' : recharge.status === 'approved' ? 'text-green-500' : 'text-red-500'
@@ -428,7 +429,7 @@ const Recharges = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-gray-900/50 rounded-xl p-3">
                     <p className="text-gray-500 text-xs mb-1">Monto</p>
-                    <p className="text-white font-bold text-lg">{formatAmount(detailTarget.amount)}</p>
+                    {isWompi(detailTarget) ? <WompiAmounts amount={detailTarget.amount} feeQuote={detailTarget.feeQuote} status={detailTarget.status} environment={detailTarget.environment} /> : <p className="text-white font-bold text-lg">{formatAmount(detailTarget.amount)}</p>}
                   </div>
                   <div className="bg-gray-900/50 rounded-xl p-3">
                     <p className="text-gray-500 text-xs mb-1">Estado</p>

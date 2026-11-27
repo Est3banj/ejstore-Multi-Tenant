@@ -138,6 +138,7 @@ export interface Recharge {
   amount: number;
   status: 'pending' | 'approved' | 'rejected' | 'sandbox_approved';
   provider?: 'qr' | 'wompi';
+  feeQuote?: import('./wompi').WompiFeeQuote;
   environment?: 'test' | 'prod';
   createdAt: Date;
   processedAt?: Date;

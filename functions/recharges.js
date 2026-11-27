@@ -191,6 +191,7 @@ async function settleRechargeTransaction({ rechargeRef, action, processedBy, rea
     const intentRef = db.collection('wompi_intents').doc(rechargeRef.id);
     const intentSnap = await transaction.get(intentRef);
     const intent = intentSnap.exists ? intentSnap.data() : null;
+    const feeQuote = intent ? require('./services/wompiFees').intentQuote(intent) : null;
     let wompiConsumptionRef = null;
     if (intent || data.provider === 'wompi' || rechargeRef.id.startsWith('wompi_')) {
       if (!intent || !wompiPayment || paymentEmail ||
@@ -274,6 +275,8 @@ async function settleRechargeTransaction({ rechargeRef, action, processedBy, rea
       updateData.provider = 'wompi';
       updateData.providerStatus = wompiPayment.status;
       updateData.transactionId = wompiPayment.transactionId;
+      // Private frozen authority wins over any mutable receipt metadata.
+      updateData.feeQuote = feeQuote;
       transaction.update(intentRef, { status: updateData.status, transactionId: wompiPayment.transactionId, processedAt: now });
       transaction.create(wompiConsumptionRef, { rechargeId: rechargeRef.id, tenantId: intent.tenantId,
         transactionId: wompiPayment.transactionId, environment: intent.environment, consumedAt: now });
@@ -288,6 +291,7 @@ async function settleRechargeTransaction({ rechargeRef, action, processedBy, rea
       transaction.set(db.collection('balanceTransactions').doc(rechargeRef.id), {
         customerId: data.userId,
         amount: data.amount,
+        ...(intent ? { provider: 'wompi', feeQuote } : {}),
         type: 'recharge',
         description: 'Recarga aprobada',
         rechargeId: rechargeRef.id,
@@ -851,6 +855,7 @@ async function getRechargeHistory(data, context) {
       resellerId: d.resellerId || null,
       provider: d.provider || 'qr',
       environment: d.environment || null,
+      ...(d.provider === 'wompi' && d.feeQuote ? { feeQuote: d.feeQuote } : {}),
     };
   };
 

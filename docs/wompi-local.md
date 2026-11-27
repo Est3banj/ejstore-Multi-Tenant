@@ -1,5 +1,48 @@
 # Wompi Colombia opcional por tenant — implementación local
 
+## Integración acotada sobre HEAD — 2026-11-27
+
+Esta selección parte de `2e36444294e378eb319a3be994056f16d4fa2479` y conserva
+las dos identidades Firebase de esa revisión. **No incorpora la migración local
+de autenticación unificada.** Las secciones del 25 de noviembre más abajo son
+evidencia histórica; sus cantidades y próximos pasos no describen esta selección.
+
+- Cliente: `auth`, `user` y su propio perfil. Panel: `adminAuth` y `adminUser`.
+  La superficie explícita elige la identidad; el rol global del panel no cambia
+  una recarga cliente. Ausencia de una sesión nunca usa la otra como fallback.
+  El transporte existente espera persistencia y rechaza cambios de identidad
+  durante token/HTTP. Se conservan sus exports y todos los contratos históricos.
+- El modal conserva el gate de teléfono mediante actualización real del perfil
+  cliente propio y `setCustomer`, con guard de sesión; no introduce un proveedor
+  ficticio ni depende de `openProfileCompletion`. No modifica saldo ni claims.
+- Cotización Wompi autenticada y sin escrituras. Sólo la confirmación final crea
+  el intento idempotente; total, tarifa, ambiente y versión quedan congelados.
+  El Widget oficial recibe configuración tipada y validada. Su callback aporta
+  sólo un locator: la conciliación privada del servidor exige titular, tenant,
+  comercio, referencia, moneda y total antes de usar la liquidación compartida.
+- Los retornos e historial conservan `/historial-recargas` para cliente y
+  `/r/historial-recargas` para panel. El resultado reutiliza el componente QR;
+  una aprobación Sandbox nunca acredita saldo real.
+- Validación en copia independiente de HEAD: frontend **196/196**, incluidos
+  los tres proyectos configurados y 12 casos nuevos de integración dual;
+  TypeScript sin emisión y cierre de imports reales **43 fuentes / 199 imports**,
+  cero diagnósticos. Candidate **29**, handlers **14**, runtime HTTP **15** y P0
+  con emuladores demo **75**, sin skipped/todo. Readiness calcula **51 fuentes**;
+  su resultado sigue siendo **NO-GO para publicación**, sin artefacto certificado.
+  El workflow manual ejecuta estos gates, incluido el checker de imports.
+- La QA real anterior probó exactamente un aprobado y un rechazado Sandbox,
+  ambos con base 10.000, cargo 1.186 y total 11.186 COP: webhook firmado,
+  autocierre del SDK, resultado compartido y saldo demo sin cambios. Esa corrida
+  usó el source local con sesión unificada; no certifica por sí sola este patch
+  dual. Los casos de integración anteriores usan límites externos sintéticos.
+  «Webhook ausente + locator vivo» sigue sin ejercitarse contra un pago real.
+- La revisión/commit usa exclusivamente el patch de la copia limpia. Los bytes
+  del working tree local, sus reglas, configuración, datos y migración unificada
+  se preservan. El CI debe consultar el SHA del commit, no ese source dirty.
+  No se ejecutan builds, despliegues, pagos nuevos ni cambios de credenciales.
+
+## Registro histórico — 2026-11-25
+
 Fecha: **2026-11-25**. Rama `feature/landing-page`, HEAD al inicio
 `45c2ba19599d6dca361e1d27ecc5257f3c367f20`.
 

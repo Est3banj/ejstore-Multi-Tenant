@@ -73,7 +73,10 @@ beforeEach(() => {
 });
 
 describe('Wompi real import/session contracts / external boundaries only', () => {
-  const checkout = 'https://checkout.wompi.co/p/?reference=synthetic';
+  const reference = `wompi_${'a'.repeat(48)}`;
+  const checkout = `https://checkout.wompi.co/p/?public-key=pub_test_SYNTHETIC&reference=${reference}&amount-in-cents=1000000&currency=COP&signature:integrity=${'a'.repeat(64)}`;
+  const feeQuote = { version: 1, currency: 'COP', baseAmount: 10000, processingFee: 0, totalAmount: 10000 };
+  const preview = { feeQuote, quoteHash: 'a'.repeat(64), environment: 'test' };
   it('admin config reads/saves with the panel token and never writes public tenant settings', async () => {
     await sessions();
     sdk.emit(adminAuth, user('admin-B', { role: 'admin', tenantId: 't1' }));
@@ -92,16 +95,26 @@ describe('Wompi real import/session contracts / external boundaries only', () =>
   });
   it('customer and reseller checkouts use distinct actual HTTP sessions with both signed in', async () => {
     await sessions();
-    reply = name => name === 'getWompiAvailability' ? { enabled: true, environment: 'test' } : { checkoutUrl: checkout };
-    const first = mount(<WompiPaymentOption amount="10000" tenantId="t1" />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Pagar con Wompi' }));
-    await screen.findByRole('link'); first.unmount();
-    mount(<WompiPaymentOption amount="10000" tenantId="t1" panel />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Pagar con Wompi' }));
-    await screen.findByRole('link');
-    expect(requests.map(r => r.headers.Authorization)).toEqual([
-      'Bearer token-client-A', 'Bearer token-client-A', 'Bearer token-reseller-B', 'Bearer token-reseller-B',
-    ]);
+    const widgetOpen = vi.fn();
+    vi.stubGlobal('WidgetCheckout', vi.fn(function () { return { open: widgetOpen }; }));
+    let owner = 'client-A';
+    reply = name => name === 'getWompiAvailability' ? { enabled: true, environment: 'test' }
+      : name === 'getWompiQuote' ? preview : name === 'getRechargeHistory'
+        ? { recharges: [{ id: reference, userId: owner, tenantId: 't1', provider: 'wompi', status: 'pending' }] }
+        : { checkoutUrl: checkout, feeQuote };
+    for (const panel of [false, true]) {
+      owner = panel ? 'reseller-B' : 'client-A';
+      const start = requests.length;
+      const view = mount(<WompiPaymentOption amount="10000" tenantId="t1" panel={panel} />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Ver total' }));
+      const confirm = await screen.findByRole('button', { name: /Continuar a Wompi por/ });
+      expect(requests.slice(start).map(r => r.name)).toEqual(['getWompiAvailability', 'getWompiQuote']);
+      fireEvent.click(confirm);
+      await waitFor(() => expect(widgetOpen).toHaveBeenCalledTimes(panel ? 2 : 1));
+      expect(requests.slice(start).every(r => r.headers.Authorization === `Bearer token-${owner}`)).toBe(true);
+      expect(requests.slice(start).filter(r => r.name === 'createWompiCheckout')).toHaveLength(1);
+      view.unmount();
+    }
     expect(sdk.writes).toHaveLength(0);
     expect(useAuthStore.getState().customer?.balance).toBe(10000);
   });
@@ -118,7 +131,7 @@ describe('Wompi real import/session contracts / external boundaries only', () =>
     reply = () => new Response('{}', { status: 503 });
     mount(<RechargeModal onClose={() => {}} />);
     await screen.findByText(/No se pudo consultar Wompi/);
-    expect(screen.queryByRole('button', { name: 'Pagar con Wompi' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Ver total' })).toBeNull();
     fireEvent.change(screen.getByPlaceholderText('10,000'), { target: { value: '10000' } });
     fireEvent.click(screen.getByRole('button', { name: /Transferencia BRE-B/ }));
     expect(await screen.findByAltText('QR de pago')).toHaveAttribute('src', '/synthetic-qr.png');
@@ -137,37 +150,42 @@ describe('Wompi real import/session contracts / external boundaries only', () =>
   });
   it('real reseller history and resume keep the panel token and send no browser amount', async () => {
     await sessions();
-    const reference = `wompi_${'a'.repeat(48)}`;
-    reply = name => name === 'getRechargeHistory' ? { success: true, recharges: [{ id: reference, tenantId: 't1', provider: 'wompi', amount: 10000, status: 'pending', customerName: 'Synthetic', createdAt: null }] }
+    reply = name => name === 'getRechargeHistory' ? { success: true, recharges: [{ id: reference, userId: 'reseller-B', tenantId: 't1', provider: 'wompi', amount: 10000, status: 'pending', customerName: 'Synthetic', createdAt: null }] }
       : name === 'getWompiAvailability' ? { enabled: true, environment: 'prod' } : { checkoutUrl: checkout };
-    mount(<HistorialRecargas />);
+    mount(<HistorialRecargas panel />);
     fireEvent.click(await screen.findByRole('button', { name: 'Retomar pago Wompi' }));
-    await screen.findByRole('link');
-    expect(requests.map(r => r.headers.Authorization)).toEqual(Array(3).fill('Bearer token-reseller-B'));
+    await screen.findByRole('button', { name: /Continuar a Wompi por/ });
+    expect(requests.map(r => r.headers.Authorization)).toEqual(Array(4).fill('Bearer token-reseller-B'));
     expect(requests[1].data).toEqual({ tenantId: 't1', rechargeId: reference });
-    expect(requests[2].data).toEqual({ tenantId: 't1', rechargeId: reference });
+    expect(requests[2].data).toEqual({});
+    expect(requests[3].data).toEqual({ tenantId: 't1', rechargeId: reference });
     fireEvent(document, new Event('visibilitychange'));
-    await waitFor(() => expect(requests.filter(r => r.name === 'getRechargeHistory')).toHaveLength(2));
+    // Both history and its mounted prepared-payment control refresh on return.
+    await waitFor(() => expect(requests.filter(r => r.name === 'getRechargeHistory')).toHaveLength(4));
+    expect(requests.every(r => r.headers.Authorization === 'Bearer token-reseller-B')).toBe(true);
     expect(requests.at(-1)?.headers.Authorization).toBe('Bearer token-reseller-B');
   });
   it('logout during checkout response cannot return a private checkout link', async () => {
     sdk.emit(auth, user('client-A')); const pending = defer<any>();
     reply = name => name === 'getWompiAvailability' ? { enabled: true } : pending.promise;
     mount(<WompiPaymentOption amount="10000" tenantId="t1" />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Pagar con Wompi' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver total' }));
     await waitFor(() => expect(requests).toHaveLength(2)); sdk.emit(auth, null);
-    await act(async () => pending.resolve({ checkoutUrl: checkout }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('sesión');
+    await act(async () => pending.resolve(preview));
+    expect(screen.queryByRole('button', { name: /Continuar a Wompi por/ })).toBeNull();
+    expect(requests.some(r => r.name === 'createWompiCheckout')).toBe(false);
     expect(screen.queryByRole('link')).toBeNull();
   });
   it('amount edits discard late real HTTP checkout responses without changing balance', async () => {
     await sessions(); const pending = defer<any>();
     reply = name => name === 'getWompiAvailability' ? { enabled: true } : pending.promise;
     const view = mount(<WompiPaymentOption amount="10000" tenantId="t1" />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Pagar con Wompi' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver total' }));
     await waitFor(() => expect(requests).toHaveLength(2));
     view.rerender(<WompiPaymentOption amount="20000" tenantId="t1" />);
-    await act(async () => pending.resolve({ checkoutUrl: checkout }));
+    await act(async () => pending.resolve(preview));
+    expect(screen.queryByRole('button', { name: /Continuar a Wompi por/ })).toBeNull();
+    expect(requests.some(r => r.name === 'createWompiCheckout')).toBe(false);
     expect(screen.queryByRole('link')).toBeNull();
     expect(useAuthStore.getState().customer?.balance).toBe(10000);
     expect(sdk.writes).toHaveLength(0);

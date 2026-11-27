@@ -35,7 +35,7 @@ const {
   getRechargeHistory,
 } = require('../../functions/recharges');
 const { notifyPrizeWon, processSpin } = require('../../functions/roulette');
-const { getWompiConfig, saveWompiConfig, getWompiAvailability, createWompiCheckout } = require('../../functions/wompi');
+const { getWompiConfig, saveWompiConfig, getWompiAvailability, getWompiQuote, createWompiCheckout, reconcileWompiPayment } = require('../../functions/wompi');
 const {
   generateTelegramToken,
   checkTelegramStatus,
@@ -66,7 +66,9 @@ const FN_REGISTRY = {
   getWompiConfig: { auth: 'bearer', handler: getWompiConfig },
   saveWompiConfig: { auth: 'bearer', handler: saveWompiConfig },
   getWompiAvailability: { auth: 'bearer', handler: getWompiAvailability },
+  getWompiQuote: { auth: 'bearer', handler: getWompiQuote },
   createWompiCheckout: { auth: 'bearer', handler: createWompiCheckout },
+  reconcileWompiPayment: { auth: 'bearer', handler: reconcileWompiPayment },
   getUserRole: { auth: 'bearer', handler: getUserRoleHandler },
   createAdmin: { auth: 'bearer', handler: createAdmin },
   getPublicAccount: { auth: 'none', handler: getPublicAccount },

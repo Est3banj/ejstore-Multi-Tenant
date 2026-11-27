@@ -40,13 +40,13 @@ for (const name of selected) {
   if (name === 'frontend') {
     const report = JSON.parse(output);
     assert.equal(report.success, true);
-    assert.equal(report.numTotalTests, 83);
-    assert.equal(report.numPassedTests, 83);
+    assert.equal(report.numTotalTests, 196);
+    assert.equal(report.numPassedTests, 196);
     assert.equal(report.numFailedTests, 0);
     assert.equal(report.numPendingTests, 0);
     assert.equal(report.numTodoTests, 0);
     const cases = report.testResults.flatMap(file => file.assertionResults);
-    assert.equal(cases.length, 83);
+    assert.equal(cases.length, 196);
     assert.ok(cases.every(test => test.status === 'passed'), 'Skipped/todo frontend tests cannot pass this gate');
   } else {
     for (const [field, expected] of Object.entries({

@@ -98,12 +98,17 @@ async function request(instance, options = {}) {
   }
 }
 
-test('root wrapper initializes once and exposes 49 callable routes including four optional Wompi handlers', () => {
+test('root wrapper initializes once and exposes 51 callable routes including six optional Wompi handlers', () => {
   const lock = JSON.parse(readFileSync(resolve(root, 'api/package-lock.json'), 'utf8'));
   assert.equal(require('express/package.json').version, lock.packages['node_modules/express'].version);
   const r = runtime();
   assert.equal(r.calls.init, 1);
-  assert.equal(Object.keys(r.registry).length, 49);
+  assert.equal(Object.keys(r.registry).length, 51);
+  for (const name of ['getWompiConfig', 'saveWompiConfig', 'getWompiAvailability',
+    'getWompiQuote', 'createWompiCheckout', 'reconcileWompiPayment']) {
+    assert.equal(r.registry[name].auth, 'bearer');
+    assert.equal(typeof r.registry[name].handler, 'function');
+  }
   assert.equal(r.registry.getStockAvailability.auth, 'none');
   assert.equal(r.registry.getPurchaseCredentials.auth, 'bearer');
 });

@@ -480,7 +480,7 @@ const ResellerDashboard = (): JSX.Element => {
       {/* Modal de recarga — mismo flujo que la página de usuario final */}
       <AnimatePresence>
         {showRecharge && (
-          <RechargeModal onClose={() => setShowRecharge(false)} />
+          <RechargeModal panel onClose={() => setShowRecharge(false)} />
         )}
       </AnimatePresence>
     </div>

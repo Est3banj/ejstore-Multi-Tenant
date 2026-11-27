@@ -83,7 +83,7 @@ const PublicRoutes = () => {
             <Route path="mis-reportes" element={<MisReportes />} />
             <Route path="perfil" element={<Perfil />} />
             <Route path="reportar" element={<ResellerReportar />} />
-            <Route path="historial-recargas" element={<HistorialRecargas />} />
+            <Route path="historial-recargas" element={<HistorialRecargas panel />} />
           </Route>
           <Route path="*" element={<Navigate to="/r/dashboard" replace />} />
         </>

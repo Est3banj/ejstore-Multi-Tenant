@@ -12,6 +12,8 @@ const SPEC_ROUTES = [
   { name: 'saveWompiConfig', auth: 'bearer' },
   { name: 'getWompiAvailability', auth: 'bearer' },
   { name: 'createWompiCheckout', auth: 'bearer' },
+  { name: 'getWompiQuote', auth: 'bearer' },
+  { name: 'reconcileWompiPayment', auth: 'bearer' },
   { name: 'getUserRole', auth: 'bearer' },
   { name: 'createAdmin', auth: 'bearer' },
   { name: 'getPublicAccount', auth: 'none' },
@@ -77,11 +79,11 @@ describe('registry estructura', () => {
     }
   });
 
-  it('registry contiene exactamente 49 rutas callable (45 existentes + 4 Wompi autenticadas)', () => {
+  it('registry contiene exactamente 51 rutas callable (45 existentes + 6 Wompi autenticadas)', () => {
     const registryNames = Object.keys(FN_REGISTRY).sort();
     const specNames = SPEC_ROUTES.map((r) => r.name).sort();
     expect(registryNames).toEqual(specNames);
-    expect(SPEC_ROUTES).toHaveLength(49);
+    expect(SPEC_ROUTES).toHaveLength(51);
   });
 
   it('auth-class de cada ruta coincide con la tabla del spec', () => {

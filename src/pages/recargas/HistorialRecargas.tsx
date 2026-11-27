@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../../store/authStore';
+import { useTenantStore } from '../../store/tenantStore';
 import { getRechargeHistory, checkRechargePayment } from '../../services/marketplace';
+import { customCallable, customAdminCallable } from '../../services/apiClient';
 import { WompiPaymentOption } from '../../components/WompiPaymentOption';
+import { WompiAmounts, type WompiFeeQuote } from '../../components/WompiAmounts';
 import {
   Clock,
   CheckCircle,
@@ -27,6 +30,8 @@ interface Recharge {
   processedAt: string | null;
   createdAt: string | null;
   provider?: string;
+  feeQuote?: WompiFeeQuote;
+  environment?: string | null;
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
@@ -37,9 +42,21 @@ const statusConfig: Record<string, { label: string; color: string; icon: any }> 
   failed: { label: 'Fallida', color: 'bg-red-500/10 text-red-400 border-red-500/20', icon: AlertCircle },
 };
 
-const HistorialRecargas = (): JSX.Element => {
-  const { role } = useAuthStore();
-  const [recharges, setRecharges] = useState<Recharge[]>([]);
+const HistorialRecargas = ({ panel = false }: { panel?: boolean }): JSX.Element => {
+  const { role, user: clientUser, adminUser, initialized, loading: authLoading } = useAuthStore();
+  const user = panel ? adminUser : clientUser;
+  const tenantId = useTenantStore(state => state.tenant?.id);
+  const scope = `${user?.uid || ''}:${tenantId || ''}:${panel}:${panel ? role || '' : ''}`;
+  const currentScope = useRef(scope);
+  currentScope.current = scope;
+  const request = useRef(0);
+  const [history, setHistory] = useState<{ scope: string; recharges: Recharge[] }>({ scope: '', recharges: [] });
+  const recharges = history.scope === scope ? history.recharges : [];
+  const [historyError, setHistoryError] = useState(false);
+  const params = new URLSearchParams(window.location.search);
+  const returnReference = params.get('wompi_ref');
+  const returned = !!returnReference;
+  const returnedRecharge = recharges.find(item => item.id === returnReference && item.provider === 'wompi' && item.userId === user?.uid);
   const [loading, setLoading] = useState(true);
   const [_verifyingId, _setVerifyingId] = useState<string | null>(null);
   const [showNameModal, setShowNameModal] = useState(false);
@@ -48,28 +65,86 @@ const HistorialRecargas = (): JSX.Element => {
   const [verifying, setVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  const isReseller = role === 'reseller';
-
-  const loadHistory = async () => {
-    setLoading(true);
+  const loadHistory = useCallback(async (options?: { silent?: boolean }) => {
+    if (!user || !tenantId || !initialized || authLoading) return;
+    const sequence = ++request.current;
+    if (!options?.silent) setLoading(true);
     try {
-      const result = await getRechargeHistory(isReseller);
-      if (result.success) {
-        setRecharges(result.recharges);
+      let result = await getRechargeHistory(panel);
+      if (currentScope.current !== scope || request.current !== sequence) return;
+      if (!result.success) throw new Error('History unavailable');
+      const reference = new URLSearchParams(window.location.search).get('wompi_ref');
+      const locator = new URLSearchParams(window.location.search).get('id');
+      if (locator && /^[A-Za-z0-9_-]{1,128}$/.test(locator) && result.recharges.some(item =>
+        item.id === reference && item.provider === 'wompi' && item.status === 'pending' && item.tenantId === tenantId && item.userId === user.uid)) {
+        // Redirect fields are untrusted locators, never financial evidence.
+        const verification = await (panel ? customAdminCallable : customCallable)<{ status: string }>('reconcileWompiPayment', { tenantId, rechargeId: reference, transactionId: locator });
+        if (currentScope.current !== scope || request.current !== sequence) return;
+        if (['approved', 'sandbox_approved', 'rejected'].includes(verification.data.status)) {
+          result = await getRechargeHistory(panel);
+          if (currentScope.current !== scope || request.current !== sequence) return;
+          if (!result.success) throw new Error('History unavailable');
+        }
       }
-    } catch (err) {
-      console.error('Error loading recharge history:', err);
+      setHistory({ scope, recharges: result.recharges.filter(item => item.tenantId === tenantId) });
+      setHistoryError(false);
+    } catch {
+      if (currentScope.current === scope && request.current === sequence) setHistoryError(true);
     } finally {
-      setLoading(false);
+      if (currentScope.current === scope && request.current === sequence) setLoading(false);
     }
-  };
+  }, [user, tenantId, initialized, authLoading, panel, scope]);
 
   useEffect(() => {
-    loadHistory();
-    const onVisible = () => { if (document.visibilityState === 'visible') void loadHistory(); };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, []);
+    setHistoryError(false);
+    setShowNameModal(false); setSelectedRecharge(null); setVerifyResult(null);
+    void loadHistory();
+    return () => { request.current++; };
+  }, [loadHistory]);
+
+  // L3 — refetch al volver la pestaña a visible: un cliente que deja el sitio
+  // con una recarga pending y regresa ve el estado actualizado sin recargar.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadHistory({ silent: true });
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [loadHistory]);
+
+  // Serial, bounded reads. A returned id is verified server-to-server before
+  // settlement; a returned status is never used.
+  useEffect(() => {
+    if (!returned || !user || !initialized || authLoading ||
+        (returnedRecharge && returnedRecharge.status !== 'pending')) return;
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    let attempts = 0;
+    const schedule = () => {
+      timer = setTimeout(async () => {
+        await loadHistory({ silent: true });
+        if (active && ++attempts < 6) schedule();
+      }, Math.min(3000 * 2 ** attempts, 15000));
+    };
+    schedule();
+    return () => { active = false; clearTimeout(timer); };
+  }, [returned, user, initialized, authLoading, returnedRecharge?.status, loadHistory]);
+
+  if (!initialized || authLoading) return <p role="status">Restaurando sesión…</p>;
+  if (!user) return <div className="p-8 space-y-4">
+    <p>Iniciá sesión para consultar tu recarga. El regreso de Wompi no confirma el pago.</p>
+    <button className="btn-secondary" onClick={() => window.dispatchEvent(new CustomEvent('openAuthModal', { detail: 'login' }))}>Iniciar sesión para ver mi recarga</button>
+  </div>;
+
+  const returnMessage = historyError ? 'No pudimos consultar la confirmación. Usá Actualizar para reintentar.'
+    : loading ? 'Consultando el estado de tu recarga…'
+      : !returnedRecharge ? 'Consultá tus recargas en esta cuenta y tienda. Si no aparece el pago, usá Actualizar o contactá al comercio.'
+        : returnedRecharge.status === 'sandbox_approved' ? 'Pago de prueba confirmado. No acredita saldo real.'
+          : returnedRecharge.status === 'approved' ? 'Pago confirmado por el servidor. Recarga aprobada.'
+            : ['rejected', 'failed'].includes(returnedRecharge.status) ? 'El pago no fue aprobado. No se acreditó saldo.'
+              : 'Estamos confirmando tu pago. El estado se actualiza al recibir la confirmación de Wompi; también podés usar Actualizar.';
 
   const handleVerifyClick = (recharge: Recharge) => {
     setSelectedRecharge(recharge);
@@ -88,7 +163,7 @@ const HistorialRecargas = (): JSX.Element => {
       const result = await checkRechargePayment({
         rechargeId: selectedRecharge.id,
         customerName: customerName.trim(),
-      }, isReseller);
+      }, panel);
 
       if (result.found && result.status === 'approved') {
         setVerifyResult({ success: true, message: 'Recarga aprobada. Saldo actualizado.' });
@@ -148,7 +223,7 @@ const HistorialRecargas = (): JSX.Element => {
           </p>
         </div>
         <button
-          onClick={loadHistory}
+          onClick={() => loadHistory()}
           disabled={loading}
           className="btn-secondary flex items-center gap-2"
         >
@@ -157,6 +232,8 @@ const HistorialRecargas = (): JSX.Element => {
         </button>
       </div>
 
+      {returned && <p role="status" className="mb-6 rounded-xl border border-white/20 p-4 text-white/80">{returnMessage}</p>}
+      {!returned && historyError && <p role="alert">No se pudo consultar el historial. Intentá Actualizar.</p>}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="w-10 h-10 border-4 border-white/10 border-t-white rounded-full animate-spin" />
@@ -179,59 +256,63 @@ const HistorialRecargas = (): JSX.Element => {
           animate={{ opacity: 1, y: 0 }}
           className="glass rounded-xl overflow-hidden"
         >
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-white/10">
-                <th className="text-left text-white/50 text-sm font-medium pb-3 pr-4 pt-3 px-4">Fecha</th>
-                <th className="text-left text-white/50 text-sm font-medium pb-3 pr-4 pt-3">Nombre</th>
-                <th className="text-right text-white/50 text-sm font-medium pb-3 pr-4 pt-3">Monto</th>
-                <th className="text-center text-white/50 text-sm font-medium pb-3 pr-4 pt-3">Estado</th>
-                <th className="text-right text-white/50 text-sm font-medium pb-3 pt-3 pr-4">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recharges.map((recharge) => {
-                const status = statusConfig[recharge.status] || statusConfig.pending;
-                const StatusIcon = status.icon;
-                return (
-                  <tr key={recharge.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                    <td className="py-4 pr-4 px-4">
-                      <span className="text-white text-sm">{formatDate(recharge.createdAt)}</span>
-                    </td>
-                    <td className="py-4 pr-4">
-                      <span className="text-white/70 text-sm">{recharge.customerName || '-'}</span>
-                    </td>
-                    <td className="py-4 pr-4 text-right">
-                      <span className="text-white font-medium">{formatAmount(recharge.amount)}</span>
-                    </td>
-                    <td className="py-4 pr-4">
-                      <div className="flex justify-center">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${status.color}`}>
-                          <StatusIcon size={12} />
-                          {status.label}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-4 text-right pr-4">
-                      {recharge.provider === 'wompi' && recharge.status === 'pending' ? (
-                        <WompiPaymentOption amount={String(recharge.amount)} tenantId={recharge.tenantId} rechargeId={recharge.id} panel={isReseller} />
-                      ) : canVerify(recharge.status) ? (
-                        <button
-                          onClick={() => handleVerifyClick(recharge)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-xs font-medium transition-colors ml-auto"
-                        >
-                          <Search size={12} />
-                          Verificar
-                        </button>
-                      ) : (
-                        <span className="text-white/30 text-xs">-</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="text-left text-white/50 text-sm font-medium pb-3 pr-4 pt-3 px-4">Fecha</th>
+                  <th className="text-left text-white/50 text-sm font-medium pb-3 pr-4 pt-3">Nombre</th>
+                  <th className="text-right text-white/50 text-sm font-medium pb-3 pr-4 pt-3">Monto</th>
+                  <th className="text-center text-white/50 text-sm font-medium pb-3 pr-4 pt-3">Estado</th>
+                  <th className="text-right text-white/50 text-sm font-medium pb-3 pt-3 pr-4">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recharges.map((recharge) => {
+                  const status = statusConfig[recharge.status] || statusConfig.pending;
+                  const StatusIcon = status.icon;
+                  return (
+                    <tr key={recharge.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                      <td className="py-4 pr-4 px-4">
+                        <span className="text-white text-sm">{formatDate(recharge.createdAt)}</span>
+                      </td>
+                      <td className="py-4 pr-4">
+                        <span className="text-white/70 text-sm">{recharge.customerName || '-'}</span>
+                      </td>
+                      <td className="py-4 pr-4 text-right">
+                        {recharge.provider === 'wompi' || recharge.id.startsWith('wompi_')
+                          ? <WompiAmounts amount={recharge.amount} feeQuote={recharge.feeQuote} status={recharge.status} environment={recharge.environment} />
+                          : <span className="text-white font-medium">{formatAmount(recharge.amount)}</span>}
+                      </td>
+                      <td className="py-4 pr-4">
+                        <div className="flex justify-center">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${status.color}`}>
+                            <StatusIcon size={12} />
+                            {status.label}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-4 text-right pr-4">
+                        {recharge.provider === 'wompi' && recharge.status === 'pending' ? (
+                          <WompiPaymentOption amount={String(recharge.amount)} tenantId={recharge.tenantId} rechargeId={recharge.id} panel={panel} />
+                        ) : canVerify(recharge.status) ? (
+                          <button
+                            onClick={() => handleVerifyClick(recharge)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-xs font-medium transition-colors ml-auto"
+                          >
+                            <Search size={12} />
+                            Verificar
+                          </button>
+                        ) : (
+                          <span className="text-white/30 text-xs">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </motion.div>
       )}
 

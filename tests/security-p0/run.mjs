@@ -55,12 +55,12 @@ try {
   timer = setTimeout(() => { console.error('P0 emulator gate exceeded 240 seconds'); stop(); }, 240000);
   const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('exit', resolve); });
   assert.equal(code, 0, 'P0 emulator command failed');
-  for (const [key, count] of Object.entries({ tests: 55, pass: 55, fail: 0, cancelled: 0, skipped: 0, todo: 0 })) {
+  for (const [key, count] of Object.entries({ tests: 75, pass: 75, fail: 0, cancelled: 0, skipped: 0, todo: 0 })) {
     const values = [...output.matchAll(new RegExp(`^# ${key} (\\d+)\\r?$`, 'gm'))];
     assert.equal(values.length, 1, `Missing or ambiguous TAP summary: ${key}`);
     assert.equal(Number(values[0][1]), count, `Expected ${key} ${count}`);
   }
-  console.log('P0 + Wompi gate: 55/55 passed; no skipped/cancelled/todo tests.');
+  console.log('P0 + Wompi gate: 75/75 passed; no skipped/cancelled/todo tests.');
 } finally {
   clearTimeout(timer); stop(); process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', interrupt);
   await rm(scratch, { recursive: true, force: true });
