@@ -1,5 +1,10 @@
 {
   "version": 2,
+  "git": {
+    "deploymentEnabled": {
+      "feature/landing-page": false
+    }
+  },
   "builds": [{ "src": "api.cjs", "use": "@vercel/node" }],
   "routes": [{ "src": "/api/(.*)", "dest": "/api.cjs" }],
   "regions": ["iad1"]
