@@ -16,16 +16,19 @@ const origins = [
 // Run the actual root wrapper, index, app, middleware, config and registry.
 // Only infrastructure and legacy handlers are replaced. No Admin SDK or .env
 // is loaded. Real EXPAND handlers use a read-only synthetic Firestore boundary.
-function runtime(env = {}, databaseFails = false) {
+function runtime(env = {}, databaseFails = false, overrides = {}) {
   const calls = { db: 0, auth: 0, init: 0 };
   const records = {
     'tenants/a': {},
     'services/s': { tenantId: 'a' },
-    'purchases/p': { customerId: 'owner', tenantId: 'a', serviceId: 's', accountId: 'c' },
+    'purchases/p': { status: 'active', customerId: 'owner', tenantId: 'a', serviceId: 's', accountId: 'c' },
+    [`public_links/${'A'.repeat(20)}`]: { status: 'active', purchaseId: 'p', serviceId: 's', accountId: 'c', accountIndex: 0,
+      createdAt: new Date('2026-01-01'), expiresAt: new Date('2099-01-01'), credential: { password: 'NEVER-RETURN' } },
     'services/s/accounts/c': {
       status: 'sold', soldTo: 'owner', purchaseId: 'p',
       credential: { email: 'fixture@example.invalid', password: 'FICTIONAL', pin: 'EXCLUDED' },
     },
+    ...overrides,
   };
   const ref = path => ({
     doc: id => ref(`${path}/${id}`),
@@ -41,6 +44,9 @@ function runtime(env = {}, databaseFails = false) {
     } }) }),
   });
   const db = { collection: ref };
+  db.runTransaction = async fn => fn({ get: r => r.get(),
+    create: () => {}, update: () => {},
+  });
   const admin = {
     getAdmin: () => { calls.init++; },
     auth: () => ({ verifyIdToken: async token => {
@@ -59,12 +65,13 @@ function runtime(env = {}, databaseFails = false) {
       if (name === 'express') return require('express');
       const target = localRequire.resolve(name);
       if (target === resolve(root, 'api/src/firebaseAdmin.js')) return admin;
-      if (target === resolve(root, 'functions/config.js')) return { db };
-      if (file === resolve(root, 'api/src/registry.js') && name !== '../../functions/availability') {
+      if (target === resolve(root, 'functions/config.js')) return { db, createModuleLogger: () => ({}) };
+      if (file === resolve(root, 'functions/accounts.js') && ['../auth', './auth', './services/notificationTriggers'].includes(name)) return {};
+      if (file === resolve(root, 'api/src/registry.js') && !['../../functions/availability', '../../functions/accounts'].includes(name)) {
         return new Proxy({}, { get: () => () => { throw new Error('Legacy handler must not run'); } });
       }
       if (target.startsWith(`${root}/api/`) || target === resolve(root, 'api.cjs') ||
-          target === resolve(root, 'functions/availability.js')) return load(target);
+          target === resolve(root, 'functions/availability.js') || target === resolve(root, 'functions/accounts.js')) return load(target);
       return localRequire(name);
     };
     const execute = vm.runInThisContext(`(function(require,module,exports,process,__dirname){${readFileSync(file, 'utf8')}\n})`, { filename: file });
@@ -72,7 +79,7 @@ function runtime(env = {}, databaseFails = false) {
     return module.exports;
   }
   const app = load(resolve(root, 'api.cjs'));
-  return { app, calls, config: load(resolve(root, 'api/src/config.js')), registry: load(resolve(root, 'api/src/registry.js')).FN_REGISTRY };
+  return { app, calls, config: load(resolve(root, 'api/src/config.js')), middleware: load(resolve(root, 'api/src/middleware.js')), registry: load(resolve(root, 'api/src/registry.js')).FN_REGISTRY };
 }
 
 async function request(instance, options = {}) {
@@ -98,12 +105,71 @@ async function request(instance, options = {}) {
   }
 }
 
-test('root wrapper initializes once and exposes 51 callable routes including six optional Wompi handlers', () => {
+test('real public account handler remains anonymous and returns only existing consumer contract after validation', async () => {
+  const r = runtime({ ALLOWED_ORIGINS: 'https://tenant.example.invalid' });
+  const response = await request(r, { path: '/api/getPublicAccount', headers: { Origin: 'https://tenant.example.invalid' }, body: { data: { token: 'A'.repeat(20) } } });
+  assert.equal(response.status, 200);
+  assert.equal(response.body.result.success, true);
+  assert.deepEqual(Object.keys(response.body.result).sort(), ['success', 'account', 'lastEmail'].sort());
+  assert.deepEqual(Object.keys(response.body.result.account).sort(), ['serviceName', 'status', 'createdAt', 'expiresAt'].sort());
+  assert.equal(response.text.includes('FICTIONAL'), false);
+  assert.equal(response.text.includes('NEVER-RETURN'), false);
+  assert.equal(response.headers['cache-control'], 'private, no-store');
+  assert.match(response.headers.vary, /Origin/);
+  assert.equal(r.calls.auth, 0);
+});
+
+test('public link errors, JSON errors, CORS and preflight all carry no-store; unavailable links are indistinguishable', async () => {
+  for (const options of [
+    { body: { data: null }, status: 404 },
+    { body: { data: { token: '../bad' } }, status: 404 },
+    { body: { data: { token: 'Z'.repeat(20) } }, status: 404 },
+    { raw: '{', status: 400 },
+    { headers: { Origin: 'https://evil.example.invalid' }, status: 403 },
+    { method: 'OPTIONS', headers: { Origin: origins[0] }, status: 204 },
+  ]) {
+    const r = runtime();
+    const response = await request(r, { path: '/api/getPublicAccount', ...options });
+    assert.equal(response.status, options.status);
+    assert.equal(response.headers['cache-control'], 'private, no-store');
+    assert.match(response.headers.vary, /Origin/);
+    if (options.status === 404) assert.equal(response.body.error.message, 'Link no disponible');
+  }
+  const response = await request(runtime({}, true), { path: '/api/getPublicAccount', body: { data: { token: 'A'.repeat(20) } } });
+  assert.equal(response.status, 503); assert.equal(response.headers['cache-control'], 'private, no-store');
+  assert.equal(response.text.includes('PRIVATE'), false);
+  const privateResponse = await request(runtime(), { path: '/api/createPublicLink', body: { data: { purchaseId: 'p', accountIndex: 0 } } });
+  assert.equal(privateResponse.status, 401); assert.equal(privateResponse.headers['cache-control'], 'private, no-store');
+});
+
+test('public lookup process limiter bounds repeated guesses, ignores spoofed forwarding and resets at window boundary', async () => {
+  let now = 1000, next = 0;
+  const limiter = runtime().middleware.createPublicLookupLimiter(() => now, 2);
+  const response = { setHeader: () => {}, status(code) { this.code = code; return this; }, json() {} };
+  const req = { method: 'POST', path: '/api/getPublicAccount', ip: '127.0.0.1', headers: { 'x-forwarded-for': 'spoof' } };
+  limiter(req, response, () => next++); limiter(req, response, () => next++);
+  limiter({ ...req, path: '/api/%67etPublicAccount/', headers: { 'x-forwarded-for': 'different-spoof' } }, response, () => next++);
+  assert.equal(next, 2); assert.equal(response.code, 429);
+  now += 60000; limiter(req, response, () => next++); assert.equal(next, 3);
+});
+
+test('actual HTTP creation requires the purchase owner and returns only an opaque token', async () => {
+  const options = { path: '/api/createPublicLink', headers: { Authorization: 'Bearer synthetic-owner' }, body: { data: { purchaseId: 'p', accountIndex: 0 } } };
+  const response = await request(runtime(), options);
+  assert.equal(response.status, 200);
+  assert.deepEqual(Object.keys(response.body.result), ['token']);
+  assert.match(response.body.result.token, /^[a-f0-9]{64}$/);
+  assert.equal(response.headers['cache-control'], 'private, no-store');
+  const other = runtime({}, false, { 'purchases/p': { status: 'active', customerId: 'other', tenantId: 'a', serviceId: 's', accountId: 'c' } });
+  assert.equal((await request(other, options)).status, 404);
+});
+
+test('root wrapper initializes once and exposes 52 callable routes including private link creation', () => {
   const lock = JSON.parse(readFileSync(resolve(root, 'api/package-lock.json'), 'utf8'));
   assert.equal(require('express/package.json').version, lock.packages['node_modules/express'].version);
   const r = runtime();
   assert.equal(r.calls.init, 1);
-  assert.equal(Object.keys(r.registry).length, 51);
+  assert.equal(Object.keys(r.registry).length, 52);
   for (const name of ['getWompiConfig', 'saveWompiConfig', 'getWompiAvailability',
     'getWompiQuote', 'createWompiCheckout', 'reconcileWompiPayment']) {
     assert.equal(r.registry[name].auth, 'bearer');

@@ -180,8 +180,13 @@ function isSenderAllowed(fromAddress, allowedSenders) {
 // (opcional) consumo del UID del email de pago + limpieza del lock de dedupe,
 // TODO en UNA runTransaction. Lecturas antes de escrituras (regla Firestore).
 // Idempotente: reintentos/aprobaciones concurrentes = exactamente 1 crédito.
-async function settleRechargeTransaction({ rechargeRef, action, processedBy, reason, paymentEmail, wompiPayment }) {
+async function settleRechargeTransaction({ rechargeRef, action, processedBy, reason, paymentEmail, wompiPayment, wompiBeneficiaryRef }) {
   return db.runTransaction(async (transaction) => {
+    // The verified intent supplies a read-order hint, NOT credit authority.
+    // Read this shared write target before the receipt: otherwise one commit
+    // can hold the beneficiary while waiting for another reader's receipt.
+    // Validate the hint against the intent read inside this transaction below.
+    const earlyBeneficiary = wompiBeneficiaryRef ? await transaction.get(wompiBeneficiaryRef) : null;
     const snap = await transaction.get(rechargeRef);
     if (!snap.exists) {
       throw new HttpsError('not-found', 'Recarga no encontrada');
@@ -246,7 +251,10 @@ async function settleRechargeTransaction({ rechargeRef, action, processedBy, rea
         : (resellerSnap.exists ? resellerRef : db.collection('customers').doc(data.userId)))
       : null;
     if (intent && creditBalance) {
-      const beneficiary = await transaction.get(beneficiaryRef);
+      if (wompiBeneficiaryRef && wompiBeneficiaryRef.path !== beneficiaryRef.path) {
+        throw new HttpsError('failed-precondition', 'Beneficiario inválido');
+      }
+      const beneficiary = earlyBeneficiary || await transaction.get(beneficiaryRef);
       if (!beneficiary.exists || beneficiary.data().tenantId !== intent.tenantId) {
         throw new HttpsError('failed-precondition', 'Beneficiario inválido');
       }

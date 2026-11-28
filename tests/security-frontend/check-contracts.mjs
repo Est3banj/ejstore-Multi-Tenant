@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { relative, resolve } from 'node:path';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const modules = resolve(root, 'tests/security-frontend/node_modules');
-const roots = ['src/pages/Product.jsx', 'src/pages/reseller/CatalogoMayorista.tsx',
+const roots = ['src/pages/reseller/MisClientes.tsx', 'src/pages/public/VerCuenta.tsx', 'src/pages/Product.jsx', 'src/pages/reseller/CatalogoMayorista.tsx',
   'src/pages/customer/PurchaseResult.tsx', 'src/components/ServiceCard.tsx',
   'src/types/marketplace.ts', 'src/vite-env.d.ts', 'src/components/WompiPaymentOption.tsx',
   'src/components/admin/WompiSettings.tsx', 'src/components/RechargeModal.tsx',
@@ -21,6 +21,7 @@ const options = {
     'react/*': [resolve(modules, '@types/react/*')],
     'react-dom': [resolve(modules, '@types/react-dom/index.d.ts')],
     'vite/client': [resolve(modules, 'vite/client.d.ts')],
+    sweetalert2: [resolve(modules, 'sweetalert2/sweetalert2.d.ts')],
     'firebase/*': [resolve(root, 'tests/security-rules/node_modules/firebase/*')],
     ...Object.fromEntries(['zustand', '@tanstack/react-query', 'framer-motion', 'lucide-react', 'react-router-dom'].map(name => [name, [resolve(modules, name)]])),
   },

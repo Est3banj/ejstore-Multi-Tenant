@@ -9,11 +9,9 @@ import {
   orderBy,
   limit,
   getDocs,
-  doc,
-  setDoc,
-  serverTimestamp,
 } from "firebase/firestore";
 import { adminDb } from "../../services/firebase";
+import { customAdminCallable } from "../../services/apiClient";
 import {
   ShoppingBag,
   Search,
@@ -100,16 +98,6 @@ const buildTemplate = (serviceName: string, row: AccountRow): string => {
     TEMPLATE_RULES,
   ];
   return lines.join("\n");
-};
-
-const generateToken = (): string => {
-  const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let result = "";
-  for (let i = 0; i < 20; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -305,22 +293,9 @@ const MisClientes = (): JSX.Element => {
     setGeneratingFor(linkKey);
 
     try {
-      const token = generateToken();
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-      await setDoc(doc(adminDb, "public_links", token), {
-        token,
-        resellerId: uid,
-        accountId: row.purchase.accountIds[row.idx] || "",
-        serviceId: row.purchase.serviceId,
-        serviceName: row.purchase.serviceName,
+      await customAdminCallable("createPublicLink", {
         purchaseId: row.purchase.id,
         accountIndex: row.idx,
-        credential: row.credential,
-        createdAt: serverTimestamp(),
-        expiresAt,
-        status: "active",
       });
 
       await loadData();

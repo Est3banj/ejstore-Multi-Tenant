@@ -9,8 +9,9 @@
   "scripts": {
     "test": "node run.mjs",
     "test:baseline": "node run.mjs --baseline",
-    "test:handlers": "node --require ./loopback-only.cjs --test availability.test.cjs",
+    "test:handlers": "node --require ./loopback-only.cjs --test availability.test.cjs public-links.test.cjs",
     "test:runtime": "node --require ./loopback-only.cjs --test runtime.test.cjs",
+    "test:links": "node --require ./loopback-only.cjs --test public-links.test.cjs",
     "diagnostic:denial": "node run.mjs --diagnostic-denial"
   },
   "devDependencies": {

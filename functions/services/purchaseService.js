@@ -136,6 +136,7 @@ async function processPurchase({ serviceId, tenantId, customerId, customerEmail,
       return {
         purchaseId: purchaseRef.id,
         accountId: selected.accountRef.id,
+        profileId: selected.profileRef ? selected.profileRef.id : null,
         credential: selected.credential,
         serviceName: serviceData.name,
         profileName: selected.profileName,
@@ -157,7 +158,8 @@ async function processPurchase({ serviceId, tenantId, customerId, customerEmail,
       }],
       result.serviceName,
       null,
-      result.hasCodeExtraction
+      result.hasCodeExtraction,
+      { tenantId, customerId, accountId: result.accountId, profileId: result.profileId }
     );
 
     if (linkTokens.length > 0) {
@@ -328,6 +330,7 @@ async function processBulkPurchase({ serviceId, tenantId, resellerId, resellerEm
 
           soldProfiles.push({
             profileRef: candidate.profileRef,
+            assignmentId: `${purchaseRef.id}_${i}`,
             profileName: profData.name,
             profilePin: profData.pin || null,
             credential: acctData.credential,
@@ -345,6 +348,7 @@ async function processBulkPurchase({ serviceId, tenantId, resellerId, resellerEm
             data: {
               status: 'sold',
               soldTo: resellerId,
+              purchaseId: `${purchaseRef.id}_${i}`,
               updatedAt: now,
             },
           });
@@ -358,6 +362,7 @@ async function processBulkPurchase({ serviceId, tenantId, resellerId, resellerEm
 
           soldProfiles.push({
             profileRef: null,
+            assignmentId: `${purchaseRef.id}_${i}`,
             profileName: 'Perfil 1',
             profilePin: null,
             credential: acctData.credential,
@@ -386,6 +391,8 @@ async function processBulkPurchase({ serviceId, tenantId, resellerId, resellerEm
       }
 
       const profilesData = soldProfiles.map(p => ({
+        accountId: p.accountRef.id,
+        assignmentId: p.assignmentId,
         profileId: p.profileRef ? p.profileRef.id : null,
         profileName: p.profileName,
         profilePin: p.profilePin,
@@ -439,7 +446,8 @@ async function processBulkPurchase({ serviceId, tenantId, resellerId, resellerEm
       result.profiles,
       result.serviceName,
       resellerId,
-      hasCodeExtraction
+      hasCodeExtraction,
+      { tenantId, customerId: resellerId, resellerId, profiles: result.profiles }
     );
 
     if (linkTokens.length > 0) {

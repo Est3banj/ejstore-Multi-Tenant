@@ -1,7 +1,7 @@
 // Synthetic fixtures based on Wompi Colombia docs, retrieved 2026-11-25.
 // Real handlers + real Auth/Firestore emulators. Only outbound provider HTTP
 // and notifications use the existing infrastructure boundary.
-const { test, beforeEach, after } = require('node:test');
+const { test, beforeEach, afterEach, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const fixture = require('./boundaries.cjs');
@@ -28,6 +28,7 @@ beforeEach(async () => {
   fixture.setWompiGet(async (url, options) => { calls.push({ url, options }); throw new Error('No response'); });
 });
 after(fixture.close);
+afterEach(() => assert.equal(fixture.transactionStats().activeTransactions, 0, 'Test must await all transaction outcomes'));
 const config = (env = 'prod') => saveWompiConfig({ tenantId, ...credentials(env) }, adminCtx);
 const acceptedQuotes = new Map();
 const create = async (ctx = customer, amount = 50000, key = randomUUID()) => {
@@ -52,6 +53,20 @@ async function assertUntouched(reference) {
   assert.equal(await balance(), 10000);
   assert.equal((await db.collection('recharges').doc(reference).get()).data().status, 'pending');
   assert.equal((await db.collection('balanceTransactions').doc(reference).get()).exists, false);
+}
+async function assertAtomicRaceState(reference, amount, outcomes) {
+  const receipt = (await db.collection('recharges').doc(reference).get()).data();
+  const intent = (await db.collection('wompi_intents').doc(reference).get()).data();
+  const ledger = await db.collection('balanceTransactions').where('rechargeId', '==', reference).get();
+  const consumption = await db.collection('wompi_payment_consumptions').where('rechargeId', '==', reference).get();
+  const committed = receipt.status === 'approved';
+  assert.equal(intent.status, receipt.status);
+  assert.equal(await balance(), 10000 + (committed ? amount : 0));
+  assert.equal(ledger.size, committed ? 1 : 0); assert.equal(consumption.size, committed ? 1 : 0);
+  assert.equal((await db.collection('recharge_locks').doc(customer.auth.uid).get()).exists, !committed);
+  if (committed) assert.equal(ledger.docs[0].data().amount, amount);
+  console.log('Wompi race atomic state:', JSON.stringify({ status: receipt.status, ledger: ledger.size,
+    consumption: consumption.size, outcomes: outcomes.map(outcome => outcome.status === 'fulfilled' ? 'fulfilled' : outcome.reason?.code) }));
 }
 
 test('lost webhook: owner locator is verified against frozen merchant and total; Sandbox settles once without balance', async () => {
@@ -201,9 +216,14 @@ test('server signs safe integer COP cents and persists private authority; checko
 test('negative, fractional, oversized, nonnumeric and unsafe amounts fail before creation', async () => {
   await config(); for (const amount of [-1, 999, 1000.01, 5000001, Number.MAX_SAFE_INTEGER, '1e4', 'NaN']) await assert.rejects(create(customer, amount));
 });
+const stressIterations = process.env.WOMPI_STRESS_ITERATIONS ? Number(process.env.WOMPI_STRESS_ITERATIONS) : 1;
+assert.ok([1, 10, 20].includes(stressIterations));
+for (let iteration = 0; iteration < stressIterations; iteration++) {
 test('idempotent concurrent checkout creation creates one intent and owner can resume', async () => {
   await config(); const key = randomUUID();
-  const results = await Promise.all([create(customer, 50000, key), create(customer, 50000, key)]);
+  const outcomes = await Promise.allSettled([create(customer, 50000, key), create(customer, 50000, key)]);
+  for (const outcome of outcomes) assert.equal(outcome.status, 'fulfilled', outcome.reason?.stack);
+  const results = outcomes.map(outcome => outcome.value);
   assert.equal(results[0].reference, results[1].reference);
   assert.equal((await db.collection('wompi_intents').where('userId', '==', customer.auth.uid).get()).size, 1);
   await assert.rejects(create(customer, 60000, key));
@@ -211,10 +231,31 @@ test('idempotent concurrent checkout creation creates one intent and owner can r
   assert.equal(resumed.checkoutUrl, results[0].checkoutUrl);
   assert.deepEqual(resumed.widgetConfig, results[0].widgetConfig);
 });
+}
 test('QR pending blocks Wompi', async () => {
   await config(); await createRechargeRequest({ amount: 50000, customerName: 'Synthetic', customerPhone: '3001234567' }, customer);
   await assert.rejects(create());
 });
+for (let iteration = 0; iteration < stressIterations; iteration++) {
+test('scheduled concurrent checkout returns one atomic intent and keeps the owner lock consistent', async () => {
+  await config(); const key = randomUUID();
+  const stop = fixture.contendOnTransactionRead('wompi_requests/' + hash(`${customer.auth.uid}:${key}`));
+  let outcomes;
+  try { outcomes = await Promise.allSettled([create(customer, 50000, key), create(customer, 50000, key)]); }
+  finally { stop(); }
+  for (const outcome of outcomes) assert.equal(outcome.status, 'fulfilled', outcome.reason?.stack);
+  const reference = outcomes[0].value.reference;
+  assert.equal(outcomes[1].value.reference, reference);
+  assert.equal((await db.collection('wompi_intents').where('userId', '==', customer.auth.uid).get()).size, 1);
+  const receipts = await db.collection('recharges').where('userId', '==', customer.auth.uid).get();
+  assert.equal(receipts.size, 1); assert.equal(receipts.docs[0].id, reference);
+  assert.equal((await db.collection('recharge_locks').doc(customer.auth.uid).get()).data().rechargeId, reference);
+  assert.equal((await db.collection('wompi_requests').doc(hash(`${customer.auth.uid}:${key}`)).get()).data().reference, reference);
+  assert.equal(await balance(), 10000);
+  assert.equal((await db.collection('balanceTransactions').doc(reference).get()).exists, false);
+  assert.equal((await db.collection('wompi_payment_consumptions').where('rechargeId', '==', reference).get()).size, 0);
+});
+}
 test('approved customer payment credits once, writes ledger, and verifies fixed authenticated provider URL', async () => {
   await config(); const result = await create(), value = event(result.reference); provider(value);
   await handleWompiEvent(value, 'prod'); await handleWompiEvent(value, 'prod');
@@ -265,14 +306,27 @@ test('PENDING does not credit; declined/error/voided finalize without balance or
     assert.equal((await db.collection('recharges').doc(created.reference).get()).data().status, 'rejected');
   }
 });
+for (let iteration = 0; iteration < stressIterations; iteration++) {
 test('concurrent webhook retries and manual approval race credit exactly once; IMAP never runs', async () => {
   await config(); const result = await create(), value = event(result.reference); provider(value);
   assert.equal((await checkRechargePayment({ rechargeId: result.reference }, customer)).processed, false); assert.equal(fixture.imapCalls(), 0);
   const results = await Promise.allSettled([handleWompiEvent(value, 'prod'), handleWompiEvent(value, 'prod'),
     processRecharge({ rechargeId: result.reference, action: 'approve' }, adminCtx)]);
-  assert.equal(results[0].status, 'fulfilled'); assert.equal(results[1].status, 'fulfilled'); assert.equal(results[2].status, 'rejected');
+  await assertAtomicRaceState(result.reference, 50000, results);
+  assert.equal(results[0].status, 'fulfilled', results[0].reason?.stack); assert.equal(results[1].status, 'fulfilled', results[1].reason?.stack); assert.equal(results[2].status, 'rejected');
+  assert.equal(results[2].reason.code, 'failed-precondition');
+  assert.match(results[2].reason.message, /confirmación verificada de Wompi/);
   assert.equal(await balance(), 60000);
+  const receipt = (await db.collection('recharges').doc(result.reference).get()).data();
+  const intent = (await db.collection('wompi_intents').doc(result.reference).get()).data();
+  assert.equal(receipt.status, 'approved'); assert.equal(intent.status, receipt.status);
+  assert.equal(intent.transactionId, value.data.transaction.id); assert.equal(receipt.transactionId, intent.transactionId);
+  const ledger = await db.collection('balanceTransactions').where('rechargeId', '==', result.reference).get();
+  assert.equal(ledger.size, 1); assert.equal(ledger.docs[0].data().amount, 50000);
+  assert.equal((await db.collection('wompi_payment_consumptions').where('rechargeId', '==', result.reference).get()).size, 1);
+  assert.equal((await db.collection('recharge_locks').doc(customer.auth.uid).get()).exists, false);
 });
+}
 test('public provider removal cannot bypass manual guard; altered authority fails closed', async () => {
   await config(); const result = await create(); const ref = db.collection('recharges').doc(result.reference);
   await ref.update({ provider: admin.firestore.FieldValue.delete() });
@@ -389,11 +443,14 @@ test('quote binds tenant and owner; wrong claims, inactive profiles and bad conf
   await assert.rejects(getWompiQuote({ amount: 20000 }, customer), { code: 'failed-precondition' });
   assert.equal(calls.length, 0);
 });
+for (let iteration = 0; iteration < stressIterations; iteration++) {
 test('different concurrent final keys acquire only one shared lock; committed retry and resume write nothing', async () => {
   await withFees(); const quote = await getWompiQuote({ amount: 20000 }, customer);
   const keys = [randomUUID(), randomUUID()];
   const results = await Promise.allSettled(keys.map(idempotencyKey => createWompiCheckout({ amount: 20000, idempotencyKey, expectedQuoteHash: quote.quoteHash }, customer)));
   assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
+  const rejected = results.find(result => result.status === 'rejected');
+  assert.equal(rejected.reason.code, 'failed-precondition'); assert.match(rejected.reason.message, /recarga pendiente/);
   const index = results.findIndex(result => result.status === 'fulfilled'), created = results[index].value;
   await saveWompiConfig({ tenantId, enabled: false }, adminCtx);
   const before = await paymentSnapshot();
@@ -402,6 +459,7 @@ test('different concurrent final keys acquire only one shared lock; committed re
   assert.equal(replay.checkoutUrl, created.checkoutUrl); assert.equal(resumed.checkoutUrl, created.checkoutUrl);
   assert.deepEqual(await paymentSnapshot(), before); assert.equal(calls.length, 0);
 });
+}
 test('preview may read with an actual pending payment but cannot bypass the existing final guard', async () => {
   await config(); const created = await create();
   const before = await paymentSnapshot(), quote = await getWompiQuote({ amount: 20000 }, customer);
@@ -451,6 +509,50 @@ test('customer fee is server authoritative: checkout charges total, prod ledger 
   assert.equal(ledger.amount, 20000); assert.deepEqual(ledger.feeQuote, result.feeQuote);
   const history = await getRechargeHistory({}, customer);
   assert.equal(history.recharges[0].amount, 20000); assert.deepEqual(history.recharges[0].feeQuote, result.feeQuote);
+});
+for (let iteration = 0; iteration < stressIterations; iteration++) {
+test('webhook and owner reconciliation race settle frozen fee base with one consumption and complete ledger', async () => {
+  await withFees(); const result = await create(customer, 20000);
+  const value = event(result.reference, { amount_in_cents: 2151200 });
+  provider(value, { merchant: { public_key: credentials().publicKey } });
+  const outcomes = await Promise.allSettled([
+    handleWompiEvent(value, 'prod'),
+    reconcileWompiPayment({ rechargeId: result.reference, transactionId: value.data.transaction.id }, customer),
+  ]);
+  await assertAtomicRaceState(result.reference, 20000, outcomes);
+  for (const outcome of outcomes) assert.equal(outcome.status, 'fulfilled', outcome.reason?.stack);
+  assert.equal(await balance(), 30000);
+  for (const collection of ['recharges', 'wompi_intents']) {
+    const receipt = (await db.collection(collection).doc(result.reference).get()).data();
+    assert.equal(receipt.status, 'approved'); assert.equal(receipt.transactionId, value.data.transaction.id);
+    assert.deepEqual(receipt.feeQuote, result.feeQuote);
+  }
+  const ledger = await db.collection('balanceTransactions').where('rechargeId', '==', result.reference).get();
+  assert.equal(ledger.size, 1); assert.equal(ledger.docs[0].data().amount, 20000);
+  assert.deepEqual(ledger.docs[0].data().feeQuote, result.feeQuote);
+  const consumptions = await db.collection('wompi_payment_consumptions').where('rechargeId', '==', result.reference).get();
+  assert.equal(consumptions.size, 1); assert.equal(consumptions.docs[0].data().transactionId, value.data.transaction.id);
+  assert.equal((await db.collection('recharge_locks').doc(customer.auth.uid).get()).exists, false);
+  await handleWompiEvent(value, 'prod');
+  assert.equal((await reconcileWompiPayment({ rechargeId: result.reference }, customer)).status, 'approved');
+  assert.equal(await balance(), 30000);
+});
+}
+test('beneficiary read-order hint cannot override the private transactional credit authority', async () => {
+  await config(); const created = await create();
+  const wrong = db.collection('customers').doc('wrong-' + randomUUID());
+  await wrong.set({ tenantId, balance: 777 });
+  await assert.rejects(require('../../functions/recharges').settleRechargeTransaction({
+    rechargeRef: db.collection('recharges').doc(created.reference), action: 'approve', processedBy: 'wompi',
+    wompiBeneficiaryRef: wrong,
+    wompiPayment: { transactionId: 'synthetic-verified', reference: created.reference, environment: 'prod',
+      amountInCents: 5000000, currency: 'COP', status: 'APPROVED' },
+  }), error => error.code === 'failed-precondition' && error.message === 'Beneficiario inválido');
+  await assertUntouched(created.reference);
+  assert.equal((await db.collection('wompi_intents').doc(created.reference).get()).data().status, 'pending');
+  assert.equal((await wrong.get()).data().balance, 777);
+  assert.equal((await db.collection('wompi_payment_consumptions').where('rechargeId', '==', created.reference).get()).size, 0);
+  assert.equal(calls.length, 0);
 });
 test('sandbox fee records base/cargo/total but neither balance nor monetary ledger', async () => {
   await withFees('test'); const result = await create(customer, 20000);

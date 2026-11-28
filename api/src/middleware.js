@@ -3,6 +3,35 @@ const { APIError, HttpsError, errorEnvelope, errorStatusFor } = require('./error
 const { getAllowedOrigins } = require('./config');
 const { auth } = require('./firebaseAdmin');
 
+// Per-process abuse bound only; no proxy header is trusted as a client identity.
+// Edge/distributed limits remain an operational rollout concern.
+function createPublicLookupLimiter(clock = Date.now, limit = 60) {
+  const windows = new Map();
+  return (req, res, next) => {
+    let path;
+    try { path = decodeURIComponent(req.path); } catch { return next(); }
+    if (req.method !== 'POST' || !/^\/api\/getPublicAccount\/?$/i.test(path)) return next();
+    const now = clock();
+    const key = req.ip || req.socket.remoteAddress || 'unknown';
+    let entry = windows.get(key);
+    if (!entry || entry.until <= now) {
+      for (const [id, value] of windows) if (value.until <= now) windows.delete(id);
+      if (windows.size >= 2048) {
+        res.status(429).json(errorEnvelope('resource-exhausted', 'Demasiadas consultas'));
+        return;
+      }
+      entry = { count: 0, until: now + 60000 };
+      windows.set(key, entry);
+    }
+    if (++entry.count > limit) {
+      res.setHeader('Retry-After', String(Math.max(1, Math.ceil((entry.until - now) / 1000))));
+      res.status(429).json(errorEnvelope('resource-exhausted', 'Demasiadas consultas'));
+      return;
+    }
+    next();
+  };
+}
+
 function corsMiddleware(req, res, next) {
   const origin = req.headers.origin;
   // Cache selection also varies for rejected and origin-less requests.
@@ -76,4 +105,4 @@ function errorMiddleware(err, req, res, next) {
   res.status(500).json(errorEnvelope('internal', 'Error interno del servidor'));
 }
 
-module.exports = { corsMiddleware, makeVerifyBearer, verifyBearer, errorMiddleware };
+module.exports = { corsMiddleware, createPublicLookupLimiter, makeVerifyBearer, verifyBearer, errorMiddleware };

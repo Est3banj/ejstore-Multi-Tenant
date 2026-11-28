@@ -11,7 +11,7 @@ const gates = {
   runtime: ['run', 'test:runtime', '--prefix', 'tests/security-rules'],
   readiness: null,
 };
-const counts = { candidate: 29, handlers: 14, runtime: 15 };
+const counts = { candidate: 31, handlers: 26, runtime: 19 };
 const selected = process.argv.slice(2);
 if (selected.length === 0) selected.push(...Object.keys(gates));
 assert.ok(selected.every(name => Object.hasOwn(gates, name)), 'Unknown validation gate');
@@ -40,13 +40,13 @@ for (const name of selected) {
   if (name === 'frontend') {
     const report = JSON.parse(output);
     assert.equal(report.success, true);
-    assert.equal(report.numTotalTests, 196);
-    assert.equal(report.numPassedTests, 196);
+    assert.equal(report.numTotalTests, 216);
+    assert.equal(report.numPassedTests, 216);
     assert.equal(report.numFailedTests, 0);
     assert.equal(report.numPendingTests, 0);
     assert.equal(report.numTodoTests, 0);
     const cases = report.testResults.flatMap(file => file.assertionResults);
-    assert.equal(cases.length, 196);
+    assert.equal(cases.length, 216);
     assert.ok(cases.every(test => test.status === 'passed'), 'Skipped/todo frontend tests cannot pass this gate');
   } else {
     for (const [field, expected] of Object.entries({

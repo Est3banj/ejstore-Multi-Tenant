@@ -9,6 +9,14 @@ assert.equal(process.env.FIRESTORE_EMULATOR_HOST, '127.0.0.1:8088');
 assert.equal(process.env.FIREBASE_AUTH_EMULATOR_HOST, '127.0.0.1:9098');
 admin.initializeApp({ projectId: 'demo-ejstore-p0' });
 const db = admin.firestore();
+const scheduling = require('./transactionSchedule.cjs')(db);
+const nativeRunTransaction = db.runTransaction.bind(db);
+let activeTransactions = 0;
+db.runTransaction = async (callback, options) => {
+  activeTransactions++;
+  try { return await nativeRunTransaction(scheduling.wrap(callback), options); }
+  finally { activeTransactions--; }
+};
 const auth = admin.auth();
 const root = resolve(__dirname, '../..');
 const logger = { info() {}, warn() {}, error() {}, debug() {}, child() { return this; } };
@@ -56,5 +64,11 @@ module.exports = {
   setEmails(value) { emails = value; imapCalls = 0; },
   imapCalls: () => imapCalls,
   setWompiGet(fn) { wompiGet = fn; },
-  async close() { await db.terminate(); await admin.app().delete(); },
+  transactionStats: () => ({ activeTransactions }),
+  contendOnTransactionRead: path => scheduling.contendOnRead(path),
+  async close() {
+    assert.equal(activeTransactions, 0, 'Cannot close Firestore with live transactions');
+    console.log('Emulator transaction stats:', JSON.stringify({ activeTransactions }));
+    await db.terminate(); await admin.app().delete();
+  },
 };

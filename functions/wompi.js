@@ -152,6 +152,10 @@ async function createWompiCheckout(data, context) {
     .orderBy('createdAt', 'desc').limit(50).get();
   const hasPending = history.docs.some(doc => doc.data().status === 'pending');
   const result = await db.runTransaction(async transaction => {
+    // Read the shared owner lock before the request that this commit writes.
+    // A reader holding the request while waiting for a committing lock creates
+    // a read/write lock inversion. Keep the same order across contenders.
+    const lock = await transaction.get(lockRef);
     const config = (await transaction.get(privateRef(identity.tenantId))).data();
     const request = await transaction.get(requestRef);
     if (request.exists) {
@@ -165,7 +169,6 @@ async function createWompiCheckout(data, context) {
     if (typeof data?.expectedQuoteHash !== 'string' || data.expectedQuoteHash !== quoteHash) {
       throw new HttpsError('failed-precondition', 'El total cambió. Revisalo antes de continuar con Wompi.');
     }
-    const lock = await transaction.get(lockRef);
     if (lock.exists && lock.data().rechargeId) {
       const pending = await transaction.get(db.collection('recharges').doc(lock.data().rechargeId));
       if (pending.exists && pending.data().status === 'pending') {
@@ -255,6 +258,8 @@ async function settleVerifiedPayment(intent, verified) {
   }
   const settled = await settleRechargeTransaction({ rechargeRef: db.collection('recharges').doc(intent.reference),
     action: verified.status === 'APPROVED' ? 'approve' : 'reject', processedBy: 'wompi',
+    wompiBeneficiaryRef: verified.status === 'APPROVED' && environment === 'prod'
+      ? db.collection(intent.beneficiaryCollection).doc(intent.userId) : null,
     wompiPayment: { transactionId: verified.id, reference: intent.reference, environment,
       amountInCents: verified.amount_in_cents, currency: verified.currency, status: verified.status } });
   if (!settled.duplicate) {

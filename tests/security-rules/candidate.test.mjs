@@ -29,6 +29,10 @@ before(async () => {
       batch.set(doc(db, `users/admin-${t}`), { role: 'admin', tenantId: `tenant-${t}` });
       batch.set(doc(db, `users/client-${t}`), { role: 'customer', tenantId: `tenant-${t}` });
       batch.set(doc(db, `users/reseller-${t}`), { role: 'reseller', tenantId: `tenant-${t}` });
+      batch.set(doc(db, `public_links/${'A'.repeat(20)}-${t}`), {
+        tenantId: `tenant-${t}`, resellerId: `reseller-${t}`, status: 'active',
+        expiresAt: new Date('2099-01-01'), credential,
+      });
       batch.set(doc(db, `purchases/bulk-${t}`), { resellerId: `reseller-${t}`, tenantId: `tenant-${t}`, profiles: [{ credential }] });
       for (const status of ['available', 'sold']) {
         batch.set(doc(db, path(t, status)), {
@@ -90,6 +94,17 @@ for (const t of ['a', 'b']) {
   const other = t === 'a' ? 'b' : 'a';
   test(`${t}: public service metadata remains readable`, async () => {
     await assertSucceeds(getDoc(doc(anon, `services/service-${t}`)));
+  });
+  test(`${t}: public bearer link documents deny all client reads, queries and mutations`, async () => {
+    for (const db of [anon, clients[t], clients[other], resellers[t], admins[t], admins[other], superadmin]) {
+      const ref = doc(db, `public_links/${'A'.repeat(20)}-${t}`);
+      await assertFails(getDoc(ref));
+      await assertFails(getDocs(collection(db, 'public_links')));
+      await assertFails(getDocs(query(collection(db, 'public_links'), where('resellerId', '==', `reseller-${t}`))));
+      await assertFails(setDoc(doc(db, `public_links/forged-${t}`), { resellerId: `reseller-${t}`, status: 'active' }));
+      await assertFails(updateDoc(ref, { status: 'active' }));
+      await assertFails(deleteDoc(ref));
+    }
   });
   for (const kind of ['anon', 'same-client', 'other-client', 'other-admin']) {
     test(`${t}: ${kind} cannot get or query available accounts`, async () => {

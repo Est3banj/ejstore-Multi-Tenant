@@ -39,5 +39,18 @@ export async function readCandidate() {
           isSuperadmin() ||
           (isAdmin() && isTenantAdminFor(get(/databases/$(database)/documents/services/$(serviceId)).data.tenantId))
         );`);
+  replaceOnce(`      allow get: if true;
+      allow list: if request.auth != null && (
+        isSuperadmin() ||
+        (isAdmin() && isTenantAdminFor(resource.data.tenantId)) ||
+        request.auth.uid == resource.data.resellerId
+      );
+      allow create: if request.auth != null && (
+        isSuperadmin() ||
+        request.auth.uid == request.resource.data.resellerId
+      );
+      allow update: if false;
+      allow delete: if isSuperadmin();`, `      // Bearer links are resolved/created exclusively through the server API.
+      allow read, write: if false;`);
   return rules;
 }

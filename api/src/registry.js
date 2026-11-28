@@ -1,5 +1,6 @@
 const {
   getPublicAccount,
+  createPublicLink,
   createAccountWithProfiles,
   updateTicketCredentials,
   adminUpdateTicket,
@@ -72,6 +73,7 @@ const FN_REGISTRY = {
   getUserRole: { auth: 'bearer', handler: getUserRoleHandler },
   createAdmin: { auth: 'bearer', handler: createAdmin },
   getPublicAccount: { auth: 'none', handler: getPublicAccount },
+  createPublicLink: { auth: 'bearer', handler: createPublicLink },
   getPublicStats: { auth: 'none', handler: getPublicStats },
   getStockAvailability: { auth: 'none', handler: getStockAvailability },
   getPurchaseCredentials: { auth: 'bearer', handler: getPurchaseCredentials },

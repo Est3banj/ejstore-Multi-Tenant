@@ -26,6 +26,9 @@ before(async () => {
     const batch = writeBatch(db);
     for (const tenant of tenants) {
       batch.set(doc(db, `services/service-${tenant}`), { tenantId: `tenant-${tenant}` });
+      batch.set(doc(db, `public_links/fictional-revoked-${tenant}`), {
+        tenantId: `tenant-${tenant}`, status: 'revoked', expiresAt: new Date('2000-01-01'), credential: credential(tenant, 'link'),
+      });
       for (const role of ['client', 'admin']) {
         batch.set(doc(db, `users/${role}-${tenant}`), {
           role: role === 'client' ? 'customer' : 'admin', tenantId: `tenant-${tenant}`,
@@ -68,6 +71,10 @@ async function expectCredential(db, tenant, status) {
 
 for (const tenant of tenants) {
   const other = tenant === 'a' ? 'b' : 'a';
+  test(`EXPOSURE: anonymous direct get ignores revoked/expired public link in ${tenant} (characterization ONLY)`, async () => {
+    const snapshot = await assertSucceeds(getDoc(doc(anonymous, `public_links/fictional-revoked-${tenant}`)));
+    assert.deepEqual(snapshot.data().credential, credential(tenant, 'link'));
+  });
   test(`EXPOSURE: anonymous get available in tenant ${tenant} returns email AND password`, async () => {
     await expectCredential(anonymous, tenant, 'available');
   });

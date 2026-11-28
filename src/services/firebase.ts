@@ -7,8 +7,10 @@ import {
   getAnalytics,
   isSupported,
   logEvent as firebaseLogEvent,
+  settings as analyticsSettings,
   type Analytics
 } from 'firebase/analytics';
+import { analyticsPrivacy, hasCapabilityParams } from './analyticsPrivacy';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -38,10 +40,15 @@ export const adminFunctions = getFunctions(adminApp, 'us-central1');
 // (SSR, algunos webviews) y nunca debe tirar. Sin VITE_FIREBASE_MEASUREMENT_ID
 // (dev/local sin GA) no se inicializa nada.
 let analytics: Analytics | null = null;
-if (import.meta.env.VITE_FIREBASE_MEASUREMENT_ID) {
+if (import.meta.env.VITE_FIREBASE_MEASUREMENT_ID && analyticsPrivacy?.allowed()) {
+  analyticsPrivacy.registerMeasurement(import.meta.env.VITE_FIREBASE_MEASUREMENT_ID);
+  (window as unknown as Record<string, unknown>).ejstoreGtag = analyticsPrivacy.gtag;
   isSupported()
     .then((supported) => {
-      if (supported) analytics = getAnalytics(app);
+      if (supported && analyticsPrivacy?.allowed()) {
+        analyticsSettings({ gtagName: 'ejstoreGtag' });
+        analytics = getAnalytics(app);
+      }
     })
     .catch(() => {});
 }
@@ -49,7 +56,7 @@ if (import.meta.env.VITE_FIREBASE_MEASUREMENT_ID) {
 // Wrapper seguro para el resto de la app: no-op si analytics no está
 // disponible y jamás lanza — GA4 nunca puede romper el flujo del usuario.
 export const logAnalyticsEvent = (name: string, params?: Record<string, unknown>): void => {
-  if (!analytics) return;
+  if (!analytics || !analyticsPrivacy?.allowed() || hasCapabilityParams(params)) return;
   try {
     firebaseLogEvent(analytics, name, params);
   } catch {
@@ -58,4 +65,3 @@ export const logAnalyticsEvent = (name: string, params?: Record<string, unknown>
 };
 
 export default app;
-

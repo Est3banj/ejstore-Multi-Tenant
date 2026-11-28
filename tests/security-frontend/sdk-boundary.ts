@@ -60,7 +60,8 @@ vi.mock('firebase/functions', async importOriginal => ({
   ...await importOriginal<any>(), getFunctions: app => ({ app }),
 }));
 vi.mock('firebase/analytics', () => ({
-  isSupported: sdk.supported, getAnalytics: app => ({ app }), logEvent: sdk.logEvent,
+  isSupported: sdk.supported, getAnalytics: vi.fn(app => ({ app })), logEvent: sdk.logEvent,
+  settings: vi.fn(),
 }));
 Object.defineProperty(window, 'matchMedia', { writable: true, value: () => ({ matches: false, addListener() {}, removeListener() {} }) });
 global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} } as any;

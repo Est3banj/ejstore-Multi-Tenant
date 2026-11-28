@@ -6,12 +6,14 @@ import { readCandidate } from './candidate.mjs';
 
 assert.deepEqual(process.argv.slice(2), ['--dry-run'], 'Only --dry-run is supported; this script cannot deploy or write rules');
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-const baseline = await readBaseline(); // Pins the historical fixture, NOT active/remote production rules.
+const baseline = await readBaseline(); // Pins the active file to the audited original.
 const candidate = await readCandidate();
 assert.notEqual(hash(candidate), hash(baseline));
 const paths = [
   'api/src/registry.js', 'api/src/app.js', 'api/src/middleware.js', 'api/src/config.js',
   'functions/availability.js', 'functions/services/stockAvailability.js', 'functions/services/purchaseCredentials.js',
+  'functions/accounts.js', 'functions/services/publicLinks.js', 'functions/services/inventoryService.js', 'functions/services/purchaseService.js',
+  'src/pages/public/VerCuenta.tsx', 'src/pages/reseller/MisClientes.tsx',
   'src/services/apiClient.ts', 'src/services/marketplace.ts', 'src/pages/Home.jsx', 'src/pages/Product.jsx',
   'src/pages/reseller/CatalogoMayorista.tsx', 'src/components/ServiceCard.tsx',
   'src/pages/customer/MisServicios.tsx', 'src/pages/customer/PurchaseResult.tsx',

@@ -1,10 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../../services/firebase';
+import { customCallable } from '../../services/apiClient';
 import type {
-  GetPublicAccountRequest,
   GetPublicAccountResponse,
 } from '../../types/marketplace';
 import {
@@ -22,6 +20,19 @@ const CASOS: { value: string; label: string }[] = [
 ];
 
 const VerCuenta = (): JSX.Element => {
+  useEffect(() => {
+    const existing = document.querySelector<HTMLMetaElement>('meta[name="referrer"]');
+    const meta = existing || document.createElement('meta');
+    const previous = existing?.getAttribute('content');
+    meta.name = 'referrer';
+    meta.content = 'no-referrer';
+    if (!existing) document.head.appendChild(meta);
+    return () => {
+      if (!existing) meta.remove();
+      else if (previous == null) meta.removeAttribute('content');
+      else meta.content = previous;
+    };
+  }, []);
   const { token: pathToken } = useParams<{ token: string }>();
   const [searchParams] = useSearchParams();
   const queryToken = searchParams.get('token');
@@ -47,11 +58,7 @@ const VerCuenta = (): JSX.Element => {
     setShowPreview(false);
 
     try {
-      const cf = httpsCallable<GetPublicAccountRequest, GetPublicAccountResponse>(
-        functions,
-        'getPublicAccount'
-      );
-      const res = await cf({ token });
+      const res = await customCallable<GetPublicAccountResponse>('getPublicAccount', { token });
 
       if (!res.data.success) {
         setError(res.data.error || 'Token inválido o expirado.');
@@ -337,7 +344,7 @@ const VerCuenta = (): JSX.Element => {
               </div>
 
               {/* Credenciales */}
-              {Object.keys(result.account.credential).length > 0 && (
+              {Object.keys(result.account.credential || {}).length > 0 && (
                 <div className="bg-gray-900/50 rounded-lg border border-gray-700/50 overflow-hidden">
                   <div className="px-4 py-2.5 border-b border-gray-700/50 text-sm font-medium text-gray-300 flex items-center gap-2">
                     <Key size={14} className="text-yellow-400" />

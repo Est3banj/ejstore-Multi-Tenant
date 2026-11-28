@@ -17,6 +17,7 @@ const SPEC_ROUTES = [
   { name: 'getUserRole', auth: 'bearer' },
   { name: 'createAdmin', auth: 'bearer' },
   { name: 'getPublicAccount', auth: 'none' },
+  { name: 'createPublicLink', auth: 'bearer' },
   { name: 'getPublicStats', auth: 'none' },
   { name: 'getStockAvailability', auth: 'none' },
   { name: 'getPurchaseCredentials', auth: 'bearer' },
@@ -79,11 +80,11 @@ describe('registry estructura', () => {
     }
   });
 
-  it('registry contiene exactamente 51 rutas callable (45 existentes + 6 Wompi autenticadas)', () => {
+  it('registry contiene exactamente 52 rutas callable (incluye creación privada de links)', () => {
     const registryNames = Object.keys(FN_REGISTRY).sort();
     const specNames = SPEC_ROUTES.map((r) => r.name).sort();
     expect(registryNames).toEqual(specNames);
-    expect(SPEC_ROUTES).toHaveLength(51);
+    expect(SPEC_ROUTES).toHaveLength(52);
   });
 
   it('auth-class de cada ruta coincide con la tabla del spec', () => {
@@ -106,10 +107,10 @@ describe('rutas 404 del dispatch', () => {
     }
   });
 
-  it('getPublicAccount (auth none) no es 404/501 — el handler corre y responde invalid-argument', async () => {
+  it('getPublicAccount no distingue token malformado de link no disponible', async () => {
     const res = await request(app).post('/api/getPublicAccount').send({ data: {} });
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('invalid-argument');
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe('not-found');
   });
 
   it('getPublicStats (auth none) — ruta registrada; 200 shape con handler stub', async () => {

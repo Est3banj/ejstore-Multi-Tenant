@@ -3,36 +3,14 @@ const { HttpsError } = require('./services/httpsError');
 const { generateVerificationCode } = require('./utils/crypto');
 const { notifyTicketResolvedOnce } = require('./services/notificationTriggers');
 const { getUserRole } = require('./auth');
+const { createPublicLinkHandlers } = require('./services/publicLinks');
+const { resolvePublicLink, createPublicLink } = createPublicLinkHandlers(db);
 
 const log = createModuleLogger('accounts');
 
 async function getPublicAccount(data, context) {
-  const { token } = data;
-  if (!token) {
-    throw new HttpsError('invalid-argument', 'Token es requerido');
-  }
-
   try {
-    const linkDoc = await db.collection('public_links').doc(token).get();
-
-    if (!linkDoc.exists) {
-      throw new HttpsError('not-found', 'Link no encontrado o inválido');
-    }
-
-    const link = linkDoc.data();
-    const ahora = Date.now();
-    const expira = link.expiresAt?.toMillis?.() || 0;
-
-    if (link.status !== 'active' || (expira > 0 && ahora > expira)) {
-      if (link.status === 'active') {
-        await linkDoc.ref.update({ status: 'expired', updatedAt: new Date().toISOString() });
-      }
-      return {
-        success: false,
-        error: 'Este link ha expirado. Contactá a tu vendedor para obtener uno nuevo.',
-        account: null,
-      };
-    }
+    const link = await resolvePublicLink(data);
 
     const svcName = (link.serviceName || '').toLowerCase();
     const codigo = generateVerificationCode(6);
@@ -134,8 +112,8 @@ async function getPublicAccount(data, context) {
       account: {
         serviceName: link.serviceName || 'Servicio',
         status: 'active',
-        createdAt: link.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-        expiresAt: link.expiresAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+        createdAt: link.createdAt,
+        expiresAt: link.expiresAt,
       },
       lastEmail: {
         subject: plantilla.subject,
@@ -147,7 +125,6 @@ async function getPublicAccount(data, context) {
     };
   } catch (error) {
     if (error instanceof HttpsError) throw error;
-    console.error('Error en getPublicAccount:', error);
     throw new HttpsError('internal', 'Error al obtener la cuenta');
   }
 }
@@ -393,4 +370,4 @@ async function adminUpdateTicket(data, context) {
   return { success: true };
 }
 
-module.exports = { getPublicAccount, createAccountWithProfiles, updateTicketCredentials, adminUpdateTicket };
+module.exports = { getPublicAccount, createPublicLink, createAccountWithProfiles, updateTicketCredentials, adminUpdateTicket };

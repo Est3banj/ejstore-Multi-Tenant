@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { access, mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { access, mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,6 +8,17 @@ import { fileURLToPath } from 'node:url';
 
 assert.equal(process.versions.node.split('.')[0], '22', 'Use Node 22');
 const dir = fileURLToPath(new URL('.', import.meta.url));
+const mode = process.argv[2];
+const stressModes = {
+  '--stress-wompi': { iterations: 10, count: 20, pattern: 'idempotent concurrent checkout|concurrent webhook retries' },
+  '--stress-wompi-checkout': { iterations: 20, count: 20, pattern: 'idempotent concurrent checkout' },
+  '--stress-wompi-scheduled': { iterations: 20, count: 20, pattern: 'scheduled concurrent checkout' },
+  '--stress-wompi-settlement': { iterations: 20, count: 20, pattern: 'concurrent webhook retries' },
+  '--stress-wompi-reconcile': { iterations: 20, count: 20, pattern: 'webhook and owner reconciliation race' },
+  '--stress-wompi-distinct': { iterations: 20, count: 20, pattern: 'different concurrent final keys' },
+};
+const stress = Object.hasOwn(stressModes, mode) ? stressModes[mode] : null;
+assert.ok(process.argv.length === 2 || (stress && process.argv.length === 3));
 const guard = fileURLToPath(new URL('../security-rules/loopback-only.cjs', import.meta.url));
 const cache = join(homedir(), '.cache/firebase/emulators');
 await access(join(cache, 'cloud-firestore-emulator-v1.20.4.jar'));
@@ -27,6 +38,7 @@ const env = {
   NODE_OPTIONS: `--require=${JSON.stringify(guard)}`,
   // Use the already locked isolated Express package, never root/API installs.
   NODE_PATH: join(dir, '../security-rules/node_modules'),
+  ...(stress ? { WOMPI_STRESS_ITERATIONS: String(stress.iterations) } : {}),
 };
 let child, timer;
 const stop = () => { if (child?.pid) { try { process.kill(-child.pid, 'SIGTERM'); } catch (e) { if (e.code !== 'ESRCH') throw e; } } };
@@ -45,7 +57,8 @@ try {
     },
   }));
   const command = [process.execPath, '--test', '--test-concurrency=1', '--test-timeout=90000', '--test-reporter=tap',
-    ...['recharges', 'purchases', 'admin', 'wompi'].map(name => join(dir, `${name}.test.cjs`))]
+    ...(stress ? [`--test-name-pattern=${stress.pattern}`] : []),
+    ...(stress ? ['wompi'] : ['recharges', 'purchases', 'admin', 'wompi']).map(name => join(dir, `${name}.test.cjs`))]
     .map(arg => `'${arg.replaceAll("'", "'\\''")}'`).join(' ');
   child = spawn('firebase', ['emulators:exec', '--only', 'firestore,auth', '--project', 'demo-ejstore-p0',
     '--config', join(scratch, 'firebase.json'), '--non-interactive', command], { cwd: scratch, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -54,13 +67,14 @@ try {
   child.stderr.on('data', chunk => process.stderr.write(chunk));
   timer = setTimeout(() => { console.error('P0 emulator gate exceeded 240 seconds'); stop(); }, 240000);
   const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('exit', resolve); });
+  if (code !== 0) console.error(await readFile(join(scratch, 'firestore-debug.log'), 'utf8'));
   assert.equal(code, 0, 'P0 emulator command failed');
-  for (const [key, count] of Object.entries({ tests: 75, pass: 75, fail: 0, cancelled: 0, skipped: 0, todo: 0 })) {
+  for (const [key, count] of Object.entries({ tests: stress ? stress.count : 78, pass: stress ? stress.count : 78, fail: 0, cancelled: 0, skipped: 0, todo: 0 })) {
     const values = [...output.matchAll(new RegExp(`^# ${key} (\\d+)\\r?$`, 'gm'))];
     assert.equal(values.length, 1, `Missing or ambiguous TAP summary: ${key}`);
     assert.equal(Number(values[0][1]), count, `Expected ${key} ${count}`);
   }
-  console.log('P0 + Wompi gate: 75/75 passed; no skipped/cancelled/todo tests.');
+  console.log(stress ? `Wompi stress: ${stress.count}/${stress.count} passed (${mode}).` : 'P0 + Wompi gate: 78/78 passed; no skipped/cancelled/todo tests.');
 } finally {
   clearTimeout(timer); stop(); process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', interrupt);
   await rm(scratch, { recursive: true, force: true });

@@ -1,8 +1,9 @@
-const { admin, db } = require('../config');
-const { generateSecureToken } = require('../utils/crypto');
+const { db } = require('../config');
+const { randomBytes } = require('node:crypto');
+const { linkRecord } = require('./publicLinks');
 
 function generateToken() {
-  return generateSecureToken(20);
+  return randomBytes(32).toString('hex');
 }
 
 function buildTicketCode(purchaseId, idx = 0) {
@@ -112,35 +113,22 @@ async function selectProfileInTransaction(transaction, profileCandidates) {
   return null;
 }
 
-async function createPublicLinks(serviceId, purchaseId, credentials, serviceName, resellerId = null, hasCodeExtraction = false) {
+async function createPublicLinks(serviceId, purchaseId, credentials, serviceName, resellerId = null, hasCodeExtraction = false, committedPurchase) {
   const linkTokens = [];
   if (!hasCodeExtraction) return linkTokens;
 
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const uniqueAccounts = [...new Map(
-    credentials.map(p => [p.credential.email || JSON.stringify(p.credential), p])
-  ).values()];
-
-  for (let i = 0; i < uniqueAccounts.length; i++) {
+  // Keep one link per purchased profile, including shared-parent profiles.
+  for (let i = 0; i < credentials.length; i++) {
     const token = generateToken();
-    const profile = uniqueAccounts[i];
-
-    await db.collection('public_links').doc(token).set({
-      token,
-      resellerId,
-      accountId: profile.profileId || '',
-      serviceId,
-      serviceName,
-      purchaseId,
-      accountIndex: i,
-      credential: profile.credential,
-      profileName: profile.profileName || null,
-      profilePin: profile.profilePin || null,
-      createdAt: now,
-      expiresAt,
-      status: 'active',
-    });
+    // Use references returned by the successful financial transaction. Fresh
+    // catalog/tenant reads here would introduce new post-debit failure paths.
+    // Public resolution still revalidates the live assignment on every lookup.
+    const row = committedPurchase.profiles ? committedPurchase.profiles[i] : committedPurchase;
+    const scope = { purchase: committedPurchase, tenantId: committedPurchase.tenantId,
+      serviceId, serviceName, accountId: row.accountId, profileId: row.profileId || null,
+      assignmentId: committedPurchase.profiles ? row.assignmentId : purchaseId };
+    await db.collection('public_links').doc(token).create(linkRecord(scope, purchaseId, i, now));
     linkTokens.push(token);
   }
 

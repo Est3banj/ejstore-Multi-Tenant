@@ -1,6 +1,6 @@
 const express = require('express');
 const { errorEnvelope } = require('./errors');
-const { corsMiddleware, errorMiddleware, verifyBearer } = require('./middleware');
+const { corsMiddleware, createPublicLookupLimiter, errorMiddleware, verifyBearer } = require('./middleware');
 const { FN_REGISTRY, EXCLUDED_ROUTES } = require('./registry');
 
 function createApp(registry = FN_REGISTRY, overrides = {}) {
@@ -10,12 +10,13 @@ function createApp(registry = FN_REGISTRY, overrides = {}) {
 
   app.use('/api/:fn', (req, res, next) => {
     // Include CORS, auth and JSON errors, not just successful secret delivery.
-    if (req.params.fn === 'getPurchaseCredentials' || /wompi/i.test(req.params.fn)) {
+    if (['getPurchaseCredentials', 'getPublicAccount', 'createPublicLink'].includes(req.params.fn) || /wompi/i.test(req.params.fn)) {
       res.setHeader('Cache-Control', 'private, no-store');
     }
     next();
   });
   app.use(corsMiddleware);
+  app.use(createPublicLookupLimiter());
   app.use(express.json({ limit: '1mb' }));
 
   app.get('/api/health', (req, res) => {
